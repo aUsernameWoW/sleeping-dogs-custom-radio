@@ -1,0 +1,21 @@
+{
+  "extraKnownMarketplaces": {
+    "claude-plugins-official": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/anthropics/claude-plugins-official.git"
+      }
+    },
+    "mrexodia": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/mrexodia/claude-marketplace.git"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "clangd-lsp@claude-plugins-official": true,
+    "microsoft-docs@claude-plugins-official": true,
+    "ida-pro-mcp@mrexodia": true
+  }
+}

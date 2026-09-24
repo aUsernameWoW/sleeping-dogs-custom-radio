@@ -1,0 +1,13 @@
+# The workflow pins actions to commit SHAs; Dependabot moves the pins (and their version comments) forward.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    # Give a new action release a week in the wild before proposing it.
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ['*']

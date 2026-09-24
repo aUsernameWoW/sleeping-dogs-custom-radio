@@ -1,0 +1,198 @@
+# Builds SDRadio.asi and runs the automated tests, the way tools\build.ps1 -Test does in the modding
+# workspace. The .vcxproj reads its third-party sources from ..\..\reference, so the job recreates that
+# layout: this repo in mods\SDRadio, MinHook in reference\minhook, dr_libs in reference\dr_libs, stb in
+# reference\stb. Every push to main that passes is then published as a prerelease.
+name: Build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
+  pull_request:
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # The commits reference\ is built from; together they key the reference\ cache.
+  # Upstream MinHook, compiled from source into the .asi.
+  MINHOOK_REF: c3fcafdc10146beb5919319d0683e44e3c30d537 # v1.3.4
+  # dr_mp3 0.7.4, dr_flac 0.13.4, dr_wav 0.14.6 (dr_libs has no per-library tags).
+  DR_LIBS_REF: dfe8377631000664666519fdb83da193fd8037f4
+  # stb_vorbis 1.22.
+  STB_REF: 2c980bb59875b0d32144a71867fbdebb2f77cd20
+
+jobs:
+  build:
+    name: Release x64
+    # The image windows-latest points to: Windows Server 2025, Visual Studio 2026 with the project's v143
+    # toolset (MSVC 14.44) installed alongside. Named explicitly: plain windows-2025 has been served both
+    # VS 2022 and VS 2026 images (actions/runner-images#14004).
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: mods/SDRadio
+    steps:
+      - name: Check out SDRadio
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: mods/SDRadio
+          persist-credentials: false
+
+      # reference\ only changes when a pin moves, so a hit skips the checkouts below.
+      - name: Restore reference\ from cache
+        id: reference
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: reference
+          key: reference-minhook-${{ env.MINHOOK_REF }}-drlibs-${{ env.DR_LIBS_REF }}-stb-${{ env.STB_REF }}
+
+      - name: Check out MinHook 1.3.4
+        if: steps.reference.outputs.cache-hit != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: TsudaKageyu/minhook
+          ref: ${{ env.MINHOOK_REF }}
+          path: reference/minhook
+          sparse-checkout: |
+            include
+            src
+          filter: blob:none
+          persist-credentials: false
+
+      # Single-file libraries: only the files the project compiles.
+      - name: Check out dr_libs
+        if: steps.reference.outputs.cache-hit != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: mackron/dr_libs
+          ref: ${{ env.DR_LIBS_REF }}
+          path: reference/dr_libs
+          sparse-checkout: |
+            dr_mp3.h
+            dr_flac.h
+            dr_wav.h
+          sparse-checkout-cone-mode: false
+          filter: blob:none
+          persist-credentials: false
+
+      - name: Check out stb
+        if: steps.reference.outputs.cache-hit != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: nothings/stb
+          ref: ${{ env.STB_REF }}
+          path: reference/stb
+          sparse-checkout: |
+            stb_vorbis.c
+          sparse-checkout-cone-mode: false
+          filter: blob:none
+          persist-credentials: false
+
+      # The build is warning-free at /W4 and should stay so, hence -warnAsError (CI only, not build.ps1).
+      - name: Build
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+          & "$vs\MSBuild\Current\Bin\amd64\MSBuild.exe" SDRadio.sln -p:Configuration=Release -p:Platform=x64 -v:m -nologo -warnAsError
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      # tests\*.cc are all compiled; *_test.cc run with the .asi path as argv[1] (exit 0 = pass).
+      - name: Test
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+          & "$vs\Common7\Tools\Launch-VsDevShell.ps1" -Arch amd64 -HostArch amd64 -SkipAutomaticLocation
+          $asi = (Resolve-Path build\Release\SDRadio.asi).Path
+          $out = (New-Item -ItemType Directory -Force build\tests).FullName
+          $failed = @()
+          foreach ($src in Get-ChildItem tests -Filter *.cc) {
+              Push-Location $out
+              cl /nologo /EHsc /W3 /std:c++20 /utf-8 $src.FullName
+              $compiled = $LASTEXITCODE -eq 0
+              Pop-Location
+              if (-not $compiled) { throw "Failed to compile $($src.Name)" }
+          }
+          foreach ($src in Get-ChildItem tests -Filter *_test.cc) {
+              Write-Host "== $($src.BaseName)"
+              # Run next to a private copy so the test writes its .ini/.log there, not in build\Release.
+              $sandbox = (New-Item -ItemType Directory -Force (Join-Path $out $src.BaseName)).FullName
+              Copy-Item $asi $sandbox -Force
+              & (Join-Path $out "$($src.BaseName).exe") (Join-Path $sandbox SDRadio.asi)
+              if ($LASTEXITCODE) { $failed += $src.BaseName }
+          }
+          if ($failed) { throw "Failed: $($failed -join ', ')" }
+
+      - name: Upload SDRadio.asi
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: SDRadio
+          path: |
+            mods/SDRadio/build/Release/SDRadio.asi
+            mods/SDRadio/build/Release/SDRadio.pdb
+          if-no-files-found: error
+
+  # Tag build-<N>, N = the commit's position on main (stable across re-runs). The assets keep their plain
+  # names so SDRadio.asi can go into plugins\ as downloaded.
+  prerelease:
+    name: Prerelease
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      # Full history and tags: the build number and the change list since the previous build.
+      - name: Check out history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download SDRadio.asi
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: SDRadio
+          path: dist
+
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          n=$(git rev-list --count HEAD)
+          tag="build-$n"
+          short=$(git rev-parse --short HEAD)
+          if gh release view "$tag" > /dev/null 2>&1; then
+            # A re-run of the same commit refreshes the assets; the same number on another commit means
+            # main was rewritten, which needs a person to sort out.
+            if [ "$(git rev-list -n 1 "refs/tags/$tag")" != "$GITHUB_SHA" ]; then
+              echo "::error::$tag already exists for another commit"
+              exit 1
+            fi
+            gh release upload "$tag" dist/SDRadio.asi dist/SDRadio.pdb THIRD-PARTY-NOTICES.md --clobber
+            exit 0
+          fi
+          prev=$(git describe --tags --abbrev=0 --match 'build-*' HEAD 2> /dev/null || true)
+          {
+            echo "Automatic build of $short on \`main\` ([CI run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)). Untested in game."
+            echo
+            echo "Copy \`SDRadio.asi\` into the game's \`plugins\` folder and your music into \`plugins\\SDRadio\`. \`SDRadio.pdb\` is only needed to read crash dumps."
+            echo
+            if [ -n "$prev" ]; then
+              echo "Changes since $prev:"
+              git log --format='- %s (%h)' "$prev..HEAD"
+            else
+              echo "Recent changes:"
+              git log -n 10 --format='- %s (%h)'
+            fi
+          } > notes.md
+          gh release create "$tag" dist/SDRadio.asi dist/SDRadio.pdb THIRD-PARTY-NOTICES.md --prerelease --target "$GITHUB_SHA" \
+            --title "SDRadio build $n ($short)" --notes-file notes.md
