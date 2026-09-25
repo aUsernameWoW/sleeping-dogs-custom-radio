@@ -11,7 +11,12 @@ service on the main path. Decoding is bundled (dr_libs, stb_vorbis), tags are pa
 Foundation and the shell property store are only a fallback for formats nothing bundled handles, and the
 log names the backend of each track.
 
-Status (2026-09-24): first build, all offline checks pass, **not yet run in game**.
+Status (2026-09-24): **works in game on Windows** (user: "works as expected"). First test log (two FLACs,
+48 and 44.1 kHz): all hooks found in the installed build, bank loads with result 1 (default pool -1) on every
+switch to the station, events play, a whole 3.5-min FLAC decodes in ~110 ms, longest read wait 47 ms (only
+at stream start), tracks alternate on end-of-track, and resuming the station starts mid-track (the game's
+`SeekMS(m_currentTrackTimer)`: the station "kept playing" meanwhile) without trouble. Not yet tried: MP3/OGG/
+M4A in game, Chinese titles on the HUD, Linux (Proton) and macOS (CrossOver/Wine).
 
 ## How it works
 
@@ -93,8 +98,7 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
 
 ## Plan
 
-1. First in-game test: station appears (HUD name/logo), bank loads (`bank: ... result 1`), tracks play
-   (`radio: post event ... playing`, `stream: open track`, decode times, read waits), next track on end.
-2. Then: own HUD logo (build a texture pack), long-track seek behavior (`SeekMS` on resume reads far ahead:
+1. First in-game test — **passed** 2026-09-24 (Windows).
+2. Next: Linux/macOS runs (the user has both), Chinese titles on the HUD, own HUD logo (build a texture pack), long-track seek behavior (`SeekMS` on resume reads far ahead:
    decode-to-position latency), Chinese titles on the HUD (font glyphs), Wine/Proton/CrossOver runs.
 3. Maybe: several stations (one per subfolder), shuffle/order option, M3U playlists.
