@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <vector>
 
 #include "tags.hh"
 
@@ -28,6 +29,10 @@ namespace decoder
 
 	// Reads format, length and tags without decoding the audio. False if no backend can open the file.
 	bool Probe(const std::wstring& path, Info& out);
+
+	// The embedded cover art (encoded, as stored) of a file a bundled decoder handles; false if there's none.
+	// Files only Media Foundation plays (M4A...) aren't read: their art comes from the folder instead.
+	bool ReadPicture(const std::wstring& path, std::vector<uint8_t>& out);
 
 	// Decodes from the start. `sink` gets interleaved stereo frames and returns false to stop early. `rate`
 	// receives the sample rate before the first frame. False on errors (what was delivered stays valid).

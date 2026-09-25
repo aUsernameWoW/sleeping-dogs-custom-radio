@@ -25,7 +25,11 @@
    - M4A/AAC、WMA 等：借助 Windows 的 Media Foundation，在 Wine/Proton 下是否可用取决于其版本。
    - 歌名和歌手取自文件标签（ID3、Vorbis comment），没有标签时用文件名；GBK 编码的老式中文标签也能识别。
 3. 开车时切台，新电台排在最后。台名、音乐文件夹和图标可在 `plugins\SDRadio.ini` 里修改。
-4. 出问题时请附上 `plugins\SDRadio.log`。
+4. 电台图标显示正在播放歌曲的封面：优先用音乐文件内嵌的封面（MP3、FLAC、OGG），否则找同一文件夹
+   （或上级文件夹，直到音乐文件夹）里的 `cover`/`folder`/`front`/`logo` 图片（jpg、png、bmp、gif）。
+   在音乐文件夹里放一张 `logo.png`，没有封面的歌就显示它。这个功能借用了 HKPD 警用频道的图标位置
+   （它只在警用扫描模式下出现，届时可能显示最后一张封面）；`CoverArt = 0` 可关闭。
+5. 出问题时请附上 `plugins\SDRadio.log`。
 
 ## English
 
@@ -50,6 +54,11 @@ Status: verified in game on Windows (FLAC); Linux / macOS (Proton, Wine, CrossOv
    - M4A/AAC, WMA and others: through Windows Media Foundation; under Wine/Proton it depends on the build.
    - Titles and artists come from the tags (ID3, Vorbis comments), else the file name.
 3. Switch stations while driving; the new one comes last. Name, folder and logo are in `plugins\SDRadio.ini`.
-4. When reporting a problem, attach `plugins\SDRadio.log`.
+4. The station logo shows the playing track's cover art: embedded in the file (MP3, FLAC, Ogg), else a
+   `cover`/`folder`/`front`/`logo` image (jpg, png, bmp, gif) in its folder or a parent up to the music
+   folder. A `logo.png` in the music folder shows for tracks without art. This takes over the HKPD
+   scanner's logo slot (only seen in cop-scanner mode, where it may then show the last cover);
+   `CoverArt = 0` turns it off.
+5. When reporting a problem, attach `plugins\SDRadio.log`.
 
 Third-party code and licenses: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

@@ -7,11 +7,14 @@
 #include <cstring>
 #include <mutex>
 #include <string>
-#include <unordered_set>
+#include <unordered_map>
 
 #include "ak.hh"
 #include "bank.hh"
 #include "config.hh"
+#include "cover.hh"
+#include "d3d.hh"
+#include "hud.hh"
 #include "library.hh"
 #include "log.hh"
 #include "radios.hh"
@@ -73,8 +76,9 @@ namespace hooks
 		std::string gPatchedXml;        // Radios.xml with our station, built once
 		uint32_t gStation = 0;
 		uint32_t gBankId = 0;
-		std::unordered_set<uint32_t> gEventIds;
+		std::unordered_map<uint32_t, uint32_t> gEventTracks; // play_station_<id>_track_<k> -> k
 		std::atomic<bool> gStationReady{ false };
+		bool gCoverArt = false; // configured, and the D3D hook is in
 
 		bool IsRadiosXml(const char* filename)
 		{
@@ -109,14 +113,14 @@ namespace hooks
 			gStation = radios::MaxStationId(original) + 1;
 			radios::Station station;
 			station.mName = gConfig.mStationName;
-			station.mTextureName = gConfig.mTextureName;
-			station.mTexturePack = gConfig.mTexturePack;
+			station.mTextureName = gCoverArt ? "Logo_HKPDScanner" : gConfig.mTextureName;
+			station.mTexturePack = gCoverArt ? "Radio_HKPDScanner_TexturePack" : gConfig.mTexturePack;
 			std::vector<streamio::TrackSource> sources;
 			for (const library::Track& t : *tracks) {
 				station.mTracks.push_back({ t.mArtist, t.mTitle });
 				const uint32_t k = static_cast<uint32_t>(sources.size() + 1);
 				sources.push_back({ bank::TrackFileId(gStation, k), t.mPath, t.mSampleRate, t.mFrames });
-				gEventIds.insert(bank::TrackEventId(gStation, k));
+				gEventTracks[bank::TrackEventId(gStation, k)] = k;
 			}
 
 			gPatchedXml = radios::Append(original, station, gStation);
@@ -130,6 +134,13 @@ namespace hooks
 			LOG("radios: station %u \"%s\" with %zu tracks, logo %s / %s; bank mus_radio_station_%u = %08X (%zu bytes)", gStation,
 				radios::TruncateUtf8(station.mName, 63).c_str(), sources.size(), station.mTextureName.c_str(), station.mTexturePack.c_str(), gStation,
 				gBankId, image.size());
+			if (gCoverArt) {
+				std::vector<std::wstring> paths;
+				for (const library::Track& t : *tracks) {
+					paths.push_back(t.mPath);
+				}
+				cover::Start(std::move(paths), gConfig.mMusicFolder);
+			}
 			streamio::Register(gBankId, std::move(image), std::move(sources));
 			return true;
 		}
@@ -213,8 +224,14 @@ namespace hooks
 		bool __fastcall CreateAndPlayEventHook(void* entity, uint32_t eventId, void* controller, const void* params, uint32_t fadeMs, void* externalSources)
 		{
 			const bool played = gCreateAndPlayEvent(entity, eventId, controller, params, fadeMs, externalSources);
-			if (gStationReady && gEventIds.count(eventId)) {
-				LOG("radio: post event %08X on entity %p: %s", eventId, entity, played ? "playing" : "FAILED");
+			if (!gStationReady) {
+				return played;
+			}
+			if (auto it = gEventTracks.find(eventId); it != gEventTracks.end()) {
+				LOG("radio: post event %08X (track %u) on entity %p: %s", eventId, it->second, entity, played ? "playing" : "FAILED");
+				if (played && gCoverArt) {
+					cover::Request(it->second);
+				}
 			}
 			return played;
 		}
@@ -276,5 +293,14 @@ namespace hooks
 		const bool diagnostics = Hook("BankLoadCallback", bankLoaded, &BankLoadCallbackHook, gBankLoadCallback) &
 			Hook("CreateAndPlayEvent", playEvent, &CreateAndPlayEventHook, gCreateAndPlayEvent);
 		LOG("hook: station hooks ready%s", diagnostics ? "" : " (diagnostic hooks missing)");
+
+		// Cover art needs the track starts, which CreateAndPlayEvent reports.
+		if (gConfig.mCoverArt && gCreateAndPlayEvent) {
+			// The Flash hook first: our texture without it would show as a white square.
+			gCoverArt = hud::Install("img://Logo_HKPDScanner") && d3d::Install();
+		}
+		else if (gConfig.mCoverArt) {
+			LOG("hook: no CreateAndPlayEvent hook, so no cover art");
+		}
 	}
 }

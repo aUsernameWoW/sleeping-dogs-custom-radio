@@ -154,10 +154,11 @@ This software is distributed without any warranty.
 See <http://creativecommons.org/publicdomain/zero/1.0/>.
 ```
 
-## stb_vorbis 1.22
+## stb_vorbis 1.22, stb_image 2.30, stb_image_resize2 2.18, stb_dxt 1.12
 
-https://github.com/nothings/stb (commit 2c980bb) — the Ogg Vorbis decoder, built from source. MIT or public
-domain, at the user's choice; SDRadio uses it under the MIT license.
+https://github.com/nothings/stb (commit 2c980bb) — the Ogg Vorbis decoder and, for the cover-art logo, the
+image decoder, resizer and DXT compressor, built from source. All four carry the license below: MIT or
+public domain, at the user's choice; SDRadio uses them under the MIT license.
 
 ```text
 This software is available under 2 licenses -- choose whichever you prefer.

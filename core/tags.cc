@@ -114,6 +114,110 @@ namespace tags
 		{
 			if (field.empty() && !value.empty()) field = std::move(value);
 		}
+
+		// APIC (2.3/2.4): encoding, MIME type (Latin-1, NUL-terminated), picture type, description (in the
+		// frame's encoding, NUL-terminated), image. PIC (2.2) has a 3-character format instead of the MIME type.
+		void ParsePictureFrame(const uint8_t* p, size_t n, bool v22, Tags& out)
+		{
+			if (!out.mWantPicture || n < 4) {
+				return;
+			}
+			const uint8_t encoding = p[0];
+			size_t at = 1;
+			if (v22) {
+				at += 3;
+			}
+			else {
+				while (at < n && p[at]) ++at;
+				++at;
+			}
+			if (at >= n) {
+				return;
+			}
+			const int type = p[at++];
+			if (encoding == 1 || encoding == 2) {
+				while (at + 1 < n && (p[at] || p[at + 1])) at += 2;
+				at += 2;
+			}
+			else {
+				while (at < n && p[at]) ++at;
+				++at;
+			}
+			if (at < n) {
+				AddPicture(type, p + at, n - at, out);
+			}
+		}
+	}
+
+	void AddPicture(int type, const uint8_t* data, size_t size, Tags& out)
+	{
+		if (!out.mWantPicture || size == 0) {
+			return;
+		}
+		if (out.mPictureType == kFrontCover || (out.mPictureType >= 0 && type != kFrontCover)) {
+			return;
+		}
+		out.mPicture.assign(data, data + size);
+		out.mPictureType = type;
+	}
+
+	void ParseFlacPicture(const uint8_t* p, size_t n, Tags& out)
+	{
+		if (!out.mWantPicture || n < 32) {
+			return;
+		}
+		const int type = static_cast<int>(Be32(p));
+		size_t at = 4;
+		for (int field = 0; field < 2; ++field) { // MIME type, description
+			if (at + 4 > n) return;
+			const uint32_t length = Be32(p + at);
+			at += 4;
+			if (length > n - at) return;
+			at += length;
+		}
+		if (at + 20 > n) {
+			return;
+		}
+		at += 16; // width, height, depth, palette size
+		const uint32_t size = Be32(p + at);
+		at += 4;
+		if (size <= n - at) {
+			AddPicture(type, p + at, size, out);
+		}
+	}
+
+	std::vector<uint8_t> Base64Decode(std::string_view text)
+	{
+		std::vector<uint8_t> out;
+		out.reserve(text.size() / 4 * 3);
+		uint32_t bits = 0;
+		int count = 0;
+		for (const char c : text) {
+			int v;
+			if (c >= 'A' && c <= 'Z') v = c - 'A';
+			else if (c >= 'a' && c <= 'z') v = c - 'a' + 26;
+			else if (c >= '0' && c <= '9') v = c - '0' + 52;
+			else if (c == '+') v = 62;
+			else if (c == '/') v = 63;
+			else if (c == ' ' || c == '\t' || c == '\r' || c == '\n') continue;
+			else break; // '=' padding or garbage
+			bits = bits << 6 | static_cast<uint32_t>(v);
+			if (++count == 4) {
+				out.push_back(static_cast<uint8_t>(bits >> 16));
+				out.push_back(static_cast<uint8_t>(bits >> 8));
+				out.push_back(static_cast<uint8_t>(bits));
+				bits = 0;
+				count = 0;
+			}
+		}
+		if (count == 3) {
+			out.push_back(static_cast<uint8_t>(bits >> 10));
+			out.push_back(static_cast<uint8_t>(bits >> 2));
+		}
+		else if (count == 2) {
+			out.push_back(static_cast<uint8_t>(bits >> 4));
+		}
+		return out;
 	}
 
 	std::string LegacyToUtf8(std::string_view bytes)
@@ -187,6 +291,9 @@ namespace tags
 			else if (id == "TPE2" || id == "TP2") {
 				Set(out.mAlbumArtist, DecodeText(p, n));
 			}
+			else if (id == "APIC" || id == "PIC") {
+				ParsePictureFrame(p, n, version == 2, out);
+			}
 			at += frameSize;
 		}
 	}
@@ -213,6 +320,18 @@ namespace tags
 		}
 		std::string key(comment.substr(0, eq));
 		for (char& c : key) c = static_cast<char>(c >= 'a' && c <= 'z' ? c - 'a' + 'A' : c);
+		if (key == "METADATA_BLOCK_PICTURE" || key == "COVERART") {
+			if (out.mWantPicture) {
+				const std::vector<uint8_t> raw = Base64Decode(comment.substr(eq + 1));
+				if (key == "COVERART") {
+					AddPicture(0, raw.data(), raw.size(), out); // the old convention: the bare image, type unknown
+				}
+				else {
+					ParseFlacPicture(raw.data(), raw.size(), out);
+				}
+			}
+			return;
+		}
 		const std::string value = Tidy(std::string(comment.substr(eq + 1)));
 		if (value.empty()) {
 			return;

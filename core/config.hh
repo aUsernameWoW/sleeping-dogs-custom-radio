@@ -10,7 +10,11 @@ struct Config
 	// Where the music is (subfolders included). Empty = the SDRadio folder next to the .asi.
 	std::wstring mMusicFolder;
 
-	// HUD logo: any station's texture from UI.big until the mod ships its own.
+	// HUD logo shows the playing track's cover art (see cover.hh, d3d.hh). Takes the HKPD scanner's logo slot
+	// and overrides the two settings below.
+	bool mCoverArt = true;
+
+	// HUD logo without cover art: any station's texture from UI.big.
 	std::string mTextureName = "Logo_Softly";
 	std::string mTexturePack = "Radio_Softly_TexturePack";
 

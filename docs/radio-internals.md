@@ -18,7 +18,8 @@ build is found by signature (see `core/hooks.cc`).
   ctor, `SetupIdentAsset`, then children `Tracks/Track(artist, name)` → `SetupTrackAsset(index from 1)`,
   `Ads count` → ad assets, `DJs/DJ(track1..3)`, `TextureName name`, `TexturePack name`. Stations are kept in
   `Radio::sm_stationList` in file order; `sm_numStations`.
-- The shipped file: 11 stations, ids 01-11 (11 = HKPD, `copScanner="true"`).
+- The shipped file: 11 stations, ids 01-11 (11 = HKPD, `copScanner="true"`). Read it with
+  `tools\extract.ps1 xml 'radios\.xml$' OUT` (the cache holds two identical copies).
 
 ## Playing
 
@@ -37,6 +38,38 @@ build is found by signature (see `core/hooks.cc`).
   a random asset of that type not in the recently played list.
 - HUD: `UIHKRadioStationWidget` reads the station list (`img://%s`, `Data\UI\%s.perm.bin`), shows
   `LocalizeText(m_name)` and `LocalizeText(GetCurrentlyPlayingSong())`.
+
+## The HUD logo
+
+- `UIHKRadioStationWidget::LoadTextures(old, new)` (0x1405f1870): if the new station's pack name differs
+  from `mLoadedTexturePack`, `UIScreenTextureManager::ReleaseTexturePack(old)` +
+  `QueueTexturePackLoad(new, TextureLoadedCallback)` and wait (`mWaitingForTexture`, 2 s timeout → empty
+  texture); same name → just refresh. `HandleNewSong` (0x1405eb540) only sets `mChanged`. `Update`
+  (0x140616710): `Deactivate` 4 s after the last input; on `mChanged` → `Flash_SetVisible`, then
+  `Flash_SetTexture(texture)` only if `mShouldRefreshTextures` (station change), `Flash_Intro` if it was
+  inactive, and always `Flash_SetSongTitle`/`Flash_SetStationName`. So a new song never re-shows the widget.
+- `Flash_SetTexture` → `mc_RadioStations.SetTexture("img://Logo_X")`. Screens\RadioStations.bin (UI.big) is a
+  `CFX` (zlib) GFx 8 movie, AS2 class `RadioStations`: `SetTexture` does `m_loader.loadClip(texture,
+  slot.holder)` (5 slots, center 2); `onLoadInit` sets `holder._height = 64; holder._width = 128`. The slot
+  sits on `Backing_9Slice_Metal_1`. Sprite 12 places `holder` (depth 1) with color transform mult (0,0,0,1)
+  add (255,255,255,0): whatever loads into it shows white with its own alpha, which is how the black logos
+  appear white in game (and why an untouched cover is a white square). Scaleform keeps a target clip's
+  transform across `loadClip`. Changing it at runtime: `Movie::Invoke` (0x1408e6de0, `mov rcx,[rcx+18h];
+  mov r10,[rcx]; jmp [r10+1C0h]`) → `ASMovieRootBase` vtable: `GetVariable` +0x188, `Invoke_2` +0x1C0;
+  `Value` (0x30: list node, `pObjectInterface` +0x10, `Type` +0x18, payload +0x20; VT_String 6,
+  VT_DisplayObject 10, managed bit 0x40) → `Value::ObjectInterface` vtable: `ObjectRelease` +0x10,
+  `GetCxform` +0x110, `SetCxform` +0x118 (`AS2ValueObjectInterface::SetCxform` also stops timeline moves
+  from overriding it). `Render::Cxform` = float[2][4], multiply row then add row, add in 0..1.
+- The pack's texture: `Illusion::TexturePlat::CreateResources` (0x140a18fc0) builds a D3D11 desc from the
+  Illusion texture (usage IMMUTABLE when there's initial data and no CPU access/UAV/RT flags; mips from the
+  resource, pixels contiguous in `mInitialImageData`/`mVRamHandle`) → `Illusion::CreateTexture` →
+  `ID3D11Device::CreateTexture2D`, SRV with a null desc. Scaleform wraps it with
+  `D3D1x::Texture::Initialize(ID3D11Texture2D*)` (0x140a0efe0), which takes size and mip count from
+  `GetDesc`.
+- All radio logos: 128×64 DXT5, 1 level, 8192 bytes. FNV-1a-64 of the blocks (installed build): HKPD scanner
+  `B3D3AD52833FA849`, Softly `D69A728F575CA4C2`, Kerrang `9C012F9F33FAF74E`
+  (`tools\extract.ps1 hash '^LOGO_'`; the movie and its AS2: `tools\extract.ps1 gfx 'Screens.RadioStations' OUT`).
+- The installed exe imports `D3D11CreateDevice` (d3d11.dll) and `CreateDXGIFactory1` (dxgi.dll).
 
 ## The station banks (SFX.pck)
 

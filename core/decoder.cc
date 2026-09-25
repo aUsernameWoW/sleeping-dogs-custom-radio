@@ -93,6 +93,11 @@ namespace decoder
 		private:
 			static void OnMeta(void* user, drflac_metadata* meta)
 			{
+				if (meta->type == DRFLAC_METADATA_BLOCK_TYPE_PICTURE && meta->data.picture.pPictureData) {
+					tags::AddPicture(static_cast<int>(meta->data.picture.type), meta->data.picture.pPictureData, meta->data.picture.pictureDataSize,
+						*static_cast<tags::Tags*>(user));
+					return;
+				}
 				if (meta->type != DRFLAC_METADATA_BLOCK_TYPE_VORBIS_COMMENT) {
 					return;
 				}
@@ -246,6 +251,17 @@ namespace decoder
 		}
 		out.mTags = {};
 		return mf::Probe(path, out);
+	}
+
+	bool ReadPicture(const std::wstring& path, std::vector<uint8_t>& out)
+	{
+		tags::Tags t;
+		t.mWantPicture = true;
+		if (!OpenBundled(path, &t, false)) {
+			return false;
+		}
+		out = std::move(t.mPicture);
+		return !out.empty();
 	}
 
 	bool Decode(const std::wstring& path, uint32_t& rate, const std::function<bool(const int16_t*, size_t)>& sink)

@@ -106,9 +106,14 @@
     <ClCompile Include="dllmain.cc" />
     <ClCompile Include="core\bank.cc" />
     <ClCompile Include="core\config.cc" />
+    <ClCompile Include="core\cover.cc" />
+    <ClCompile Include="core\cover_image.cc" />
+    <ClCompile Include="core\crash.cc" />
+    <ClCompile Include="core\d3d.cc" />
     <ClCompile Include="core\decoder.cc" />
     <ClCompile Include="core\decoder_mf.cc" />
     <ClCompile Include="core\hooks.cc" />
+    <ClCompile Include="core\hud.cc" />
     <ClCompile Include="core\library.cc" />
     <ClCompile Include="core\log.cc" />
     <ClCompile Include="core\radios.cc" />
@@ -116,7 +121,8 @@
     <ClCompile Include="core\stream_io.cc" />
     <ClCompile Include="core\tags.cc" />
   </ItemGroup>
-  <!-- The bundled decoders (dr_mp3/dr_flac/dr_wav, stb_vorbis; public domain / MIT-0), compiled as C. -->
+  <!-- The bundled decoders (dr_mp3/dr_flac/dr_wav, stb_vorbis) and image code (stb_image, stb_image_resize2,
+       stb_dxt); public domain / MIT-0 / MIT, compiled as C. -->
   <ItemGroup>
     <ClCompile Include="core\third_party.c;$(StbDir)stb_vorbis.c">
       <WarningLevel>TurnOffAllWarnings</WarningLevel>
@@ -133,8 +139,13 @@
     <ClInclude Include="core\ak.hh" />
     <ClInclude Include="core\bank.hh" />
     <ClInclude Include="core\config.hh" />
+    <ClInclude Include="core\cover.hh" />
+    <ClInclude Include="core\cover_image.hh" />
+    <ClInclude Include="core\crash.hh" />
+    <ClInclude Include="core\d3d.hh" />
     <ClInclude Include="core\decoder.hh" />
     <ClInclude Include="core\hooks.hh" />
+    <ClInclude Include="core\hud.hh" />
     <ClInclude Include="core\library.hh" />
     <ClInclude Include="core\log.hh" />
     <ClInclude Include="core\radios.hh" />

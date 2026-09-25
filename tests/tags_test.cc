@@ -1,6 +1,7 @@
 // Tag parsing (core/tags.cc) on hand-built tags: ID3v2.2/2.3/2.4 text frames in every encoding, the 2.4
-// data-length flag, whole-tag unsynchronisation, album artist as fallback, ID3v1, Vorbis comments, and
-// GBK text where the format declares none. Compiles tags.cc directly; argv[1] is unused.
+// data-length flag, whole-tag unsynchronisation, album artist as fallback, ID3v1, Vorbis comments, GBK text
+// where the format declares none, and cover art (APIC/PIC, FLAC PICTURE via base64). Compiles tags.cc
+// directly; argv[1] is unused.
 
 #include "../core/tags.cc"
 
@@ -130,6 +131,61 @@ int main()
 		tags::Finish(t);
 		Check(t.mTitle == "Night Drive", "Vorbis title");
 		Check(t.mArtist == "A; B", "Vorbis artists joined, album artist ignored");
+	}
+	{
+		// APIC (2.3): UTF-16 description (even-aligned double NUL), back cover first, then the front cover.
+		const Bytes back = Frame(3, "APIC", Bytes{ 0, 'i', 'm', 'a', 'g', 'e', '/', 'p', 'n', 'g', 0, 4, 'b', 0, 0xB1, 0xB2 });
+		const Bytes front = Frame(3, "APIC",
+			Bytes{ 1, 'i', 'm', 'a', 'g', 'e', '/', 'j', 'p', 'e', 'g', 0, 3, 0xFF, 0xFE, 'x', 0, 0, 0, 0xFF, 0xD8, 0xFF, 0xE0 });
+		Bytes frames = back;
+		frames.insert(frames.end(), front.begin(), front.end());
+		const Bytes tag = Tag(3, frames);
+
+		tags::Tags skipped;
+		tags::ParseId3v2(tag.data(), tag.size(), skipped);
+		Check(skipped.mPicture.empty(), "pictures ignored unless asked for");
+
+		tags::Tags t;
+		t.mWantPicture = true;
+		tags::ParseId3v2(tag.data(), tag.size(), t);
+		Check(t.mPictureType == tags::kFrontCover && t.mPicture == (Bytes{ 0xFF, 0xD8, 0xFF, 0xE0 }), "APIC front cover wins");
+	}
+	{
+		// PIC (2.2): 3-character format instead of a MIME type.
+		tags::Tags t;
+		t.mWantPicture = true;
+		const Bytes tag = Tag(2, Frame(2, "PIC", Bytes{ 0, 'P', 'N', 'G', 0, 'd', 0, 0x89, 'P', 'N', 'G' }));
+		tags::ParseId3v2(tag.data(), tag.size(), t);
+		Check(t.mPictureType == 0 && t.mPicture == (Bytes{ 0x89, 'P', 'N', 'G' }), "PIC read");
+	}
+	{
+		Check(tags::Base64Decode("TWFu") == Str("Man") && tags::Base64Decode("TWE=") == Str("Ma") && tags::Base64Decode("T Q==\n") == Str("M"),
+			"base64");
+
+		// METADATA_BLOCK_PICTURE: type 3, MIME "image/png", no description, 4 × u32, 3 bytes of data.
+		Bytes block{ 0, 0, 0, 3, 0, 0, 0, 9 };
+		Append(block, "image/png");
+		block.insert(block.end(), { 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 3, 7, 8, 9 });
+		static constexpr char kAlphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+		std::string encoded = "metadata_block_picture=";
+		for (size_t i = 0; i < block.size(); i += 3) {
+			const uint32_t v = block[i] << 16 | (i + 1 < block.size() ? block[i + 1] << 8 : 0) | (i + 2 < block.size() ? block[i + 2] : 0);
+			encoded += kAlphabet[v >> 18 & 63];
+			encoded += kAlphabet[v >> 12 & 63];
+			encoded += i + 1 < block.size() ? kAlphabet[v >> 6 & 63] : '=';
+			encoded += i + 2 < block.size() ? kAlphabet[v & 63] : '=';
+		}
+		tags::Tags t;
+		t.mWantPicture = true;
+		tags::AddVorbisComment(encoded, t);
+		tags::AddVorbisComment("TITLE=x", t);
+		Check(t.mPictureType == 3 && t.mPicture == (Bytes{ 7, 8, 9 }), "Vorbis METADATA_BLOCK_PICTURE");
+		Check(t.mTitle == "x", "comments after a picture still read");
+
+		tags::Tags truncated;
+		truncated.mWantPicture = true;
+		tags::ParseFlacPicture(block.data(), block.size() - 1, truncated);
+		Check(truncated.mPicture.empty(), "truncated PICTURE block rejected");
 	}
 	Check(tags::LegacyToUtf8("plain ascii  ") == "plain ascii", "ASCII trimmed");
 	Check(tags::LegacyToUtf8(kMoonUtf8) == kMoonUtf8, "UTF-8 passes");

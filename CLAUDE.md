@@ -7,9 +7,9 @@ bus/effect/volume RTPCs, pauses/ducks with the game. Started 2026-09-24 ("route 
 separate audio output). Long-form reverse-engineering notes are in `docs/radio-internals.md`.
 
 **Must also run under Wine/Proton/CrossOver** (Linux, macOS; the user tests on both): no Windows-only
-service on the main path. Decoding is bundled (dr_libs, stb_vorbis), tags are parsed by hand; Media
-Foundation and the shell property store are only a fallback for formats nothing bundled handles, and the
-log names the backend of each track.
+service on the main path. Decoding is bundled (dr_libs, stb_vorbis; stb_image for cover art), tags and
+embedded pictures are parsed by hand; Media Foundation and the shell property store are only a fallback
+for formats nothing bundled handles, and the log names the backend of each track.
 
 Status (2026-09-24): **works in game on Windows** (user: "works as expected"). First test log (two FLACs,
 48 and 44.1 kHz): all hooks found in the installed build, bank loads with result 1 (default pool -1) on every
@@ -18,9 +18,29 @@ at stream start), tracks alternate on end-of-track, and resuming the station sta
 `SeekMS(m_currentTrackTimer)`: the station "kept playing" meanwhile) without trouble. Not yet tried: MP3/OGG/
 M4A in game, Chinese titles on the HUD, Linux (Proton) and macOS (CrossOver/Wine).
 
+**Branch `abandoned/cover-art` (2026-09-25): shelved.** Cover art as the HUD logo (item 5 below). The user
+dropped it: the logo is only on screen for a few seconds after switching stations, not worth touching
+Scaleform internals for. What stands, from three in-game tests:
+
+- Works: the D3D side (texture caught on every switch, 512×256 cover created, covers decoded and uploaded
+  on the render thread), tags/pictures, `cover_image` (tested), the `crash.cc` diagnostics.
+- Test 1: white square: RadioStations.swf's PlaceObject paints the holder white (see hud.hh).
+- Test 2: the game died right at the first `SetTexture` after the swap, before any `hud:` line.
+- Test 3 (SEH guard + crash.cc): read AV at `0xFFFFFFFFFFFFFFFF` in `SDHDShip.exe+0x6EEF5E`, called straight
+  from `hud.cc`: that is inside `AS2ValueObjectInterface::GetCxform` (legacy 0x1406EF100, installed RVA
+  0x6EEF00), although both vtables match the legacy PDB slot for slot. The guard caught it, but swallowing a
+  fault inside Scaleform left it broken: 20 s later execution jumped to a stack address. So the Value /
+  GetCxform call contract is wrong somehow (next step would have been reading the dump,
+  `SDRadio-crash-1.dmp`, against the installed exe), and SEH guards around Scaleform are no fix.
+- Less invasive ideas not tried: skip GetCxform and only SetCxform a hard-coded original; or replace the
+  tint where it's defined (serve a patched RadioStations movie through the game's file layer, together with
+  our own texture pack instead of the HKPD slot).
+
 ## How it works
 
 The game's radio is data-driven end to end, so the mod adds data and serves files; no game logic is patched.
+The one addition outside that is the cover-art logo (5): D3D11 calls plus Scaleform's public Value API,
+no game code.
 
 1. **Station list** — `UFG::Radio::LoadRadioStationData` parses `Data\Audio\Radios.xml`, which lives
    LZ-compressed in `Global.big` → `data\global\xmlcache\XML_CacheList.bin` and is handed out by
@@ -41,6 +61,18 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
    flag on the transfer after Read returns).
 4. `TrackFinishCallback` (end of event) starts the next track; `GetNextTrack` picks randomly, avoiding
    recently played ones. Nothing mod-side.
+5. **Cover art as the logo** (`CoverArt = 1`, default; added 2026-09-25, see Status) — the
+   station borrows `Logo_HKPDScanner` / `Radio_HKPDScanner_TexturePack` (the cop scanner's, seen only in
+   scanner mode). `CreateAndPlayEvent` of our track k → `cover::Request(k)`: a worker takes the embedded
+   picture (APIC/PIC, FLAC PICTURE, Vorbis METADATA_BLOCK_PICTURE), else cover/folder/front/logo.* in the
+   track's folder or a parent up to the music folder, else blank, and makes a 512×256 BC3 image with mips
+   (`cover_image.cc`: stb_image → stb_image_resize2 → stb_dxt). `d3d.cc` patches the game's
+   `D3D11CreateDevice` import, then MinHooks the device's `CreateTexture2D` (recognizes the HKPD logo:
+   128×64 BC3, 1 level, FNV-1a-64 of its blocks `B3D3AD52833FA849`, and creates ours instead, DEFAULT usage)
+   and the immediate context's `PSSetShaderResources` (render thread: `UpdateSubresource` when the cover
+   generation changed). No game RVAs; ReShade/DXVK see ordinary D3D11 calls. `hud.cc` hooks Scaleform's
+   `Movie::Invoke` wrapper (signature): after `mc_RadioStations.SetTexture(t)` it sets the color transform
+   of `mc_RadioStations.slot.holder` to identity if `t` is our logo, else back to its original (read once).
 
 ## Files
 
@@ -56,12 +88,60 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   `core/decoder_mf.cc` — Media Foundation fallback (delay-loaded) with shell-property tags.
 - `core/tags.*` — ID3v2.2-2.4/ID3v1, Vorbis comments, RIFF INFO; legacy text: UTF-8, else GBK, else Latin-1.
 - `core/stream_io.*` — virtual files, decoder threads, completion thread.
-- `core/third_party.c` — dr_libs implementations (C, warnings off); `stb_vorbis.c` is compiled directly.
+- `core/cover_image.*` — picture → logo image (fit into the middle 256² square, transparent sides, BC3 mip
+  chain). Pure. `core/cover.*` — worker: which picture for which track, folder cache, generation counter.
+  `core/d3d.*` — the D3D11 hooks above. `core/hud.*` — the holder's color transform through Scaleform's
+  Value API (vtable offsets from the legacy PDB, in the header comment).
+- `core/crash.*` — vectored exception handler: logs the first 4 access violations (kind, address, stack as
+  module+offset) and writes the first 2 as `SDRadio-crash-<n>.dmp` next to the .asi (`tools\dump.ps1`).
+  Observes only; installed with logging on.
+- `core/third_party.c` — dr_libs and stb_image/stb_image_resize2/stb_dxt implementations (C, warnings off);
+  `stb_vorbis.c` is compiled directly.
 - `core/ak.hh` — Wwise low-level I/O structs (legacy PDB layouts). `core/scan.*`, `core/log.*` from SDAtmos.
 - `core/config.*` — `SDRadio.ini`, parsed as UTF-8 by hand (GetPrivateProfileString would read a BOM-less
   file as ANSI and mangle a Chinese station name or path).
 - Tests: `bank_test` (reads the bank back with ported Wwise readers; mixer params byte-identical to the
-  game's top node; writes `station12.bnk`), `radios_test`, `tags_test`, `load_test`.
+  game's top node; writes `station12.bnk`), `radios_test`, `tags_test` (also pictures), `cover_test`
+  (BMP → logo, decodes the BC3 back; includes stb by relative path since tests get no include paths),
+  `load_test`.
+
+## Reading SDRadio.log
+
+The user tests in game and sends `plugins\SDRadio.log`; every step leaves a line, so one round should tell
+where things stop. In order:
+
+| Line | Means | If it's missing or different |
+|---|---|---|
+| `scan: <function> at +0x…` (8×) | each signature found once | `0 matches` / `N matches`: the exe changed. Find the function again in IDA by the legacy name in `hooks.cc` and make a new signature (unique in both builds). |
+| `hook: station hooks ready` | Wwise + XML hooks in | `game functions missing, no station`: see above |
+| `d3d: D3D11CreateDevice import patched` | cover art armed | `CoverArt = 0`, or the import is gone |
+| `library: k  artist - title  (backend, Hz, s)`, `library: N tracks ready` | the music folder | `skipping …`: no decoder for the file |
+| `radios: station 12 "…" … logo Logo_HKPDScanner / …`, `radios: Radios.xml a -> b bytes` | station added to the list | `no music found`, or the scan took > 30 s |
+| `cover: station logo <path>` | a logo image in the music folder | optional |
+| `d3d: device … (flags …), context …; logo hooks ready` | once, at startup | **missing**: the game made its device before the .asi loaded, or not through its import; cover art can't work that way. `FAILED`: MinHook couldn't patch the method. |
+| `io: game streaming device …` | Wwise I/O working | |
+| `bank: mus_radio_station_12 loaded with result 1` | each switch to the station | result ≠ 1: bank rejected, see `bank_test` / docs |
+| `d3d: HKPD logo texture replaced: 512x256, 10 mips (cover #n)` | each switch to the station (the widget reloads the pack) | `128x64 BC3 texture … isn't the HKPD logo` lines instead: the logo's bytes changed; update `kLogoHash` from `tools\extract.ps1 hash '^LOGO_HKPD'`. Neither line: the pack didn't load (check the TextureName/TexturePack line above). |
+| `radio: post event … (track k) … playing` | the game starts track k | `FAILED`: event not in the loaded bank |
+| `stream: open track …`, `stream: … decoded … in … ms`, `stream: close … longest wait …` | the track's PCM | a long wait at start: decoding slower than playback started |
+| `cover: track k: embedded PNG, 1400x1400, ready in … ms` (or a folder file, or `none (blank logo)`) | the picture for track k | `doesn't decode`: a format stb_image lacks (WebP, 12-bit JPEG…); the folder is tried next |
+| `hud: holder's own color transform: mult 0.00 0.00 0.00 1.00, add 1.00 1.00 1.00 0.00` | first logo change after startup | other values: the movie changed; `GetCxform FAILED` / `not a display object`: the path or the Value API offsets are wrong |
+| `hud: logo untinted (cover art)` / `hud: logo tint restored` | each logo change (ours / another station's) | `SetCxform FAILED`: see above. White square although "untinted": something else re-tints the holder |
+| `crash: access violation (read/write/execute 0x…) at <module>+0x…`, `crash:   #n <module>+0x…`, `crash: dump written` | a fault (handled or not) | read the frames; open the dump with `tools\dump.ps1 plugins\SDRadio-crash-1.dmp` (needs the .pdb of that exact build) |
+| `hud: exception in the color-transform code …` | the SEH guard caught a fault in hud.cc | the `crash:` lines above it say where |
+| `d3d: logo updated to cover #n` | written into the texture on the render thread | missing after a `cover:` line: no `PSSetShaderResources` on the immediate context since (unlikely), or the texture doesn't exist yet (it's created with the latest picture then) |
+
+## Tools for re-deriving facts
+
+All in the workspace (`tools\extract.ps1`, reads the installed game's archives):
+
+- `xml 'radios\.xml$' OUTDIR` — the real Radios.xml from the XML cache (the cache holds it twice).
+- `hash '^LOGO_'` — size, mips and FNV-1a-64 of level 0 of the radio logos (what `d3d.cc` matches).
+- `gfx 'Screens.RadioStations' OUTDIR` — the widget's movie inflated plus an AS2 disassembly (`SetTexture`,
+  `onLoadInit`) and its placements (the holder's white-tint color transform).
+- `export '^LOGO_' OUTDIR` — the logos as PNG.
+- The legacy exe + PDB + IDA database are in `reference\SDmodding\game-itself` (ida-pro-mcp); addresses in
+  these docs are legacy ones, the signatures work on both builds.
 
 ## Design decisions (don't undo without reason)
 
@@ -78,6 +158,17 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
 - **Memory**: a track is one `new[]` of its PCM size (~42 MB for 4 min), committed as the decoder writes;
   freed when Wwise closes the stream.
 - The original Radios.xml buffer is leaked once (~20 KB): its free isn't reachable from the hook.
+- **Cover art by swapping pixels, not names**: the widget only re-reads the texture on a station switch
+  (`LoadTextures` reloads the pack only if its name changes; `HandleNewSong` just refreshes the title), but
+  Scaleform samples the same D3D texture every frame, so writing into it changes the logo at once. The
+  HKPD slot because a borrowed regular station's logo would also show our cover on that station (same
+  pack name → no reload). A texture pack of our own (served through the game's file layer) is the clean
+  successor.
+- **Untint the holder only for our logo**: the game's logos need the white tint (they're black), so the
+  holder's color transform is switched per `SetTexture`, not removed once.
+- **Bigger texture than the slot**: RadioStations.swf's `onLoadInit` sets the holder to 128×64 whatever the
+  image size, and `Scaleform::Render::D3D1x::Texture::Initialize` takes its size from `GetDesc`, so 512×256
+  just renders sharper.
 - IDs: bank `mus_radio_station_<id>`, files/sounds/actions `sdradio_station_%02u_*` (FNV-1); none collide with
   the 45k IDs in SFX.pck + English(US).pck (checked for station 12, tracks 1-255).
 
@@ -89,16 +180,24 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   `DetermineAssetType` returns track whenever rand(100) ≤ chanceTrack.
 - HUD: `UIHKRadioStationWidget::ReadStationList` → `img://<TextureName>`, `Data\UI\<TexturePack>.perm.bin`;
   station name and song title go through `UI::LocalizeText` (unknown strings expected to pass through).
+  Logos are 128×64 DXT5, black on transparent; RadioStations.swf places the holder clip with a color
+  transform mult (0,0,0,1) add (255,255,255,0), so they show white (and so would our cover: hence hud.cc).
+  It's in the PlaceObject tag, not the AS2: `tools\extract.ps1 gfx` lists placements with their cxforms.
+  The widget fades out 4 s after the last input and doesn't pop up on a new song. Details in
+  docs/radio-internals.md.
 - Wwise bank format v88 details (LoadSource, SetNodeBaseParams, action/event layouts) are in the bank.hh
   header comment and docs; streamed PCM requires `wFormatTag == 0xFFFE` (`CAkSrcFilePCM::ParseHeader`).
 - The game's banks declare feedback data (BKHD +12 = 1), so every node ends with a feedback-bus u32.
 - External sources exist only in dialogue banks (`dlg_external`); not used.
 - Signatures are unique in both builds (installed: ExtractFromCache +0x8A920, dispatcher Open +0x149B10,
-  deferred Read +0xA36270, package Close +0x143B60, BankLoadCallback +0x143190, CreateAndPlayEvent +0x143EE0).
+  deferred Read +0xA36270, package Close +0x143B60, BankLoadCallback +0x143190, CreateAndPlayEvent +0x143EE0;
+  Scaleform `Movie::Invoke` is unique in both too).
 
 ## Plan
 
 1. First in-game test — **passed** 2026-09-24 (Windows).
-2. Next: Linux/macOS runs (the user has both), Chinese titles on the HUD, own HUD logo (build a texture pack), long-track seek behavior (`SeekMS` on resume reads far ahead:
-   decode-to-position latency), Chinese titles on the HUD (font glyphs), Wine/Proton/CrossOver runs.
+2. Next: second in-game test of the cover-art logo (colors after the untint; does a track change update a
+   visible logo at once); Linux/macOS runs (the user has both); Chinese titles on the HUD (font
+   glyphs); long-track seek behavior (`SeekMS` on resume reads far ahead: decode-to-position latency).
+   Later: our own texture pack instead of the HKPD slot; M4A `covr` art; popping the widget up on a new song.
 3. Maybe: several stations (one per subfolder), shuffle/order option, M3U playlists.

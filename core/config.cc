@@ -25,8 +25,16 @@ namespace config
 			"; Music folder (subfolders included). Empty = the SDRadio folder next to the .asi.\n"
 			"MusicFolder =\n"
 			"\n"
-			"; 电台图标：暂时借用游戏里某个电台的图标。\n"
-			"; HUD logo, borrowed from one of the game's stations for now:\n"
+			"; 电台图标显示正在播放歌曲的封面：先找音乐文件内嵌的封面，再找它所在文件夹（及上级文件夹，\n"
+			"; 直到音乐文件夹）里的 cover/folder/front/logo.jpg/png；音乐文件夹里放一张 logo.png 就是电台自己的图标。\n"
+			"; 会占用 HKPD 警用频道的图标位置（只在警用扫描模式下出现），并忽略下面的 TextureName/TexturePack。\n"
+			"; HUD logo = the playing track's cover art: embedded, else cover/folder/front/logo.jpg/png in its\n"
+			"; folder or a parent up to the music folder (a logo.png in the music folder is the station's own logo).\n"
+			"; Uses the HKPD scanner's logo slot (seen only in cop-scanner mode) and ignores TextureName/TexturePack.\n"
+			"CoverArt = 1\n"
+			"\n"
+			"; CoverArt = 0 时的电台图标：借用游戏里某个电台的图标。\n"
+			"; HUD logo with CoverArt = 0, borrowed from one of the game's stations:\n"
 			";   Logo_H_Klub / Radio_H_Klub_TexturePack, Logo_WarpRecords / Radio_WarpRecords_TexturePack,\n"
 			";   Logo_NinjaTune / Radio_NinjaTune_TexturePack, Logo_RoadRunnerRecords / Radio_RoadRunnerRecords_TexturePack,\n"
 			";   Logo_RealFM / Radio_RealFM_TexturePack, Logo_Kerrang / Radio_Kerrang_TexturePack,\n"
@@ -121,6 +129,9 @@ namespace config
 		get("Station.TexturePack", gConfig.mTexturePack);
 		std::string folder;
 		get("Station.MusicFolder", folder);
+		if (auto it = values.find("Station.CoverArt"); it != values.end()) {
+			gConfig.mCoverArt = it->second != "0";
+		}
 		if (auto it = values.find("Debug.Logging"); it != values.end()) {
 			gConfig.mLogging = it->second != "0";
 		}
