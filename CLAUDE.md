@@ -56,6 +56,12 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   `core/decoder_mf.cc` — Media Foundation fallback (delay-loaded) with shell-property tags.
 - `core/tags.*` — ID3v2.2-2.4/ID3v1, Vorbis comments, RIFF INFO; legacy text: UTF-8, else GBK, else Latin-1.
 - `core/stream_io.*` — virtual files, decoder threads, completion thread.
+- `core/crash.*` — vectored exception handler (installed with logging on): logs the first 4 access
+  violations as `crash: access violation (read/write/execute 0x…) at <module>+0x…` plus the stack as
+  module+offset frames, and writes the first 2 as `SDRadio-crash-<n>.dmp` next to the .asi (open with
+  `tools\dump.ps1`, needs the .pdb of that exact build). Observes only; handlers after it still run. It also
+  catches the game's pre-existing exit crash (see the workspace CLAUDE.md), so one `crash:` block at exit is
+  expected. Came from the shelved `abandoned/cover-art` branch, where it pinned a fault in one round.
 - `core/third_party.c` — dr_libs implementations (C, warnings off); `stb_vorbis.c` is compiled directly.
 - `core/ak.hh` — Wwise low-level I/O structs (legacy PDB layouts). `core/scan.*`, `core/log.*` from SDAtmos.
 - `core/config.*` — `SDRadio.ini`, parsed as UTF-8 by hand (GetPrivateProfileString would read a BOM-less

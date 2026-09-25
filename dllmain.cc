@@ -3,6 +3,7 @@
 #include <string>
 
 #include "core/config.hh"
+#include "core/crash.hh"
 #include "core/hooks.hh"
 #include "core/library.hh"
 #include "core/log.hh"
@@ -35,6 +36,7 @@ BOOL WINAPI DllMain(HMODULE module, DWORD reason, LPVOID)
 
 		if (gConfig.mLogging) {
 			logger::Open(dir + L"\\SDRadio.log");
+			crash::Install(dir);
 		}
 
 		LOG("SDRadio loaded, music folder %s", logger::ToUtf8(gConfig.mMusicFolder.c_str()).c_str());

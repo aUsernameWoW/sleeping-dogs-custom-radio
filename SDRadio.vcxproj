@@ -106,6 +106,7 @@
     <ClCompile Include="dllmain.cc" />
     <ClCompile Include="core\bank.cc" />
     <ClCompile Include="core\config.cc" />
+    <ClCompile Include="core\crash.cc" />
     <ClCompile Include="core\decoder.cc" />
     <ClCompile Include="core\decoder_mf.cc" />
     <ClCompile Include="core\hooks.cc" />
@@ -133,6 +134,7 @@
     <ClInclude Include="core\ak.hh" />
     <ClInclude Include="core\bank.hh" />
     <ClInclude Include="core\config.hh" />
+    <ClInclude Include="core\crash.hh" />
     <ClInclude Include="core\decoder.hh" />
     <ClInclude Include="core\hooks.hh" />
     <ClInclude Include="core\library.hh" />
