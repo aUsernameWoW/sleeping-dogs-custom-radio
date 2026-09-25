@@ -1,5 +1,7 @@
 # Sleeping Dogs: Definitive Edition — custom radio station (SDRadio)
 
+[![Build](https://github.com/aUsernameWoW/sleeping-dogs-custom-radio/actions/workflows/build.yml/badge.svg)](https://github.com/aUsernameWoW/sleeping-dogs-custom-radio/actions/workflows/build.yml)
+
 [中文](#中文) | [English](#english)
 
 ## 中文
@@ -8,7 +10,7 @@
 切台时显示台名、图标和"歌手 - 歌名"，一首放完自动换下一首（随机、避开刚放过的），音量、车内电台效果、
 暂停和对话压低都和原版电台一致。
 
-状态：开发中，尚未在游戏内验证。
+状态：Windows 上已在游戏内验证（FLAC）；Linux / macOS（Proton、Wine、CrossOver）待测。
 
 ### 需求
 
@@ -32,7 +34,7 @@ radio system: name, logo and "artist - title" on the HUD when switching, the nex
 (random, avoiding recent ones), and volume, the car-radio effect, pausing and dialogue ducking behave like
 the original stations.
 
-Status: in development, not yet verified in game.
+Status: verified in game on Windows (FLAC); Linux / macOS (Proton, Wine, CrossOver) not yet tested.
 
 ### Requirements
 
