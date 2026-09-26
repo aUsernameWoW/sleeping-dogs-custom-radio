@@ -25,7 +25,7 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
 1. **Station list** — `UFG::Radio::LoadRadioStationData` parses `Data\Audio\Radios.xml`, which lives
    LZ-compressed in `Global.big` → `data\global\xmlcache\XML_CacheList.bin` and is handed out by
    `SimpleXML::XMLCache::ExtractFromCache` (hooked). The hook appends a `<Station>` (id = max + 1 = 12,
-   chanceTrack 100, no ads/DJs, borrowed logo) with one `<Track>` per music file and returns a buffer from
+   chanceTrack 100, no ads/DJs, our logo pack, see 5) with one `<Track>` per music file and returns a buffer from
    the game's own `qMalloc` (pugixml frees it). The HUD widget and station cycling follow automatically.
 2. **Bank** — `RadioStation` loads `mus_radio_station_<id>` (FNV-1 ID) and `Radio::Update` waits for
    `SoundBankManager::BankLoaded` before playing. The bank is generated at runtime (`core/bank.cc`) and
@@ -41,6 +41,16 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
    flag on the transfer after Read returns).
 4. `TrackFinishCallback` (end of event) starts the next track; `GetNextTrack` picks randomly, avoiding
    recently played ones. Nothing mod-side.
+5. **Logo** (`CustomLogo = 1`, default; 2026-09-26) — a UI texture pack of our own. At startup a thread
+   (`logo.cc`) takes `logo.png` from the music folder, else the built-in `art/logo_512.png` (resource
+   `LOGO`, `SDRadio.rc`), makes the silhouette the HUD shows (`logo_image.cc`: alpha, or luminance against
+   the border for opaque pictures; 512×256 BC3, 7 mips) and writes it as `SDRadio-logo.perm.bin` /
+   `.temp.bin` next to the .asi (`logo_pack.cc`, only if changed). Radios.xml names texture `Logo_SDRadio`
+   in pack `..\..\plugins\SDRadio-logo` (the .asi folder relative to the game folder), so the widget loads
+   `Data\UI\..\..\plugins\SDRadio-logo.perm.bin`: no archive has that path, so the game reads the loose
+   files (see Facts). No hooks at all. With `CustomLogo = 0`, or if the pack can't be written (the .asi
+   outside the game folder or in a non-ASCII path, a write error), the station borrows `TextureName` /
+   `TexturePack` (a game station's logo).
 
 ## Files
 
@@ -62,12 +72,21 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   `tools\dump.ps1`, needs the .pdb of that exact build). Observes only; handlers after it still run. It also
   catches the game's pre-existing exit crash (see the workspace CLAUDE.md), so one `crash:` block at exit is
   expected. Came from the shelved `abandoned/cover-art` branch, where it pinned a fault in one round.
-- `core/third_party.c` — dr_libs implementations (C, warnings off); `stb_vorbis.c` is compiled directly.
+- `core/logo.*` — which picture (music folder's `logo.png`, else the `LOGO` resource), the pack's path
+  relative to the game folder, writing the pack; a thread from DllMain, which the Radios.xml hook waits for
+  (≤ 10 s). `core/logo_image.*` — PNG → silhouette → 512×256 BC3 mip chain. `core/logo_pack.*` — the
+  perm.bin/temp.bin bytes, the game's name hash and resource-file UID. Both pure. `SDRadio.rc` embeds
+  `art/logo_512.png`.
+- `core/third_party.c` — dr_libs and stb_image (PNG only) / stb_image_resize2 / stb_dxt implementations
+  (C, warnings off); `stb_vorbis.c` is compiled directly.
 - `core/ak.hh` — Wwise low-level I/O structs (legacy PDB layouts). `core/scan.*`, `core/log.*` from SDAtmos.
 - `core/config.*` — `SDRadio.ini`, parsed as UTF-8 by hand (GetPrivateProfileString would read a BOM-less
   file as ANSI and mangle a Chinese station name or path).
 - Tests: `bank_test` (reads the bank back with ported Wwise readers; mixer params byte-identical to the
-  game's top node; writes `station12.bnk`), `radios_test`, `tags_test`, `load_test`.
+  game's top node; writes `station12.bnk`), `radios_test`, `tags_test`, `load_test` (also: the pack is
+  written, one folder down from the test's "game folder"), `logo_test` (the `LOGO` resource of the built
+  .asi decodes to 7 BC3 levels whose alpha matches the PNG; the pack's fields; the UID functions against
+  5 game packs; opaque pictures, fitting; includes stb by relative path since tests get no include paths).
 - `.github/workflows/build.yml` — CI like SDIMEFix's (documented in `mods\SDIMEFix\CLAUDE.md`), without the
   Nexus job (no Nexus page yet; copy SDIMEFix's `nexus` job and `nexus-release.yml` when there is one). The
   `package` job builds `SDRadio.zip` for players: Ultimate ASI Loader as `dinput8.dll` (pinned in
@@ -76,7 +95,19 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   an audio extension). Prereleases attach it under its plain name for README.md's
   `releases/latest/download/SDRadio.zip` link. `reference.yml` (also SDIMEFix's) proposes newer pins in
   `.github/reference.env`: MinHook by release tag, dr_libs and stb by commits that change the files we compile
-  (the decoders read player-supplied files, so their fixes matter).
+  (the decoders read player-supplied files, so their fixes matter). The `reference\` cache key includes the
+  hash of `reference.env`, so adding a file to a `_FILES` list (and to the sparse checkout) refetches.
+- `art/` — the station logo **私家台** (neon tubes; 私家 as in 私家車, the player's own car and music), final
+  2026-09-26; `logo_512.png` is embedded as the default logo, so rerun `neon.py` before building after a
+  change to it. `neon.py` generates `logo.svg` from tube skeletons (traced over Noto Sans SC
+  Bold; straight glass with fixed-radius bends; ends marked 'S'/'E' stop a GAP short of the tube in front,
+  branches and crossings join; equal letter gaps; reports hairline slits, keep that empty) and renders it
+  through `render.py`: `logo_512.png`, `logo_128.png` (black RGB, alpha = coverage, the game's logo
+  convention: the HUD tints logos white, so only alpha shows; the glow is a soft alpha fringe) and
+  `build\logo_preview.png` (the logo at 3x plus a mock of the RadioStations widget, with the metal backing
+  from the workspace's `extracted\` if present). `neon.py debug` overlays each character on the Noto glyph.
+  Needs Pillow and Edge/Chrome (headless screenshots): `..\..\tools\extract\build\venv\Scripts\python.exe
+  art\neon.py` from the mod folder.
 - `README.md` — for players with no modding experience (step-by-step install, where the music goes, FAQ incl.
   the Proton launch option); keep build/internals out of it. `ADVANCED.md` — everything else (how it works,
   formats/backends, downloads, settings table, building, CI). Both bilingual (Chinese first).
@@ -98,15 +129,39 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
 - The original Radios.xml buffer is leaked once (~20 KB): its free isn't reachable from the hook.
 - IDs: bank `mus_radio_station_<id>`, files/sounds/actions `sdradio_station_%02u_*` (FNV-1); none collide with
   the 45k IDs in SFX.pck + English(US).pck (checked for station 12, tracks 1-255).
+- **Logo as a texture pack of our own, not a borrowed slot**: a first version (2026-09-26, worked in game)
+  swapped the HKPD scanner's logo texture in `ID3D11Device::CreateTexture2D`, but the HKPD station is a
+  regular choice in any police car (and players get one from the story), so it showed our logo too. The
+  pack needs no hooks at all and borrows nothing. Don't go back to a D3D swap.
+- **Pack files next to the .asi, reached with `..\..\`**, not in the game's `Data\UI`: the mod's files stay
+  in `plugins\`. Rewritten only when their bytes change.
+- **Silhouette only, no color**: the holder's white tint is in RadioStations.swf's PlaceObject; untinting it
+  through Scaleform's Value API crashed on the cover-art branch. The user chose white-only (2026-09-26).
+- **Bigger texture than the slot**: `onLoadInit` sets the holder to 128×64 whatever the image size, and
+  Scaleform takes the size from the D3D texture, so 512×256 just renders sharper.
 
 ## Facts established (legacy addresses; see docs/radio-internals.md)
 
 - Stations: `RadioStation` 0x170 bytes, `m_name` char[64] (qSPrintf, unbounded → we cut to 63), `m_id` +0x24,
-  `m_bankId` +0x118 (`mus_radio_station_%d`), `m_bIsCopScannerStation` +0x169 (HKPD, id 11, scanner mode only).
+  `m_bankId` +0x118 (`mus_radio_station_%d`), `m_bIsCopScannerStation` +0x169 (HKPD, id 11: selectable in police cars).
 - Asset kinds: track (`play_station_%02u_track_%02u`), DJ, ad, ident (`play_station_%02u_ident`);
   `DetermineAssetType` returns track whenever rand(100) ≤ chanceTrack.
 - HUD: `UIHKRadioStationWidget::ReadStationList` → `img://<TextureName>`, `Data\UI\<TexturePack>.perm.bin`;
   station name and song title go through `UI::LocalizeText` (unknown strings expected to pass through).
+  Logos are 128×64 DXT5, black on transparent; RadioStations.swf places the holder clip with a color
+  transform mult (0,0,0,1) add (255,255,255,0), so they show white. The widget sits on
+  `Backing_9Slice_Metal_1`: logo at (0,0), name at (140,6), title at (140,30.4); it fades out 4 s after the
+  last input. `tools\extract.ps1 gfx 'Screens.RadioStations'` shows the placements and cxforms.
+- UI texture packs (legacy names): `UIHKRadioStationWidget::LoadTextures` → `UIScreenTextureManager::
+  QueueTexturePackLoad("Data\UI\<pack>.perm.bin")` → `DataStreamer::QueueStream` → `OpenFiles` opens it and
+  the `temp.bin` of the same name through `StreamFileWrapper::Open`: `BigFileSystem::GetFileInfoFromBigFile`
+  (hash of the path), else `qOpen` → `PCFileDevice::FileOpen` → `CreateFileA` (loose file, relative to the
+  game folder). `LoadStreamResources` registers the loaded temp.bin under `GenerateResourceFileUID(Texture,
+  path)` = CRC-upper of the path from its last `data\` without slashes, seeded with the hash of
+  `Illusion:Texture:`; `TexturePlat::OnLoad` finds the pixels by the texture's `mTextureDataHandle` UID
+  (+0xB0) and `mImageDataPosition`. `img://<name>` resolves by `qStringHashUpper32(name)` (case-insensitive).
+  Every UI texture has 1 mip, alpha state `A3833FDE`, and the same constant words (`logo_pack.cc`);
+  mipmapped game textures pack levels tightly down to a 4-pixel side. `logo_test` has the verified UIDs.
 - Wwise bank format v88 details (LoadSource, SetNodeBaseParams, action/event layouts) are in the bank.hh
   header comment and docs; streamed PCM requires `wFormatTag == 0xFFFE` (`CAkSrcFilePCM::ParseHeader`).
 - The game's banks declare feedback data (BKHD +12 = 1), so every node ends with a feedback-bus u32.
@@ -117,6 +172,8 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
 ## Plan
 
 1. First in-game test — **passed** 2026-09-24 (Windows).
-2. Next: Linux/macOS runs (the user has both), Chinese titles on the HUD, own HUD logo (build a texture pack), long-track seek behavior (`SeekMS` on resume reads far ahead:
-   decode-to-position latency), Chinese titles on the HUD (font glyphs), Wine/Proton/CrossOver runs.
-3. Maybe: several stations (one per subfolder), shuffle/order option, M3U playlists.
+2. Own HUD logo (5) — **passed** 2026-09-26 (Windows, with FileRedirector.asi installed: no conflict): 私家台
+   on our station, HKPD keeps its own. A player `logo.png` in game not yet tried (the code path is tested).
+3. Next: Linux/macOS runs (the user has both; Wine/Proton/CrossOver), Chinese titles on the HUD (font
+   glyphs), long-track seek behavior (`SeekMS` on resume reads far ahead: decode-to-position latency).
+4. Maybe: several stations (one per subfolder), shuffle/order option, M3U playlists.

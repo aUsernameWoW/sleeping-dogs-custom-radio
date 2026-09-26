@@ -14,6 +14,7 @@
 #include "config.hh"
 #include "library.hh"
 #include "log.hh"
+#include "logo.hh"
 #include "radios.hh"
 #include "scan.hh"
 #include "stream_io.hh"
@@ -109,8 +110,10 @@ namespace hooks
 			gStation = radios::MaxStationId(original) + 1;
 			radios::Station station;
 			station.mName = gConfig.mStationName;
-			station.mTextureName = gConfig.mTextureName;
-			station.mTexturePack = gConfig.mTexturePack;
+			// Our logo's texture pack, written at startup (long done by now); without one, a game station's logo.
+			const std::string pack = gConfig.mCustomLogo ? logo::Wait(10'000) : std::string();
+			station.mTextureName = pack.empty() ? gConfig.mTextureName : logo::kTextureName;
+			station.mTexturePack = pack.empty() ? gConfig.mTexturePack : pack;
 			std::vector<streamio::TrackSource> sources;
 			for (const library::Track& t : *tracks) {
 				station.mTracks.push_back({ t.mArtist, t.mTitle });

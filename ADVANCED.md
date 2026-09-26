@@ -19,6 +19,9 @@
 3. **音频流**：hook Wwise 的底层文件 I/O，把我们的文件 ID 变成虚拟文件：bank 本身，或者每首歌实时解码成的
    16 位立体声 WAV。
 4. 一首结束后由游戏自己的逻辑随机挑下一首。
+5. **图标**：mod 启动时把图标做成游戏格式的 UI 贴图包，写成 `.asi` 旁边的 `SDRadio-logo.perm.bin` 和
+   `.temp.bin`，电台列表里写上这个包的相对路径。游戏的归档里没有这个路径，就会从磁盘读取，和加载自带电台的
+   图标完全一样，不需要任何 hook，也不占用别的电台的图标。见下面的[自定义图标](#自定义图标)。
 
 实现细节和逆向笔记见 [CLAUDE.md](CLAUDE.md) 和 [docs/radio-internals.md](docs/radio-internals.md)（英文）。
 
@@ -60,8 +63,22 @@ CrossOver）待测。
 | --- | --- | --- | --- |
 | `[Station]` | `Name` | `SDRADIO` | 切台时显示的台名，最多 63 字节 |
 | `[Station]` | `MusicFolder` | 空 | 音乐文件夹；空 = `.asi` 旁边的 `SDRadio`，相对路径相对于 `plugins` |
-| `[Station]` | `TextureName`, `TexturePack` | `Logo_Softly`, `Radio_Softly_TexturePack` | HUD 图标，暂时借用游戏里某个电台的（可选值见 ini 注释） |
+| `[Station]` | `CustomLogo` | 1 | HUD 图标：1 = 音乐文件夹里的 `logo.png`，没有就用自带的「私家台」；0 = 借用下面的游戏图标 |
+| `[Station]` | `TextureName`, `TexturePack` | `Logo_Softly`, `Radio_Softly_TexturePack` | `CustomLogo = 0` 时借用的游戏电台图标（可选值见 ini 注释） |
 | `[Debug]` | `Logging` | 1 | 写 `SDRadio.log`，出错时记录调用栈并写 `SDRadio-crash-<n>.dmp` |
+
+### 自定义图标
+
+把 PNG 命名为 `logo.png` 放进音乐文件夹（默认 `plugins\SDRadio`），重启游戏生效；删掉就回到自带的「私家台」。
+
+- HUD 会把所有电台图标染成白色（原版的彩色图标也一样），所以只有**透明度**会显示：不透明的部分是白色，半透明
+  的部分是半透明的白（可以做光晕），颜色会被忽略；
+- 比例 2:1，推荐 512×256；其他尺寸会等比缩放进 512×256 并居中，不裁切（每边最多 16384 像素）；
+- 没有透明背景的图会自动转成剪影：与图片边缘的明暗差越大越不透明，所以白纸上的黑色图案、黑底上的白色图案都可以；
+- 可以参考自带图标 [`art/logo_512.png`](art/logo_512.png)，它由 [`art/neon.py`](art/neon.py) 生成。
+- 日志里的 `logo:` 行写明用了哪张图、从透明度还是明暗得到的剪影，以及贴图包是否写好；
+- `.asi` 必须在游戏文件夹里面（通常是 `plugins\`），而且路径只含英文字符，游戏才能读到贴图包；否则电台借用
+  `TextureName` / `TexturePack` 指定的游戏图标，日志里会说明原因。
 
 ### 编译
 
@@ -93,6 +110,10 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
 3. **Streams**: Wwise's low-level file I/O is hooked; our file IDs become virtual files: the bank, or each
    track decoded on the fly into a 16-bit stereo WAV.
 4. At the end of a track the game's own logic picks the next one at random.
+5. **Logo**: at startup the mod turns the logo into a UI texture pack in the game's format,
+   `SDRadio-logo.perm.bin` and `.temp.bin` next to the `.asi`, and the station list names that pack by a
+   relative path. No archive has that path, so the game reads the files from disk, just as it loads its own
+   stations' logos: no hooks, and no other station's logo is touched. See [Custom logo](#custom-logo) below.
 
 Details and reverse-engineering notes: [CLAUDE.md](CLAUDE.md) and
 [docs/radio-internals.md](docs/radio-internals.md).
@@ -138,8 +159,27 @@ If you already have an ASI loader, just put `SDRadio.asi` where it loads plugins
 | --- | --- | --- | --- |
 | `[Station]` | `Name` | `SDRADIO` | Station name on the HUD, at most 63 bytes |
 | `[Station]` | `MusicFolder` | empty | Music folder; empty = `SDRadio` next to the `.asi`, relative paths are relative to `plugins` |
-| `[Station]` | `TextureName`, `TexturePack` | `Logo_Softly`, `Radio_Softly_TexturePack` | HUD logo, borrowed from one of the game's stations for now (choices in the ini's comments) |
+| `[Station]` | `CustomLogo` | 1 | HUD logo: 1 = `logo.png` from the music folder, else SDRadio's own (私家台); 0 = the game logo below |
+| `[Station]` | `TextureName`, `TexturePack` | `Logo_Softly`, `Radio_Softly_TexturePack` | With `CustomLogo = 0`, the game station logo to borrow (choices in the ini's comments) |
 | `[Debug]` | `Logging` | 1 | Write `SDRadio.log`; on a crash, log the stack and write `SDRadio-crash-<n>.dmp` |
+
+### Custom logo
+
+Name a PNG `logo.png` and put it into the music folder (`plugins\SDRadio` by default), then restart the
+game; delete it to get SDRadio's own logo (私家台) back.
+
+- The HUD tints every station logo white (the game's colored ones too), so only **transparency** shows:
+  opaque parts are white, translucent parts translucent white (a glow works), colors are ignored;
+- 2:1, 512×256 recommended; other sizes are scaled into 512×256 and centered, never cropped (at most 16384
+  pixels a side);
+- a picture without transparency becomes a silhouette of what differs from its border in brightness, so
+  black on white paper and white on black both work;
+- SDRadio's own logo is [`art/logo_512.png`](art/logo_512.png), made by [`art/neon.py`](art/neon.py).
+- The log's `logo:` lines name the picture used, whether the silhouette came from its transparency or its
+  brightness, and whether the pack was written;
+- the `.asi` must be inside the game folder (usually `plugins\`) in a path of English characters for the game
+  to read the pack; otherwise the station borrows the game logo named by `TextureName` / `TexturePack`, and the
+  log says why.
 
 ### Building
 

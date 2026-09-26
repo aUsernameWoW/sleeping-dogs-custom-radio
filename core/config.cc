@@ -25,8 +25,17 @@ namespace config
 			"; Music folder (subfolders included). Empty = the SDRadio folder next to the .asi.\n"
 			"MusicFolder =\n"
 			"\n"
-			"; 电台图标：暂时借用游戏里某个电台的图标。\n"
-			"; HUD logo, borrowed from one of the game's stations for now:\n"
+			"; 电台图标：音乐文件夹里有 logo.png 就用它，否则用 SDRadio 自带的「私家台」（每次启动写成 .asi 旁边的\n"
+			"; SDRadio-logo.perm.bin / .temp.bin）。游戏会把电台图标染成白色，只有形状（透明度）会显示：\n"
+			"; 请用透明背景、2:1（如 512x256）的 PNG。0 = 改用下面借来的游戏图标。\n"
+			"; HUD logo: logo.png from the music folder if there is one, else SDRadio's own (written at each start as\n"
+			"; SDRadio-logo.perm.bin / .temp.bin next to the .asi). The game tints station logos white, so only the\n"
+			"; shape (transparency) shows: use a 2:1 PNG (e.g. 512x256) with a transparent background.\n"
+			"; 0 = the game logo below.\n"
+			"CustomLogo = 1\n"
+			"\n"
+			"; CustomLogo = 0 时借用的游戏电台图标：\n"
+			"; With CustomLogo = 0, one of the game's station logos:\n"
 			";   Logo_H_Klub / Radio_H_Klub_TexturePack, Logo_WarpRecords / Radio_WarpRecords_TexturePack,\n"
 			";   Logo_NinjaTune / Radio_NinjaTune_TexturePack, Logo_RoadRunnerRecords / Radio_RoadRunnerRecords_TexturePack,\n"
 			";   Logo_RealFM / Radio_RealFM_TexturePack, Logo_Kerrang / Radio_Kerrang_TexturePack,\n"
@@ -121,6 +130,9 @@ namespace config
 		get("Station.TexturePack", gConfig.mTexturePack);
 		std::string folder;
 		get("Station.MusicFolder", folder);
+		if (auto it = values.find("Station.CustomLogo"); it != values.end()) {
+			gConfig.mCustomLogo = it->second != "0";
+		}
 		if (auto it = values.find("Debug.Logging"); it != values.end()) {
 			gConfig.mLogging = it->second != "0";
 		}

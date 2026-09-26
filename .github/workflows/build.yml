@@ -44,13 +44,14 @@ jobs:
       - name: Read the reference\ pins
         run: Get-Content .github/reference.env | Where-Object { $_ -match '^\w+=' } | Add-Content $env:GITHUB_ENV
 
-      # reference\ only changes when a pin moves, so a hit skips the checkouts below.
+      # reference\ only changes when a pin or a file list in reference.env changes (its hash is in the key),
+      # so a hit skips the checkouts below.
       - name: Restore reference\ from cache
         id: reference
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: reference
-          key: reference-minhook-${{ env.MINHOOK_REF }}-drlibs-${{ env.DR_LIBS_REF }}-stb-${{ env.STB_REF }}
+          key: reference-minhook-${{ env.MINHOOK_REF }}-drlibs-${{ env.DR_LIBS_REF }}-stb-${{ env.STB_REF }}-${{ hashFiles('mods/SDRadio/.github/reference.env') }}
 
       - name: Check out MinHook
         if: steps.reference.outputs.cache-hit != 'true'
@@ -90,6 +91,9 @@ jobs:
           path: reference/stb
           sparse-checkout: |
             stb_vorbis.c
+            stb_image.h
+            stb_image_resize2.h
+            stb_dxt.h
           sparse-checkout-cone-mode: false
           filter: blob:none
           persist-credentials: false

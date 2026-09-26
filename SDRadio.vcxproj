@@ -112,12 +112,16 @@
     <ClCompile Include="core\hooks.cc" />
     <ClCompile Include="core\library.cc" />
     <ClCompile Include="core\log.cc" />
+    <ClCompile Include="core\logo.cc" />
+    <ClCompile Include="core\logo_image.cc" />
+    <ClCompile Include="core\logo_pack.cc" />
     <ClCompile Include="core\radios.cc" />
     <ClCompile Include="core\scan.cc" />
     <ClCompile Include="core\stream_io.cc" />
     <ClCompile Include="core\tags.cc" />
   </ItemGroup>
-  <!-- The bundled decoders (dr_mp3/dr_flac/dr_wav, stb_vorbis; public domain / MIT-0), compiled as C. -->
+  <!-- The bundled decoders (dr_mp3/dr_flac/dr_wav, stb_vorbis) and the logo's image code (stb_image,
+       stb_image_resize2, stb_dxt); public domain / MIT-0 / MIT, compiled as C. -->
   <ItemGroup>
     <ClCompile Include="core\third_party.c;$(StbDir)stb_vorbis.c">
       <WarningLevel>TurnOffAllWarnings</WarningLevel>
@@ -139,10 +143,18 @@
     <ClInclude Include="core\hooks.hh" />
     <ClInclude Include="core\library.hh" />
     <ClInclude Include="core\log.hh" />
+    <ClInclude Include="core\logo.hh" />
+    <ClInclude Include="core\logo_image.hh" />
+    <ClInclude Include="core\logo_pack.hh" />
     <ClInclude Include="core\radios.hh" />
     <ClInclude Include="core\scan.hh" />
     <ClInclude Include="core\stream_io.hh" />
     <ClInclude Include="core\tags.hh" />
+  </ItemGroup>
+  <!-- The built-in logo, embedded as the LOGO resource. -->
+  <ItemGroup>
+    <ResourceCompile Include="SDRadio.rc" />
+    <None Include="art\logo_512.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -7,6 +7,7 @@
 #include "core/hooks.hh"
 #include "core/library.hh"
 #include "core/log.hh"
+#include "core/logo.hh"
 
 static std::wstring GetModuleDirectory(HMODULE module)
 {
@@ -44,9 +45,13 @@ BOOL WINAPI DllMain(HMODULE module, DWORD reason, LPVOID)
 		// So there's an obvious place to drop music into on first run.
 		CreateDirectoryW(gConfig.mMusicFolder.c_str(), nullptr);
 
-		// The scan starts now (its thread runs once the loader lock is released) and is normally finished
-		// before the game reads Radios.xml, which the hook waits for. The hooks go in before the game runs.
+		// The scan and the logo start now (their threads run once the loader lock is released) and are
+		// normally finished before the game reads Radios.xml, which the hook waits for. The hooks go in
+		// before the game runs.
 		library::StartScan(gConfig.mMusicFolder);
+		if (gConfig.mCustomLogo) {
+			logo::Start(dir, gConfig.mMusicFolder);
+		}
 		hooks::Install();
 	}
 

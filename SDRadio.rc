@@ -1,0 +1,2 @@
+// The built-in station logo (art\logo_512.png, made by art\neon.py), read by core\logo.cc.
+LOGO RCDATA "art\\logo_512.png"

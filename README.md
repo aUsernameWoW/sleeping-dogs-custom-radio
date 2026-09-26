@@ -65,7 +65,8 @@ SleepingDogsDefinitiveEdition\
 
 **第 5 步：在游戏里收听**
 
-照常从 Steam 启动游戏，上一辆车，像平时一样切换电台。新电台排在所有电台的**最后**，台名默认是 “SDRADIO”。
+照常从 Steam 启动游戏，上一辆车，像平时一样切换电台。新电台排在所有电台的**最后**，图标是霓虹灯风格的
+「私家台」，台名默认是 “SDRADIO”。
 
 ### 常见问题
 
@@ -82,9 +83,17 @@ SleepingDogsDefinitiveEdition\
 
 M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不行。换成 MP3 或 FLAC 最稳。
 
-**想改台名、换音乐文件夹或者换图标**
+**想改台名或者换音乐文件夹**
 
 用记事本打开 `plugins\SDRadio.ini`，改完保存，重启游戏。每一项都有中文说明。台名最多约 21 个汉字。
+
+**想换成自己画的电台图标**
+
+1. 画一张比例 2:1 的图（推荐 512×256），背景透明，存成 PNG；
+2. 命名为 `logo.png`，放进 `plugins\SDRadio`；
+3. 重启游戏。
+
+游戏会把所有电台图标显示成白色，所以显示出来的是图案的形状，不是颜色。删掉 `logo.png` 就回到自带的图标。
 
 **更新**
 
@@ -93,8 +102,8 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 
 **卸载**
 
-删掉 `plugins` 里的 `SDRadio.asi`、`SDRadio.ini`、`SDRadio.log` 和 `SDRadio` 文件夹（里面是你自己的音乐，
-需要的话先移走）。如果 `plugins` 里已经没有其他 `.asi` 文件了，`dinput8.dll` 也可以删掉。
+删掉 `plugins` 里所有名字以 `SDRadio` 开头的文件，以及 `SDRadio` 文件夹（里面是你自己的音乐，需要的话先
+移走）。如果 `plugins` 里已经没有其他 `.asi` 文件了，`dinput8.dll` 也可以删掉。
 
 **Linux / Steam Deck**
 
@@ -176,7 +185,7 @@ SleepingDogsDefinitiveEdition\
 **Step 5: listen in game**
 
 Start the game from Steam as usual, get into a car and switch radio stations as you normally would. The new
-station comes **last**, named "SDRADIO" by default.
+station comes **last**, with a neon 私家台 ("private station") logo, named "SDRADIO" by default.
 
 ### FAQ
 
@@ -195,10 +204,19 @@ station comes **last**, named "SDRADIO" by default.
 M4A/AAC, WMA and similar formats go through Windows' own decoders, and the odd file may not work. MP3 or FLAC
 is the safest.
 
-**Changing the station name, the music folder or the logo**
+**Changing the station name or the music folder**
 
 Open `plugins\SDRadio.ini` in Notepad, save your changes and restart the game. Every setting is explained in
 the file. The name can be up to 63 bytes.
+
+**Using your own logo**
+
+1. Draw a 2:1 picture (512×256 recommended) with a transparent background and save it as PNG;
+2. name it `logo.png` and put it into `plugins\SDRadio`;
+3. restart the game.
+
+The game shows every station logo in white, so what you see is your picture's shape, not its colors. Delete
+`logo.png` to get the original logo back.
 
 **Updating**
 
@@ -207,7 +225,7 @@ choose "Replace the files in the destination". Your music and `SDRadio.ini` are 
 
 **Uninstalling**
 
-Delete `SDRadio.asi`, `SDRadio.ini`, `SDRadio.log` and the `SDRadio` folder from `plugins` (that's your own
+Delete every file in `plugins` whose name starts with `SDRadio`, and the `SDRadio` folder (that's your own
 music, so move it out first if you want to keep it). If no other `.asi` files are left in `plugins`, you can
 delete `dinput8.dll` too.
 

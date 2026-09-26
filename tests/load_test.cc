@@ -34,9 +34,9 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	// The scan thread logs once it has looked at the (empty) folder.
+	// The scan thread logs once it has looked at the (empty) folder, the logo thread once the pack is written.
 	std::string contents;
-	for (int i = 0; i < 50 && contents.find("tracks ready") == std::string::npos; ++i) {
+	for (int i = 0; i < 50 && (contents.find("tracks ready") == std::string::npos || contents.find("logo: texture pack") == std::string::npos); ++i) {
 		Sleep(100);
 		std::ifstream log(dir + "SDRadio.log");
 		std::stringstream text;
@@ -45,11 +45,18 @@ int main(int argc, char** argv)
 	}
 	std::printf("%s", contents.c_str());
 
+	// The test's folder stands in for the game folder (the executable's), so the pack is one level down.
 	const char* expected[] = { "SDRadio loaded", "SimpleXML::XMLCache::ExtractFromCache: 0 matches", "game functions missing, no station",
-		"library: 0 music files", "library: 0 tracks ready" };
+		"library: 0 music files", "library: 0 tracks ready", "using the built-in logo", "logo: texture pack ..\\..\\load_test\\SDRadio-logo" };
 	for (const char* line : expected) {
 		if (contents.find(line) == std::string::npos) {
 			std::printf("FAIL: log lacks \"%s\"\n", line);
+			return 1;
+		}
+	}
+	for (const char* file : { "SDRadio-logo.perm.bin", "SDRadio-logo.temp.bin" }) {
+		if (!std::ifstream(dir + file)) {
+			std::printf("FAIL: no %s written\n", file);
 			return 1;
 		}
 	}
