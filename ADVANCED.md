@@ -69,9 +69,10 @@ Visual Studio 2022（v143），Windows SDK 10.0.26100。项目需要放在工作
 `reference\minhook`（MinHook v1.3.4）、`reference\dr_libs` 和 `reference\stb`，它们的源码都随项目一起编译。
 
 GitHub Actions 会对推送和 PR 按同样的布局编译（`-warnAsError`）并运行自动测试，依赖的确切版本见
-`.github/workflows/build.yml`；然后打包 `SDRadio.zip`，其中 Ultimate ASI Loader 的版本和 SHA-256 固定在
+`.github/reference.env`；然后打包 `SDRadio.zip`，其中 Ultimate ASI Loader 的版本和 SHA-256 固定在
 `.github/asi-loader.env`。推送到 `main` 且测试通过的构建会发布为预发布版 `build-<N>`。`asi-loader.yml` 每月检查
-一次 Ultimate ASI Loader 的新版本，有新版时开 PR 更新 `asi-loader.env`；Dependabot 每月更新 Actions 的版本。
+一次 Ultimate ASI Loader 的新版本，有新版时开 PR 更新 `asi-loader.env`；`reference.yml` 对编译所用的依赖做
+同样的检查，开 PR 更新 `reference.env`；Dependabot 每月更新 Actions 的版本。
 
 第三方代码及其许可证见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
 
@@ -147,10 +148,11 @@ workspace that also has `reference\minhook` (MinHook v1.3.4), `reference\dr_libs
 compiled from source with the project.
 
 GitHub Actions builds pushes and pull requests in that same layout (with `-warnAsError`) and runs the
-automated tests; `.github/workflows/build.yml` lists the exact dependency versions. It then packages
+automated tests; `.github/reference.env` lists the exact dependency versions. It then packages
 `SDRadio.zip`, with the Ultimate ASI Loader version and SHA-256 pinned in `.github/asi-loader.env`. Builds of
 `main` that pass are published as prereleases `build-<N>`. `asi-loader.yml` checks monthly for a new Ultimate
-ASI Loader release and opens a PR that updates `asi-loader.env`; Dependabot updates the Actions monthly.
+ASI Loader release and opens a PR that updates `asi-loader.env`, `reference.yml` does the same for the
+libraries the build compiles against (`reference.env`), and Dependabot updates the Actions monthly.
 
 The third-party code and its licenses are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 

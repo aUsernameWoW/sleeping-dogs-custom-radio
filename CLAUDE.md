@@ -74,7 +74,9 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   `.github/asi-loader.env`, `asi-loader.yml` opens a PR for a new release), `plugins\SDRadio.asi`, notices,
   and the music folder `plugins\SDRadio\` with `.github/PUT-YOUR-MUSIC-HERE.txt` (ignored by the scan: not
   an audio extension). Prereleases attach it under its plain name for README.md's
-  `releases/latest/download/SDRadio.zip` link.
+  `releases/latest/download/SDRadio.zip` link. `reference.yml` (also SDIMEFix's) proposes newer pins in
+  `.github/reference.env`: MinHook by release tag, dr_libs and stb by commits that change the files we compile
+  (the decoders read player-supplied files, so their fixes matter).
 - `README.md` — for players with no modding experience (step-by-step install, where the music goes, FAQ incl.
   the Proton launch option); keep build/internals out of it. `ADVANCED.md` — everything else (how it works,
   formats/backends, downloads, settings table, building, CI). Both bilingual (Chinese first).
