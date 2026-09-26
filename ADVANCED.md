@@ -31,9 +31,9 @@ CrossOver）待测。
 
 ### 需求
 
-- 《热血无赖：终极版》Steam 版当前版本，Windows 10/11 x64；也面向 Linux / macOS 上的 Proton、Wine、CrossOver。
-  mod 用字节特征码定位游戏函数，找不到时日志写 “game functions missing, no station”，不做任何改动。旧版 v1.0
-  里这些特征码也能唯一匹配，但没有在游戏里测试过。
+- 《热血无赖：终极版》的两个发行版本（当前版本在游戏里验证过；旧版 v1.0 里特征码同样唯一匹配），Windows
+  10/11 x64；也面向 Linux / macOS 上的 Proton、Wine、CrossOver。mod 用字节特征码定位游戏函数，找不到时日志写
+  “game functions missing, no station”，不做任何改动。
 - 任意 ASI 加载器，例如 [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)（`SDRadio.zip`
   里自带一份，作为 `dinput8.dll`）。Wine/Proton 下需要启动选项 `WINEDLLOVERRIDES="dinput8=n,b" %command%`。
 
@@ -106,10 +106,10 @@ Wine, CrossOver) not yet tested.
 
 ### Requirements
 
-- Sleeping Dogs: Definitive Edition, current Steam version, Windows 10/11 x64; Proton, Wine and CrossOver on
-  Linux/macOS are intended to work too. The mod finds the game's functions by byte signatures; if they aren't
-  found, the log says "game functions missing, no station" and nothing is changed. The signatures also match
-  uniquely in the legacy v1.0 build, which hasn't been tested in game.
+- Both released builds of Sleeping Dogs: Definitive Edition (the current one verified in game; the signatures
+  match uniquely in the legacy v1.0 too), Windows 10/11 x64; Proton, Wine and CrossOver on Linux/macOS are
+  intended to work too. The mod finds the game's functions by byte signatures; if they aren't found, the log
+  says "game functions missing, no station" and nothing is changed.
 - Any ASI loader, e.g. [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)
   (`SDRadio.zip` includes it as `dinput8.dll`). Under Wine/Proton it needs the launch option
   `WINEDLLOVERRIDES="dinput8=n,b" %command%`.

@@ -10,8 +10,8 @@
 
 状态：Windows 上已在游戏内验证（FLAC）；Linux / Steam Deck / macOS 还没测试。
 
-> 适用于 **Steam 版的当前版本**，Windows 10/11 64 位。其他版本没有测试过；如果 mod 认不出你的游戏版本，它会
-> 自动不生效，游戏照常运行。想了解原理、自己编译，或已经装过其他 mod，请看 [ADVANCED.md](ADVANCED.md)。
+> 适用于**任何版本**的《热血无赖：终极版》，Windows 10/11 64 位。想了解原理、自己编译，或已经装过其他 mod，
+> 请看 [ADVANCED.md](ADVANCED.md)。
 
 ### 安装（大约三分钟）
 
@@ -76,7 +76,7 @@ SleepingDogsDefinitiveEdition\
   隔离区还原并把游戏文件夹加入排除项）；如果第 3 步跳过了原有的 `dinput8.dll`，那个文件可能不是 ASI 加载器，
   备份后换成压缩包里的；
 - 确认 `plugins\SDRadio` 里有音乐文件。改动音乐文件夹后要重启游戏；
-- 打开 `plugins\SDRadio.log` 看看它找到了几首歌，以及有没有写 “missing” 或 “failed”。
+- 还是不行的话，按下面的方法反馈，并附上 `plugins\SDRadio.log`。
 
 **有的歌放不出来**
 
@@ -118,9 +118,8 @@ original stations.
 
 Status: verified in game on Windows (FLAC); Linux / Steam Deck / macOS not yet tested.
 
-> For the **current Steam version**, Windows 10/11 64-bit. Other versions are untested; if the mod doesn't
-> recognize your game version it turns itself off and the game runs as usual. For how it works, building it,
-> or adding it to an existing mod setup, see [ADVANCED.md](ADVANCED.md).
+> Works with **any version** of Sleeping Dogs: Definitive Edition, Windows 10/11 64-bit. For how it works,
+> building it, or adding it to an existing mod setup, see [ADVANCED.md](ADVANCED.md).
 
 ### Installing (about three minutes)
 
@@ -189,7 +188,7 @@ station comes **last**, named "SDRADIO" by default.
   you skipped an existing `dinput8.dll` in step 3, that file may not be an ASI loader; move it somewhere safe
   and use the one from the zip;
 - make sure there is music in `plugins\SDRadio`. Restart the game after changing the music folder;
-- open `plugins\SDRadio.log` to see how many tracks it found and whether it says "missing" or "failed".
+- if it still doesn't work, report it as described below and attach `plugins\SDRadio.log`.
 
 **Some tracks don't play**
 
