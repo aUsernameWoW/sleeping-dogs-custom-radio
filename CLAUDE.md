@@ -68,6 +68,16 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   file as ANSI and mangle a Chinese station name or path).
 - Tests: `bank_test` (reads the bank back with ported Wwise readers; mixer params byte-identical to the
   game's top node; writes `station12.bnk`), `radios_test`, `tags_test`, `load_test`.
+- `.github/workflows/build.yml` — CI like SDIMEFix's (documented in `mods\SDIMEFix\CLAUDE.md`), without the
+  Nexus job (no Nexus page yet; copy SDIMEFix's `nexus` job and `nexus-release.yml` when there is one). The
+  `package` job builds `SDRadio.zip` for players: Ultimate ASI Loader as `dinput8.dll` (pinned in
+  `.github/asi-loader.env`, `asi-loader.yml` opens a PR for a new release), `plugins\SDRadio.asi`, notices,
+  and the music folder `plugins\SDRadio\` with `.github/PUT-YOUR-MUSIC-HERE.txt` (ignored by the scan: not
+  an audio extension). Prereleases attach it under its plain name for README.md's
+  `releases/latest/download/SDRadio.zip` link.
+- `README.md` — for players with no modding experience (step-by-step install, where the music goes, FAQ incl.
+  the Proton launch option); keep build/internals out of it. `ADVANCED.md` — everything else (how it works,
+  formats/backends, downloads, settings table, building, CI). Both bilingual (Chinese first).
 
 ## Design decisions (don't undo without reason)
 

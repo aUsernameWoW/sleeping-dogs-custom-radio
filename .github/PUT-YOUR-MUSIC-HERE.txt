@@ -1,0 +1,8 @@
+把你的音乐放进这个文件夹（可以有子文件夹，最多 255 首）：MP3、FLAC、WAV、OGG，以及 M4A/AAC、WMA。
+然后启动游戏，开车时切换电台，新电台排在最后。这个说明文件可以删掉。
+
+Put your music into this folder (subfolders are fine, up to 255 tracks): MP3, FLAC, WAV, OGG, also M4A/AAC
+and WMA. Then start the game and switch radio stations while driving; the new station comes last. You can
+delete this note.
+
+https://github.com/aUsernameWoW/sleeping-dogs-custom-radio
