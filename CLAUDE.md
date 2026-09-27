@@ -91,8 +91,8 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   `library_test` (the .asi with music already in its folder: a Chinese subfolder and file name, WAV INFO tags
   in GBK and UTF-8, mono, a broken `.m4a` that the Media Foundation fallback must reject, a `.txt` to ignore;
   written for the Wine run below).
-- `.github/workflows/build.yml` — CI like SDIMEFix's (documented in `mods\SDIMEFix\CLAUDE.md`), without the
-  Nexus job (no Nexus page yet; copy SDIMEFix's `nexus` job and `nexus-release.yml` when there is one). The
+- `.github/workflows/build.yml` — CI like SDIMEFix's (documented in `mods\SDIMEFix\CLAUDE.md`), including
+  its last job, `nexus` (each prerelease → the "SDRadio GitHub CI Build" file on Nexus). The
   `package` job builds `SDRadio.zip` for players: Ultimate ASI Loader as `dinput8.dll` (pinned in
   `.github/asi-loader.env`, `asi-loader.yml` opens a PR for a new release), `plugins\SDRadio.asi`, notices,
   and the music folder `plugins\SDRadio\` with `.github/PUT-YOUR-MUSIC-HERE.txt` (ignored by the scan: not
@@ -110,6 +110,17 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   `nodrv_CreateWindow` errors, harmless); a window-creating test needs `xvfb-run`.
   First run: all 6 tests pass on both; the scan, GBK (code page 936), Chinese paths and the logo pack behave
   as on Windows.
+- `.github/workflows/nexus-release.yml` — a GitHub **release** (a `build-<N>` prerelease un-ticked as
+  prerelease) goes to the main file on [Nexus Mods](https://www.nexusmods.com/sleepingdogsdefinitiveedition/mods/175)
+  (page published 2026-09-27). Both Nexus jobs are copies of SDIMEFix's, which documents how they work; keep
+  them in step with SDIMEFix's and SDAtmos's (only the names differ, and SDRadio's file descriptions also name
+  the music folder). File descriptions write paths with `/`: the Files tab drops backslashes. Settings: repo
+  variables `NEXUS_MOD_ID`, `NEXUS_CI_FILE_ID`, `NEXUS_RELEASE_FILE_ID` (v3 IDs from a file's "Advanced"
+  dialog, not the `175` in the URL) and secret `NEXUSMODS_API_KEY`. Current values: mod `14933601288367`,
+  release file `8038689` (uploaded by hand with build-12 as "SDRadio build 12 (1414af9)"; the first release
+  through the workflow renames it "SDRadio"), CI file not created yet (the job is skipped until
+  `NEXUS_CI_FILE_ID` is set). The public GraphQL API (`api.nexusmods.com/v2/graphql`, no key) lists a mod's
+  files (`modFiles(modId: 175, gameId: 3477)`) when the site sits behind a bot check.
 - `art/` — the station logo **私家台** (neon tubes; 私家 as in 私家車, the player's own car and music), final
   2026-09-26; `logo_512.png` is embedded as the default logo, so rerun `neon.py` before building after a
   change to it. `neon.py` generates `logo.svg` from tube skeletons (traced over Noto Sans SC

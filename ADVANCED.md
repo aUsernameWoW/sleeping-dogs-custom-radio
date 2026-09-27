@@ -52,7 +52,8 @@ CrossOver）上的游戏内表现待测（自动测试在 Wine 11 和 Wine 9 下
 | `THIRD-PARTY-NOTICES.md` | 第三方代码的许可证 |
 
 `main` 上每次提交都会自动编译、测试并发布为预发布版 `build-<N>`（没有在游戏里测过）。在游戏里验证过的构建会被
-转为正式版；README 里的下载链接指向最新的正式版。
+转为正式版；README 里的下载链接指向最新的正式版。Nexus Mods 上主文件 “SDRadio” 是正式版，
+“SDRadio GitHub CI Build” 是每次的预发布版，都是同一个 `SDRadio.zip`。
 
 已经有 ASI 加载器时，只需要把 `SDRadio.asi` 放进它加载插件的目录（通常是 `plugins\`）。`SDRadio.ini`、
 `SDRadio.log` 和默认的音乐文件夹 `SDRadio\` 都在 `.asi` 旁边。
@@ -89,8 +90,8 @@ GitHub Actions 会对推送和 PR 按同样的布局编译（`-warnAsError`）�
 `.github/reference.env`；同样的测试还会在 Linux 上用 Wine 再跑一遍（WineHQ 最新稳定版和 Ubuntu 24.04 自带的
 Wine 9），Wine 报告的未实现函数汇总在运行摘要里。然后打包 `SDRadio.zip`，其中 Ultimate ASI Loader 的版本和
 SHA-256 固定在 `.github/asi-loader.env`。推送到 `main` 且测试（包括 Wine 下的）通过的构建会发布为预发布版
-`build-<N>`。`asi-loader.yml` 每月检查
-一次 Ultimate ASI Loader 的新版本，有新版时开 PR 更新 `asi-loader.env`；`reference.yml` 对编译所用的依赖做
+`build-<N>`，并作为新版本上传到 Nexus Mods；在 GitHub 上把预发布版转为正式版，会把它上传到 Nexus 的主文件
+（`nexus-release.yml`）。`asi-loader.yml` 每月检查一次 Ultimate ASI Loader 的新版本，有新版时开 PR 更新 `asi-loader.env`；`reference.yml` 对编译所用的依赖做
 同样的检查，开 PR 更新 `reference.env`；Dependabot 每月更新 Actions 的版本。
 
 第三方代码及其许可证见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
@@ -151,6 +152,8 @@ Every version on [Releases](https://github.com/aUsernameWoW/sleeping-dogs-custom
 
 Every commit on `main` is built, tested and published as a prerelease `build-<N>` (not tested in game).
 Builds verified in game are promoted to full releases; the README's download link points to the newest one.
+On Nexus Mods the main file "SDRadio" is the full release and "SDRadio GitHub CI Build" follows the
+prereleases; both are the same `SDRadio.zip`.
 
 If you already have an ASI loader, just put `SDRadio.asi` where it loads plugins from (usually `plugins\`).
 `SDRadio.ini`, `SDRadio.log` and the default music folder `SDRadio\` are next to the `.asi`.
@@ -194,8 +197,9 @@ automated tests; `.github/reference.env` lists the exact dependency versions. Th
 on Linux under Wine (WineHQ's newest stable and Ubuntu 24.04's Wine 9), with the functions Wine reports as
 unimplemented summarized in the run summary. It then packages `SDRadio.zip`, with the Ultimate ASI Loader
 version and SHA-256 pinned in `.github/asi-loader.env`. Builds of `main` that pass (under Wine too) are
-published as prereleases `build-<N>`. `asi-loader.yml` checks monthly for a new Ultimate
-ASI Loader release and opens a PR that updates `asi-loader.env`, `reference.yml` does the same for the
+published as prereleases `build-<N>` and uploaded to Nexus Mods as a new version; promoting a prerelease to
+a full release on GitHub uploads it to the Nexus main file (`nexus-release.yml`). `asi-loader.yml` checks
+monthly for a new Ultimate ASI Loader release and opens a PR that updates `asi-loader.env`, `reference.yml` does the same for the
 libraries the build compiles against (`reference.env`), and Dependabot updates the Actions monthly.
 
 The third-party code and its licenses are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

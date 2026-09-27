@@ -20,6 +20,8 @@
 **第 1 步：下载**
 
 点这里下载 **[SDRadio.zip](https://github.com/aUsernameWoW/sleeping-dogs-custom-radio/releases/latest/download/SDRadio.zip)**。
+也可以在 [Nexus Mods](https://www.nexusmods.com/sleepingdogsdefinitiveedition/mods/175?tab=files) 的 Files
+页面下载主文件 “SDRadio”，内容相同。
 
 压缩包里只有这些：
 
@@ -115,8 +117,8 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 
 **遇到问题怎么反馈**
 
-在 [GitHub Issues](https://github.com/aUsernameWoW/sleeping-dogs-custom-radio/issues) 里说明情况，并附上
-`plugins\SDRadio.log`。
+在 [GitHub Issues](https://github.com/aUsernameWoW/sleeping-dogs-custom-radio/issues) 或 Nexus Mods 页面的
+Bugs 标签里说明情况，并附上 `plugins\SDRadio.log`。
 
 与 Square Enix、United Front Games、Audiokinetic 均无关联。
 
@@ -137,6 +139,8 @@ Status: verified in game on Windows (FLAC); Linux / Steam Deck / macOS not yet t
 **Step 1: download**
 
 Download **[SDRadio.zip](https://github.com/aUsernameWoW/sleeping-dogs-custom-radio/releases/latest/download/SDRadio.zip)**.
+The main file "SDRadio" on the Files tab of [Nexus Mods](https://www.nexusmods.com/sleepingdogsdefinitiveedition/mods/175?tab=files)
+is the same thing.
 
 The zip holds only this:
 
@@ -239,7 +243,7 @@ play under Proton; use MP3, FLAC or OGG.
 
 **Reporting a problem**
 
-Describe it in [GitHub Issues](https://github.com/aUsernameWoW/sleeping-dogs-custom-radio/issues) and attach
-`plugins\SDRadio.log`.
+Describe it in [GitHub Issues](https://github.com/aUsernameWoW/sleeping-dogs-custom-radio/issues) or on the Bugs
+tab of the Nexus Mods page, and attach `plugins\SDRadio.log`.
 
 Not affiliated with Square Enix, United Front Games or Audiokinetic.

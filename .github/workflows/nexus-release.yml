@@ -1,0 +1,174 @@
+# Publishes a full release to the mod's main file on Nexus Mods (build.yml sends every prerelease to the
+# "GitHub CI Build" file). A release is a build-<N> prerelease turned into a full release on GitHub: edit it
+# and untick "Set as a pre-release". Its SDRadio.zip is uploaded as built and tested by CI, nothing is
+# rebuilt. Settings (vars.NEXUS_*, secrets.NEXUSMODS_API_KEY) are described in build.yml.
+#
+# A release event runs this file as it is in the released commit, so promoting a build older than this
+# workflow triggers nothing; run it by hand then (Actions -> Nexus Mods release -> Run workflow, tag build-<N>).
+name: Nexus Mods release
+
+on:
+  release:
+    types: [released]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag of the GitHub release to publish (e.g. build-12)
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  nexus:
+    name: Nexus Mods
+    if: vars.NEXUS_MOD_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      NEXUS_API: https://api.nexusmods.com/v3
+      NEXUS_MOD_ID: ${{ vars.NEXUS_MOD_ID }}
+      NEXUS_CI_FILE_ID: ${{ vars.NEXUS_CI_FILE_ID }}
+      NEXUS_RELEASE_FILE_ID: ${{ vars.NEXUS_RELEASE_FILE_ID }}
+      NEXUSMODS_API_KEY: ${{ secrets.NEXUSMODS_API_KEY }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      # The name of the release file; also how it is found when vars.NEXUS_RELEASE_FILE_ID is not set yet.
+      FILE_NAME: SDRadio
+    steps:
+      # Full history and tags: the change list since the previous release.
+      - name: Check out history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Package
+        id: package
+        run: |
+          if [ -z "$NEXUSMODS_API_KEY" ]; then
+            echo "::error::secrets.NEXUSMODS_API_KEY is not set"
+            exit 1
+          fi
+          api() { curl -sS --fail-with-body --retry 3 -H "apikey: $NEXUSMODS_API_KEY" -H "User-Agent: $GITHUB_REPOSITORY" "$@"; }
+
+          if [ "$(gh release view "$TAG" --json isPrerelease -q .isPrerelease)" != false ]; then
+            echo "::error::$TAG is a prerelease; those go to Nexus through build.yml"
+            exit 1
+          fi
+
+          # Before the first release the file does not exist; it is created below. If it exists but the
+          # variable was not set, find it by name instead of creating a second one.
+          file_id=$NEXUS_RELEASE_FILE_ID
+          if [ -z "$file_id" ]; then
+            api "$NEXUS_API/mods/$NEXUS_MOD_ID/files" > files.json
+            file_id=$(jq -r --arg name "$FILE_NAME" --arg ci "$NEXUS_CI_FILE_ID" \
+              '[.data.mod_files[] | select(.name == $name and .id != $ci)][0].id // empty' files.json)
+            [ -n "$file_id" ] && echo "::warning::Using release file $file_id found by name; set vars.NEXUS_RELEASE_FILE_ID=$file_id"
+          fi
+          if [ -n "$file_id" ]; then
+            api "$NEXUS_API/mod-files/$file_id/versions" > versions.json
+            if jq -e --arg v "$TAG" 'any(.data.versions[]; .version == $v)' versions.json > /dev/null; then
+              echo "::notice::Nexus Mods already has release $TAG"
+              exit 0
+            fi
+          fi
+
+          # The zip players download from GitHub, packaged by build.yml (the mod + the ASI loader).
+          zip="SDRadio-$TAG.zip"
+          if ! gh release download "$TAG" -p SDRadio.zip -O "$zip"; then
+            echo "::error::$TAG has no SDRadio.zip (built before build.yml packaged one); release a newer build"
+            exit 1
+          fi
+
+          # The CI builds carried the changelog until the first release, so that one adds none; later
+          # releases list what changed since the previous one (the nearest full release in the history).
+          prev=
+          for t in $(gh release list --exclude-pre-releases -L 100 --json tagName -q '.[].tagName'); do
+            [ "$t" = "$TAG" ] && continue
+            git merge-base --is-ancestor "$t" "$TAG" 2> /dev/null || continue
+            if [ -z "$prev" ] || git merge-base --is-ancestor "$prev" "$t"; then prev=$t; fi
+          done
+          # Paths in the description use /: the Files tab shows file descriptions with their backslashes removed.
+          {
+            echo "file_id=$file_id"
+            echo "zip=$zip"
+            echo "description=Release $TAG. Unpack into the game folder: dinput8.dll (Ultimate ASI Loader), plugins/SDRadio.asi and the music folder plugins/SDRadio. Source and .pdb: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+            delimiter="EOF_$(openssl rand -hex 8)"
+            echo "changelog<<$delimiter"
+            [ -n "$prev" ] && git log --format='%s' "$prev..$TAG"
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+      # First release: upload-action only adds versions to an existing file, so create the file through
+      # the API. It becomes the mod's primary download. The upload is multipart like upload-action's: the
+      # single-part presigned URL also signs a Content-Disposition value the API does not disclose.
+      - name: Create the release file on Nexus Mods
+        if: steps.package.outputs.zip != '' && steps.package.outputs.file_id == ''
+        env:
+          ZIP: ${{ steps.package.outputs.zip }}
+          DESCRIPTION: ${{ steps.package.outputs.description }}
+        run: |
+          api() { curl -sS --fail-with-body --retry 3 -H "apikey: $NEXUSMODS_API_KEY" -H "User-Agent: $GITHUB_REPOSITORY" "$@"; }
+          jq -n --arg f "$ZIP" --arg s "$(stat -c %s "$ZIP")" '{filename: $f, size_bytes: $s}' |
+            api -X POST -H 'Content-Type: application/json' --data @- "$NEXUS_API/uploads/multipart" > upload.json
+          upload_id=$(jq -r .data.id upload.json)
+          part_size=$(jq -r .data.part_size_bytes upload.json)
+          split -b "$part_size" -d -a 4 "$ZIP" part.
+          parts=
+          i=0
+          for url in $(jq -r '.data.part_presigned_urls[]' upload.json); do
+            file=$(printf 'part.%04d' "$i")
+            i=$((i + 1))
+            etag=$(curl -sS --fail-with-body -X PUT -H 'Content-Type: application/octet-stream' --upload-file "$file" \
+              -D - -o /dev/null "$url" | tr -d '\r' | sed -n 's/^[Ee][Tt][Aa][Gg]: *//p' | tr -d '"')
+            [ -n "$etag" ] || { echo "::error::No ETag for part $i"; exit 1; }
+            parts="$parts<Part><PartNumber>$i</PartNumber><ETag>$etag</ETag></Part>"
+          done
+          curl -sS --fail-with-body -X POST -H 'Content-Type: application/xml' \
+            --data "<CompleteMultipartUpload>$parts</CompleteMultipartUpload>" "$(jq -r .data.complete_presigned_url upload.json)"
+          api -X POST "$NEXUS_API/uploads/$upload_id/finalise" > /dev/null
+          for i in $(seq 40); do
+            state=$(api "$NEXUS_API/uploads/$upload_id" | jq -r .data.state)
+            echo "Upload $upload_id: $state"
+            [ "$state" = available ] && break
+            sleep 5
+          done
+          if [ "$state" != available ]; then
+            echo "::error::Upload $upload_id did not become available"
+            exit 1
+          fi
+          jq -n --arg u "$upload_id" --arg m "$NEXUS_MOD_ID" --arg n "$FILE_NAME" --arg v "$TAG" --arg d "$DESCRIPTION" \
+            '{upload_id: $u, mod_id: $m, name: $n, version: $v, description: $d, file_category: "main",
+              primary_mod_manager_download: true, allow_mod_manager_download: true,
+              show_requirements_pop_up: false, update_mod_version: true}' |
+            api -X POST -H 'Content-Type: application/json' --data @- "$NEXUS_API/mod-files" > file.json
+          # The response's id is that of the upload (the legacy file uid), not of the update chain that
+          # POST /mod-files/{id}/versions takes, so the variable has to be copied from the site.
+          jq . file.json
+          msg="Created the Nexus Mods release file \"$FILE_NAME\". Set vars.NEXUS_RELEASE_FILE_ID to its \"File ID\" (Advanced dialog on the Files tab)."
+          echo "::notice::$msg"
+          echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+
+      # The previous release moves to the file's archive; the mod's version shown on the page follows.
+      - name: Upload to Nexus Mods
+        if: steps.package.outputs.file_id != ''
+        uses: Nexus-Mods/upload-action@c96019556046053aa26044b44396cd38929daf23 # v1.0.0-beta.10
+        with:
+          api_key: ${{ secrets.NEXUSMODS_API_KEY }}
+          mod_id: ${{ vars.NEXUS_MOD_ID }}
+          file_id: ${{ steps.package.outputs.file_id }}
+          filename: ${{ steps.package.outputs.zip }}
+          version: ${{ env.TAG }}
+          display_name: ${{ env.FILE_NAME }}
+          description: ${{ steps.package.outputs.description }}
+          changelog: ${{ steps.package.outputs.changelog }}
+          category: main
+          primary_mod_manager_download: true
+          archive_existing_version: true
+          update_mod_version: true

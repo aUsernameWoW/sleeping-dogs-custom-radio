@@ -354,3 +354,91 @@ jobs:
           } > notes.md
           gh release create "$tag" dist/SDRadio.zip dist/SDRadio.asi dist/SDRadio.pdb THIRD-PARTY-NOTICES.md --prerelease --target "$GITHUB_SHA" \
             --title "SDRadio build $n ($short)" --notes-file notes.md
+
+  # Each new prerelease also becomes the latest version of the mod's "GitHub CI Build" file on Nexus Mods,
+  # through the v3 upload API. Full releases go to a separate main file (nexus-release.yml). Configured per
+  # repository, so the job is the same in every mod:
+  #   vars.NEXUS_MOD_ID          v3 ID of the mod ("Unique Mod ID"), vars.NEXUS_CI_FILE_ID and
+  #   vars.NEXUS_RELEASE_FILE_ID v3 IDs of the two files ("File ID": the update chain, not one upload).
+  #                              All three are in the "Advanced" dialog of a file on the mod page's Files tab.
+  #   secrets.NEXUSMODS_API_KEY  a personal API key (nexusmods.com/settings/api-keys)
+  # Without NEXUS_CI_FILE_ID the job is skipped. Until a release file exists the CI builds are the mod's main
+  # download and carry its version and changelog; after that, they are an optional file and releases do that.
+  nexus:
+    name: Nexus Mods
+    needs: prerelease
+    if: vars.NEXUS_CI_FILE_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXUS_API: https://api.nexusmods.com/v3
+      NEXUS_CI_FILE_ID: ${{ vars.NEXUS_CI_FILE_ID }}
+    steps:
+      # Full history and tags: the build number and the change list since the version Nexus has.
+      - name: Check out history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Nexus keeps every upload as a new version, so a re-run of a build it already has uploads nothing.
+      # The file is the prerelease's SDRadio.zip; the .pdb stays on GitHub. Paths in the description use /:
+      # the Files tab shows file descriptions with their backslashes removed.
+      - name: Package
+        id: package
+        env:
+          NEXUSMODS_API_KEY: ${{ secrets.NEXUSMODS_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$NEXUSMODS_API_KEY" ]; then
+            echo "::error::vars.NEXUS_CI_FILE_ID is set but secrets.NEXUSMODS_API_KEY is not"
+            exit 1
+          fi
+          n=$(git rev-list --count HEAD)
+          version="build-$n"
+          short=$(git rev-parse --short HEAD)
+          curl -sS --fail-with-body --retry 3 -H "apikey: $NEXUSMODS_API_KEY" -H "User-Agent: $GITHUB_REPOSITORY" \
+            "$NEXUS_API/mod-files/$NEXUS_CI_FILE_ID/versions" > versions.json
+          if jq -e --arg v "$version" 'any(.data.versions[]; .version == $v)' versions.json > /dev/null; then
+            echo "::notice::Nexus Mods already has $version"
+            exit 0
+          fi
+          latest=$(jq -r '.data.versions | max_by(.uploaded_at) | .version // empty' versions.json)
+
+          gh release download "$version" -p SDRadio.zip -O "SDRadio-$version.zip"
+
+          # Changes since the version Nexus has, or since the previous build if that is not a build tag.
+          if git rev-parse -q --verify "refs/tags/$latest" > /dev/null; then
+            since=$latest
+          else
+            since=$(git describe --tags --abbrev=0 --match 'build-*' HEAD^ 2> /dev/null || true)
+          fi
+          {
+            echo "version=$version"
+            echo "name=SDRadio GitHub CI Build $n"
+            echo "description=Automatic build of $short on main, untested in game. Unpack into the game folder: dinput8.dll (Ultimate ASI Loader), plugins/SDRadio.asi and the music folder plugins/SDRadio. Source and .pdb: https://github.com/$GITHUB_REPOSITORY/releases/tag/$version"
+            delimiter="EOF_$(openssl rand -hex 8)"
+            echo "changelog<<$delimiter"
+            if [ -n "$since" ]; then git log --format='%s' "$since..HEAD"; else git log -n 10 --format='%s'; fi
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+          echo "upload=true" >> "$GITHUB_OUTPUT"
+
+      # The previous version moves to the file's archive.
+      - name: Upload to Nexus Mods
+        if: steps.package.outputs.upload == 'true'
+        uses: Nexus-Mods/upload-action@c96019556046053aa26044b44396cd38929daf23 # v1.0.0-beta.10
+        with:
+          api_key: ${{ secrets.NEXUSMODS_API_KEY }}
+          mod_id: ${{ vars.NEXUS_MOD_ID }}
+          file_id: ${{ vars.NEXUS_CI_FILE_ID }}
+          filename: SDRadio-${{ steps.package.outputs.version }}.zip
+          version: ${{ steps.package.outputs.version }}
+          display_name: ${{ steps.package.outputs.name }}
+          description: ${{ steps.package.outputs.description }}
+          category: ${{ vars.NEXUS_RELEASE_FILE_ID == '' && 'main' || 'optional' }}
+          primary_mod_manager_download: ${{ vars.NEXUS_RELEASE_FILE_ID == '' }}
+          update_mod_version: ${{ vars.NEXUS_RELEASE_FILE_ID == '' }}
+          changelog: ${{ vars.NEXUS_RELEASE_FILE_ID == '' && steps.package.outputs.changelog || '' }}
+          archive_existing_version: true
