@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SDRadio 游戏原生风格</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600&family=Noto+Sans+SC:wght@500;700&family=Noto+Sans+TC:wght@500;700;900&family=Teko:wght@500;600&display=swap">
+<style>
+  /* Single dark look on purpose: it is the game's menu world. Same family as SDIMEFix's and SDAtmos's
+     logo.html, with neon magenta (the tubes of the station logo) where they use amber and cyan. */
+  :root {
+    color-scheme: dark;
+    --ground: #0f0d0c;
+    --panel: #171412;
+    --line: #2b2521;
+    --text: #ece6dc;
+    --muted: #9a9187;
+    --neon-core: #ffe3f5;
+    --neon: #ff4fc3;
+    --neon-glow: #e0189b;
+    --neon-haze: rgba(224, 24, 155, .55);
+    --neon-haze2: rgba(190, 10, 130, .35);
+    --amber-core: #ffe6b0;
+    --amber: #ffb45a;
+    --amber-glow: #ff8a2a;
+    --seal: #c61f2c;
+    --ink: #050303;
+    --latin: 'Teko', 'Bahnschrift SemiCondensed', 'Arial Narrow', sans-serif;
+    --cond: 'Barlow Condensed', 'Bahnschrift', 'Arial Narrow', sans-serif;
+    --hud: 'Bahnschrift', 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    --tc: 'Noto Sans TC', 'Microsoft JhengHei', 'PingFang TC', sans-serif;
+    --sc: 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  }
+  html { background: var(--ground); }
+  body {
+    background: var(--ground); color: var(--text);
+    font: 15px/1.6 var(--sc);
+    padding-inline: clamp(16px, 4vw, 48px); padding-block: 32px 56px;
+  }
+  main { max-width: 1180px; margin: 0 auto; display: grid; gap: 40px; }
+  header { display: grid; gap: 6px; }
+  h1 { font: 600 34px/1 var(--latin); letter-spacing: .04em; margin: 0; text-wrap: balance; }
+  h1 em { font-style: normal; color: var(--neon); }
+  header p, .note { color: var(--muted); margin: 0; max-width: 68ch; }
+  header code { color: var(--neon); }
+  h2 { font: 500 22px/1 var(--latin); letter-spacing: .08em; text-transform: uppercase; color: var(--neon); margin: 0 0 14px; }
+  figure { margin: 0; }
+  figcaption { color: var(--muted); font: 500 14px/1.4 var(--cond); letter-spacing: .06em; text-transform: uppercase; margin-top: 10px; }
+
+  /* A fixed-size artboard scaled to its frame, so the art is authored at export pixels. */
+  .frame { position: relative; width: 100%; max-width: 100%; overflow: hidden; border: 1px solid var(--line); background: #000; }
+  .frame > [data-stage] { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+
+  /* ------------------------------------------------ banner 1280x640 */
+  .banner {
+    width: 1280px; height: 640px; overflow: hidden;
+    background:
+      radial-gradient(120% 90% at 30% 45%, #1a1716 0%, #0f0e0d 55%, #060606 100%);
+    font-family: var(--sc);
+  }
+  .bokeh { position: absolute; border-radius: 50%; filter: blur(26px); }
+  .grain { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .16; mix-blend-mode: soft-light; pointer-events: none; }
+
+  .ink { position: absolute; background: var(--ink); filter: url(#rough); }
+  .ink.main { left: 34px; top: 92px; width: 760px; height: 238px; transform: rotate(-1.2deg); box-shadow: 0 0 60px 20px rgba(0,0,0,.55); }
+  .ink.dry { left: 84px; top: 318px; width: 520px; height: 40px; opacity: .8; transform: rotate(.6deg); filter: url(#rough-dry); }
+
+  /* The title is the station logo itself (art/logo.svg, 128x64 viewBox, black tubes with a soft alpha
+     halo), lit as a neon sign by #neon. */
+  .sign { position: absolute; left: 70px; top: 40px; width: 690px; height: 345px; filter: url(#neon); animation: ignite 1.6s steps(1, end) both; }
+  @keyframes ignite {
+    0% { opacity: .35; } 8% { opacity: 1; } 12% { opacity: .45; } 20% { opacity: 1; }
+    26% { opacity: .6; } 30%, 100% { opacity: 1; }
+  }
+
+  .brand { position: absolute; left: 98px; top: 356px; display: flex; align-items: flex-start; gap: 34px; }
+  .wordmark {
+    margin: 0;
+    font: 600 112px/1 var(--latin); letter-spacing: .03em; color: var(--text);
+    text-shadow: 0 3px 0 #000, 0 0 30px rgba(0,0,0,.8);
+  }
+  .wordmark .radio {
+    color: var(--neon-core);
+    text-shadow: 0 0 2px #fff, 0 0 12px var(--neon), 0 0 30px var(--neon-glow), 0 3px 0 #000;
+  }
+  .seal {
+    flex: none; width: 70px; height: 70px; margin-top: 12px;
+    display: grid; place-items: center; transform: rotate(-5deg);
+    background: var(--seal); color: #fbe9e3; border-radius: 6px;
+    font: 900 50px/1 var(--tc);
+    box-shadow: inset 0 0 0 3px #fbe9e3, inset 0 0 0 6px var(--seal), 0 6px 18px rgba(0,0,0,.6);
+    filter: url(#rough-seal);
+  }
+  .ribbon {
+    position: absolute; left: 92px; top: 470px; padding: 5px 22px 1px;
+    background: linear-gradient(#d3263a, #a3121f); color: #fff;
+    font: 500 27px/1 var(--latin); letter-spacing: .14em; text-transform: uppercase;
+    clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+    box-shadow: 0 4px 0 #5c0a12;
+  }
+  .tagline {
+    position: absolute; left: 96px; top: 522px; margin: 0;
+    font: 500 22px/1.4 var(--cond); color: #b3a99d; letter-spacing: .02em;
+  }
+  .tagline span { display: block; white-space: nowrap; }
+  .tagline .zh { font: 500 20px/1.6 var(--sc); color: #cfc5b8; letter-spacing: .03em; }
+
+  /* Right side: the music folder, drawn like SDIMEFix's input box, becomes the game's RadioStations
+     widget showing our station. */
+  .radio-ui { position: absolute; left: 828px; top: 0; width: 410px; height: 640px; }
+  .folder {
+    position: absolute; left: 8px; right: 8px; top: 112px; border-radius: 12px;
+    border: 2px solid var(--neon); background: color-mix(in srgb, var(--neon-glow) 9%, rgba(14, 8, 12, .9));
+    box-shadow: 0 0 6px var(--neon), 0 0 22px var(--neon-haze), inset 0 0 18px var(--neon-haze2);
+    padding: 12px 18px;
+  }
+  .folder-head { display: flex; align-items: center; gap: 10px; font: 500 21px/1 var(--latin); letter-spacing: .12em; color: var(--neon-core); text-shadow: 0 0 8px var(--neon-glow); padding-bottom: 8px; border-bottom: 1px solid color-mix(in srgb, var(--neon) 35%, transparent); }
+  .folder-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; font: 500 19px/1.2 var(--sc); color: #eadde4; white-space: nowrap; }
+  .folder-row svg { color: var(--neon); }
+  .folder-row small { font: inherit; color: #9f8b97; }
+  .flow { position: absolute; left: 50%; top: 292px; margin-left: -20px; overflow: visible; }
+  /* The widget in movie units u (RadioStations.swf: holder 128x64 at (0,0), name at (140,6), title at
+     (140,30.4), backing padding 20 x 15.4); backing Backing_9Slice_Metal_1 redrawn in CSS. The logo is the
+     same art/logo.svg, tinted white as the HUD does. */
+  .hud {
+    --u: 1.2px;
+    position: absolute; left: 50%; top: 366px; transform: translateX(-50%);
+    padding: 3px; border-radius: 3px;
+    background: linear-gradient(172deg, #a4a4a4 0%, #505050 22%, #262626 50%, #5a5a5a 78%, #9a9a9a 100%);
+    box-shadow: 0 14px 34px rgba(0,0,0,.75), 0 0 0 1px #000;
+  }
+  .hud-in {
+    display: flex; align-items: flex-start;
+    padding: calc(15.4 * var(--u)) calc(20 * var(--u));
+    background: linear-gradient(#161616, #0b0b0b);
+    box-shadow: inset 0 0 0 1px #000, inset 0 3px 10px rgba(0,0,0,.9);
+  }
+  .hud-logo { width: calc(128 * var(--u)); height: calc(64 * var(--u)); filter: brightness(0) invert(1); display: block; }
+  .hud-text { margin-left: calc(12 * var(--u)); color: #fff; font-family: var(--hud); white-space: nowrap; }
+  .hud-name { margin-top: calc(6 * var(--u)); font-size: calc(19 * var(--u)); font-weight: 700; line-height: calc(24 * var(--u)); }
+  .hud-song { font-size: calc(14 * var(--u)); line-height: calc(20 * var(--u)); }
+  .formats { position: absolute; left: 0; right: 0; top: 510px; display: flex; justify-content: center; gap: 10px; margin: 0; }
+  .formats span {
+    font: 500 17px/1 var(--cond); letter-spacing: .1em; color: #c9b9c3; padding: 5px 9px 4px;
+    border: 1px solid color-mix(in srgb, var(--neon) 45%, transparent); border-radius: 4px;
+    background: color-mix(in srgb, var(--neon-glow) 10%, transparent);
+  }
+
+  /* UI-scale calibration corners from the options menu. */
+  .corner { position: absolute; width: 64px; height: 64px; }
+  .corner::before, .corner::after {
+    content: ''; position: absolute; left: 0; top: 0; background: var(--amber-core);
+    box-shadow: 0 0 5px var(--amber), 0 0 16px var(--amber-glow);
+  }
+  .corner::before { width: 64px; height: 5px; }
+  .corner::after { width: 5px; height: 64px; }
+  .corner.tl { left: 26px; top: 26px; }
+  .corner.tr { right: 26px; top: 26px; transform: scaleX(-1); }
+  .corner.bl { left: 26px; bottom: 26px; transform: scaleY(-1); }
+  .corner.br { right: 26px; bottom: 26px; transform: scale(-1, -1); }
+
+  /* ------------------------------------------------ icon 512x512 */
+  .icons { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 28px; }
+  .icons figure { display: grid; justify-items: center; }
+  .icon {
+    width: 512px; height: 512px; border-radius: 112px; overflow: hidden; position: relative;
+    background: radial-gradient(80% 80% at 50% 42%, #3a0d2a 0%, #1a0714 62%, #0b050a 100%);
+  }
+  .icon .rim {
+    position: absolute; inset: 34px; border-radius: 82px; border: 11px solid var(--neon-core);
+    box-shadow: 0 0 10px var(--neon), 0 0 34px var(--neon-glow), inset 0 0 10px var(--neon), inset 0 0 40px var(--neon-haze);
+  }
+  /* 台 alone from logo.svg: lit x 91.09..121.11, y 13.90..51.70 (neon.py's layout; 家 ends at 86.69).
+     The crop window x 88.9..123.3, y 11.7..53.9 at 8.4 px per unit is centered on (256, 256); the filter
+     sits outside the crop so 家 never reaches the glow. */
+  .icon .glyph { position: absolute; left: 111.52px; top: 78.76px; width: 288.96px; height: 354.48px; filter: url(#neon-icon); }
+  .icon .glyph div { width: 100%; height: 100%; overflow: hidden; position: relative; }
+  .icon .glyph img { position: absolute; left: -746.76px; top: -98.28px; width: 1075.2px; height: 537.6px; }
+  .icon-frame { border-radius: 22%; border: 0; background: transparent; overflow: visible; }
+
+  .refs { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 28px; margin: 0; padding: 0; list-style: none; }
+  .refs li { border-top: 1px solid var(--line); padding-top: 10px; }
+  .refs b { display: block; font: 500 19px/1.2 var(--latin); letter-spacing: .06em; color: var(--text); }
+  .refs code { font: 13px/1.4 ui-monospace, Consolas, monospace; color: var(--neon); }
+  .refs span { color: var(--muted); font-size: 14px; }
+
+  html.export, html.export body { background: transparent; padding: 0; margin: 0; overflow: hidden; }
+  html.export * { animation: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sign { animation: none; }
+  }
+</style>
+
+<svg id="defs" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <filter id="rough" x="-10%" y="-20%" width="120%" height="140%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.012 0.06" numOctaves="4" seed="11" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="46" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <filter id="rough-dry" x="-10%" y="-60%" width="120%" height="220%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.02 0.4" numOctaves="3" seed="4" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="30" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <filter id="rough-seal" x="-5%" y="-5%" width="110%" height="110%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="3" seed="3" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -5 3.7" result="holes"/>
+    <feComposite in="SourceGraphic" in2="holes" operator="in"/>
+  </filter>
+  <filter id="grain-f">
+    <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/>
+    <feColorMatrix type="saturate" values="0"/>
+  </filter>
+  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+    <feGaussianBlur stdDeviation="5" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <!-- Neon from logo.svg: its tubes are opaque and its halo at most 0.6 alpha, so a steep alpha ramp keeps
+       only the glass; then colored glass, an eroded bright core and three glows. Sizes in px for a tube
+       of ~21.6 px (banner, 5.39 px per logo unit); #neon-icon is the same at 8.4 px per unit. -->
+  <filter id="neon" x="-20%" y="-40%" width="140%" height="180%" color-interpolation-filters="sRGB">
+    <feComponentTransfer in="SourceAlpha" result="tube"><feFuncA type="linear" slope="14" intercept="-12.6"/></feComponentTransfer>
+    <feMorphology in="tube" operator="erode" radius="5" result="thin"/>
+    <feGaussianBlur in="thin" stdDeviation="1.8" result="thin-soft"/>
+    <feFlood style="flood-color: var(--neon-core)"/><feComposite in2="thin-soft" operator="in" result="core"/>
+    <feFlood style="flood-color: var(--neon)"/><feComposite in2="tube" operator="in" result="glass"/>
+    <feGaussianBlur in="tube" stdDeviation="5" result="b1"/>
+    <feFlood style="flood-color: var(--neon)"/><feComposite in2="b1" operator="in" result="g1"/>
+    <feGaussianBlur in="tube" stdDeviation="16" result="b2"/>
+    <feFlood style="flood-color: var(--neon-glow)"/><feComposite in2="b2" operator="in" result="g2"/>
+    <feGaussianBlur in="tube" stdDeviation="42" result="b3"/>
+    <feFlood style="flood-color: var(--neon-glow)" flood-opacity=".7"/><feComposite in2="b3" operator="in" result="g3"/>
+    <feMerge>
+      <feMergeNode in="g3"/><feMergeNode in="g2"/><feMergeNode in="g2"/><feMergeNode in="g1"/>
+      <feMergeNode in="glass"/><feMergeNode in="core"/>
+    </feMerge>
+  </filter>
+  <filter id="neon-icon" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">
+    <feComponentTransfer in="SourceAlpha" result="tube"><feFuncA type="linear" slope="14" intercept="-12.6"/></feComponentTransfer>
+    <feMorphology in="tube" operator="erode" radius="8" result="thin"/>
+    <feGaussianBlur in="thin" stdDeviation="2.8" result="thin-soft"/>
+    <feFlood style="flood-color: var(--neon-core)"/><feComposite in2="thin-soft" operator="in" result="core"/>
+    <feFlood style="flood-color: var(--neon)"/><feComposite in2="tube" operator="in" result="glass"/>
+    <feGaussianBlur in="tube" stdDeviation="8" result="b1"/>
+    <feFlood style="flood-color: var(--neon)"/><feComposite in2="b1" operator="in" result="g1"/>
+    <feGaussianBlur in="tube" stdDeviation="25" result="b2"/>
+    <feFlood style="flood-color: var(--neon-glow)"/><feComposite in2="b2" operator="in" result="g2"/>
+    <feGaussianBlur in="tube" stdDeviation="60" result="b3"/>
+    <feFlood style="flood-color: var(--neon-glow)" flood-opacity=".7"/><feComposite in2="b3" operator="in" result="g3"/>
+    <feMerge>
+      <feMergeNode in="g3"/><feMergeNode in="g2"/><feMergeNode in="g2"/><feMergeNode in="g1"/>
+      <feMergeNode in="glass"/><feMergeNode in="core"/>
+    </feMerge>
+  </filter>
+  <symbol id="note" viewBox="0 0 16 16"><path d="M6 12.2V3.4l8-1.6v8.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><ellipse cx="4" cy="12.4" rx="2.4" ry="1.9" fill="currentColor"/><ellipse cx="12" cy="10.6" rx="2.4" ry="1.9" fill="currentColor"/></symbol>
+</svg>
+
+<main>
+  <header>
+    <h1>SDRadio · <em>游戏原生风格</em></h1>
+    <p>和 SDIMEFix、SDAtmos 同一套做法：墨迹底板、辉光标题、红印章、红飘带、UI 校准角框。标题就是电台图标本身：
+      <code>art/logo.svg</code> 的「私家台」霓虹灯管，点亮成洋红色的招牌。右侧是音乐文件夹变成游戏里的电台 HUD。
+      HUD 上的歌名用英文：中文歌名在 HUD 上还没在游戏里验证过。</p>
+  </header>
+
+  <section>
+    <h2>横幅</h2>
+    <figure>
+      <div class="frame" style="aspect-ratio: 2 / 1">
+        <div class="banner" data-stage="1280" role="img"
+          aria-label="SDRadio 横幅：墨迹底板上点亮的洋红色霓虹灯管招牌「私家台」，下方是 SDRADIO 字标和红色印章「樂」，底部说明文字；右侧是音乐文件夹 plugins\SDRadio\ 里的几首歌，箭头指向游戏的电台 HUD：金属边框里白色的私家台图标、台名 SDRADIO 和 Your Artist - Your Song，下面是支持的音频格式。">
+          <div class="bokeh" style="left:900px;top:-60px;width:260px;height:260px;background:rgba(255,79,195,.17)"></div>
+          <div class="bokeh" style="left:1110px;top:120px;width:170px;height:170px;background:rgba(214,42,74,.18)"></div>
+          <div class="bokeh" style="left:700px;top:470px;width:220px;height:220px;background:rgba(255,140,40,.10)"></div>
+          <div class="bokeh" style="left:1040px;top:470px;width:300px;height:300px;background:rgba(224,24,155,.13)"></div>
+          <div class="bokeh" style="left:-80px;top:430px;width:260px;height:260px;background:rgba(214,42,74,.10)"></div>
+
+          <div class="ink main"></div>
+          <div class="ink dry"></div>
+
+          <img class="sign" src="../../art/logo.svg" alt="">
+          <div class="brand">
+            <p class="wordmark">SD<span class="radio">RADIO</span></p>
+            <div class="seal">樂</div>
+          </div>
+          <div class="ribbon">Sleeping Dogs: Definitive Edition mod</div>
+          <p class="tagline">
+            <span class="zh">车载电台里多一个台，放你自己的音乐，用起来和原版电台一样</span>
+            <span>Your own music as a car-radio station · works just like the game's own</span>
+          </p>
+
+          <div class="radio-ui">
+            <div class="folder">
+              <div class="folder-head"><svg width="22" height="18" viewBox="0 0 22 18"><path d="M1 3a2 2 0 0 1 2-2h5l2 2.4h9a2 2 0 0 1 2 2V15a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2Z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>plugins\SDRadio\</div>
+              <div class="folder-row"><svg width="18" height="18"><use href="#note"/></svg>歌曲1.mp3</div>
+              <div class="folder-row"><svg width="18" height="18"><use href="#note"/></svg><span><small>某张专辑\</small>01 歌曲2.flac</span></div>
+              <div class="folder-row"><svg width="18" height="18"><use href="#note"/></svg>Track 03.ogg</div>
+            </div>
+            <svg class="flow" width="40" height="64" viewBox="0 0 40 64" aria-hidden="true">
+              <g filter="url(#glow)" fill="none" stroke="var(--neon)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 4V52" stroke-dasharray="2 8"/><path d="M8 42L20 56L32 42"/>
+              </g>
+            </svg>
+            <div class="hud"><div class="hud-in">
+              <img class="hud-logo" src="../../art/logo.svg" alt="">
+              <div class="hud-text"><div class="hud-name">SDRADIO</div><div class="hud-song">Your Artist - Your Song</div></div>
+            </div></div>
+            <p class="formats"><span>MP3</span><span>FLAC</span><span>OGG</span><span>WAV</span><span>M4A</span><span>WMA</span></p>
+          </div>
+
+          <div class="corner tl"></div><div class="corner tr"></div>
+          <div class="corner bl"></div><div class="corner br"></div>
+          <svg class="grain" aria-hidden="true"><rect width="100%" height="100%" filter="url(#grain-f)"/></svg>
+        </div>
+      </div>
+      <figcaption>GitHub 社交预览 · 1280 × 640</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>图标</h2>
+    <div class="icons">
+      <figure>
+        <div class="frame icon-frame" style="width:192px;height:192px"><div class="icon" data-stage="512" role="img" aria-label="SDRadio 图标：深洋红底上的洋红霓虹圆角框，框里是电台图标里的霓虹灯管「台」字。"><div class="rim"></div><div class="glyph"><div><img src="../../art/logo.svg" alt=""></div></div></div></div>
+        <figcaption>192 px</figcaption>
+      </figure>
+      <figure>
+        <div class="frame icon-frame" style="width:64px;height:64px"><div class="icon" data-stage="512" aria-hidden="true"><div class="rim"></div><div class="glyph"><div><img src="../../art/logo.svg" alt=""></div></div></div></div>
+        <figcaption>64 px</figcaption>
+      </figure>
+      <figure>
+        <div class="frame icon-frame" style="width:32px;height:32px"><div class="icon" data-stage="512" aria-hidden="true"><div class="rim"></div><div class="glyph"><div><img src="../../art/logo.svg" alt=""></div></div></div></div>
+        <figcaption>32 px</figcaption>
+      </figure>
+    </div>
+    <p class="note" style="margin-top:14px">「台」= 电台，取自招牌的最后一个字，灯管和游戏里的图标是同一套。缩到 32 px 时剩下口字框和上面的三角，仍然认得出。</p>
+  </section>
+
+  <section>
+    <h2>取材</h2>
+    <ul class="refs">
+      <li><b>标题 / 图标</b><code>art/logo.svg</code><br><span>电台图标「私家台」本身，同一个文件；改图标后重新渲染即可（图标的裁切范围按 neon.py 的排版算出，字距变了要更新）</span></li>
+      <li><b>墨迹底板</b><code>BACKING_9SLICE_LARGE / GRIT</code><br><span>标题后面粗糙的黑色笔刷</span></li>
+      <li><b>角框</b><code>BACKING_UISCALECORNER</code><br><span>画面校准时屏幕四角的 L 形辉光，保留琥珀色，和另外两个 mod 一致</span></li>
+      <li><b>飘带</b><code>SD_LOGO_TEXT_DE</code><br><span>只借用红色斜切飘带的形式，不用官方字标和盾牌</span></li>
+      <li><b>电台 HUD</b><code>Screens.RadioStations</code><br><span>图标 128×64、台名和歌名的位置；金属底板 BACKING_9SLICE_METAL_1 用 CSS 重画</span></li>
+      <li><b>文件夹框</b><code>SDIMEFix</code><br><span>和 SDIMEFix 横幅里输入框同样的辉光圆角框</span></li>
+    </ul>
+  </section>
+</main>
+
+<script>
+(() => {
+  // ?export=banner|icon renders one artboard alone at 1:1 on a transparent page, for headless screenshots.
+  const exportName = new URLSearchParams(location.search).get('export');
+  if (exportName) {
+    const art = document.querySelector(exportName === 'icon' ? '.icon' : '.banner');
+    const defs = document.getElementById('defs');
+    art.style.transform = 'none';
+    art.style.position = 'relative';
+    document.documentElement.classList.add('export');
+    document.body.replaceChildren(defs, art);
+    return;
+  }
+
+  // Scale each fixed-size artboard to the width of its frame.
+  const stages = document.querySelectorAll('[data-stage]');
+  const fit = () => {
+    for (const node of stages) {
+      const frame = node.parentElement;
+      node.style.transform = 'scale(' + frame.clientWidth / Number(node.dataset.stage) + ')';
+    }
+  };
+  if ('ResizeObserver' in window) {
+    const ro = new ResizeObserver(fit);
+    for (const node of stages) ro.observe(node.parentElement);
+  }
+  window.addEventListener('resize', fit);
+  fit();
+})();
+</script>

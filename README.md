@@ -1,5 +1,7 @@
 # Sleeping Dogs: Definitive Edition — custom radio station (SDRadio)
 
+![SDRadio: 私家台 in magenta neon tubes beside a music folder whose songs become a station on the game's radio HUD](assets/banner.png)
+
 [中文](#中文) | [English](#english)
 
 ## 中文

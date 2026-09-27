@@ -121,6 +121,17 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   from the workspace's `extracted\` if present). `neon.py debug` overlays each character on the Noto glyph.
   Needs Pillow and Edge/Chrome (headless screenshots): `..\..\tools\extract\build\venv\Scripts\python.exe
   art\neon.py` from the mod folder.
+- `assets/` — `banner.png` (README header and the GitHub social preview, 1280×640, keep under 1 MB) and
+  `icon.png` (512×512, transparent corners), both rendered from `assets/branding/logo.html` like SDIMEFix's
+  and SDAtmos's (`?export=banner` / `?export=icon` in headless Edge with an absolute `--screenshot` path,
+  `--window-size=W,H --default-background-color=00000000 --virtual-time-budget=10000`; the output is
+  byte-identical run to run). Same family look with neon magenta. The title is `art/logo.svg` itself, an
+  `<img>` lit by an SVG filter (thresholds away the logo's alpha halo, then glass, eroded core, glows);
+  the icon is its 台 alone, cropped by a window computed from `neon.py`'s layout (the numbers are in the
+  page: redo them if the lettering or letter gaps change). Re-render both after any logo change. The right
+  side is the music folder feeding the RadioStations widget (backing redrawn in CSS, logo tinted white);
+  its song title stays Latin until Chinese titles are verified on the HUD. Chosen 2026-09-27 over a
+  spectrum, a font title and green neon.
 - `README.md` — for players with no modding experience (step-by-step install, where the music goes, FAQ incl.
   the Proton launch option); keep build/internals out of it. `ADVANCED.md` — everything else (how it works,
   formats/backends, downloads, settings table, building, CI). Both bilingual (Chinese first).
