@@ -98,7 +98,7 @@ jobs:
           {
             echo "file_id=$file_id"
             echo "zip=$zip"
-            echo "description=Release $TAG. Unpack into the game folder: dinput8.dll (Ultimate ASI Loader), plugins/SDRadio.asi and the music folder plugins/SDRadio. Source and .pdb: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+            echo "description=Release $TAG. Unpack into the game folder: dinput8.dll (Ultimate ASI Loader) and plugins/SDRadio.asi. Source and .pdb: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
             delimiter="EOF_$(openssl rand -hex 8)"
             echo "changelog<<$delimiter"
             [ -n "$prev" ] && git log --format='%s' "$prev..$TAG"

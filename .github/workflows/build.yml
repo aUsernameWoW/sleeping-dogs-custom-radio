@@ -417,7 +417,7 @@ jobs:
           {
             echo "version=$version"
             echo "name=SDRadio GitHub CI Build $n"
-            echo "description=Automatic build of $short on main, untested in game. Unpack into the game folder: dinput8.dll (Ultimate ASI Loader), plugins/SDRadio.asi and the music folder plugins/SDRadio. Source and .pdb: https://github.com/$GITHUB_REPOSITORY/releases/tag/$version"
+            echo "description=Automatic build of $short on main, untested in game. Unpack into the game folder: dinput8.dll (Ultimate ASI Loader) and plugins/SDRadio.asi. Source and .pdb: https://github.com/$GITHUB_REPOSITORY/releases/tag/$version"
             delimiter="EOF_$(openssl rand -hex 8)"
             echo "changelog<<$delimiter"
             if [ -n "$since" ]; then git log --format='%s' "$since..HEAD"; else git log -n 10 --format='%s'; fi

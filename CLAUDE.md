@@ -113,8 +113,9 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
 - `.github/workflows/nexus-release.yml` — a GitHub **release** (a `build-<N>` prerelease un-ticked as
   prerelease) goes to the main file on [Nexus Mods](https://www.nexusmods.com/sleepingdogsdefinitiveedition/mods/175)
   (page published 2026-09-27). Both Nexus jobs are copies of SDIMEFix's, which documents how they work; keep
-  them in step with SDIMEFix's and SDAtmos's (only the names differ, and SDRadio's file descriptions also name
-  the music folder). File descriptions write paths with `/`: the Files tab drops backslashes. Settings: repo
+  them in step with SDIMEFix's and SDAtmos's (only the names differ). File descriptions write paths with `/`
+  (the Files tab drops backslashes) and stay at most 255 characters like the other mods' (Nexus' limit is
+  unverified; naming the music folder too would make the CI one 274). Settings: repo
   variables `NEXUS_MOD_ID`, `NEXUS_CI_FILE_ID`, `NEXUS_RELEASE_FILE_ID` (v3 IDs from a file's "Advanced"
   dialog, not the `175` in the URL) and secret `NEXUSMODS_API_KEY`. Current values: mod `14933601288367`,
   release file `8038689` (uploaded by hand with build-12 as "SDRadio build 12 (1414af9)"; the first release
