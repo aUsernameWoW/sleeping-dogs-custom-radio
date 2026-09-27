@@ -95,9 +95,22 @@ namespace decoder::mf
 
 	bool Startup()
 	{
-		// mfplat/mfreadwrite are delay-loaded: calling into a missing one would raise, so check first.
-		static const bool ok = LoadLibraryExW(L"mfplat.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32) &&
-			LoadLibraryExW(L"mfreadwrite.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32) && SUCCEEDED(MFStartup(MF_VERSION, MFSTARTUP_LITE));
+		// mfplat/mfreadwrite are delay-loaded: calling into a missing one would raise, so check first. Logged
+		// once, since under Wine either answer is possible.
+		static const bool ok = [] {
+			if (!LoadLibraryExW(L"mfplat.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32) ||
+				!LoadLibraryExW(L"mfreadwrite.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32)) {
+				LOG("decoder: no Media Foundation (error %lu), formats other than MP3/FLAC/WAV/Ogg Vorbis are skipped", GetLastError());
+				return false;
+			}
+			const HRESULT hr = MFStartup(MF_VERSION, MFSTARTUP_LITE);
+			if (FAILED(hr)) {
+				LOG("decoder: MFStartup failed (0x%08lX), formats other than MP3/FLAC/WAV/Ogg Vorbis are skipped", hr);
+				return false;
+			}
+			LOG("decoder: Media Foundation started for the other formats");
+			return true;
+		}();
 		return ok;
 	}
 

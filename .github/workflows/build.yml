@@ -142,6 +142,102 @@ jobs:
             mods/SDRadio/build/Release/SDRadio.pdb
           if-no-files-found: error
 
+      # For the wine job. Not named SDRadio*: the prerelease job downloads by that pattern.
+      - name: Upload the tests
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tests
+          path: mods/SDRadio/build/tests/*_test.exe
+          if-no-files-found: error
+
+  # The same tests under Wine on Linux, where many players run the game (Steam's Proton, CrossOver, Wine
+  # itself): the .asi and test programs built above, on the newest stable Wine from WineHQ and on Ubuntu
+  # 24.04's older Wine 9. File names, code pages, Media Foundation etc. are Wine's own implementations there,
+  # which library_test exercises. Wine's fixme:/err: lines (functions it only stubs or can't do) are counted
+  # per test into the job summary.
+  wine:
+    name: Tests under ${{ matrix.name }}
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Wine stable (WineHQ)
+            source: winehq
+          - name: Wine 9 (Ubuntu 24.04)
+            source: ubuntu
+    env:
+      WINEPREFIX: ${{ github.workspace }}/prefix
+      # No Mono/Gecko: wineboot would offer to download them, and nothing here needs them.
+      WINEDLLOVERRIDES: mscoree,mshtml=
+    steps:
+      - name: Download SDRadio.asi
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: SDRadio
+          path: dist
+
+      - name: Download the tests
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: tests
+          path: tests
+
+      - name: Install Wine
+        env:
+          SOURCE: ${{ matrix.source }}
+        run: |
+          if [ "$SOURCE" = winehq ]; then
+            sudo dpkg --add-architecture i386
+            sudo mkdir -pm755 /etc/apt/keyrings
+            sudo wget -qO /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
+            sudo wget -qNP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/noble/winehq-noble.sources
+            sudo apt-get update -q
+            sudo apt-get install -yq --no-install-recommends winehq-stable
+          else
+            sudo apt-get update -q
+            sudo apt-get install -yq --no-install-recommends wine wine64
+          fi
+          wine --version
+          wineboot --init
+          wineserver -w
+
+      # As on Windows: each test next to its own copy of the .asi, the test's folder standing in for the game
+      # folder, exit 0 = pass. Wine's messages go to stderr, kept per test.
+      - name: Test
+        run: |
+          failed=()
+          cd tests
+          wine --version
+          for exe in *_test.exe; do
+            name=${exe%.exe}
+            mkdir -p "$name"
+            cp ../dist/SDRadio.asi "$name/"
+            echo "::group::$name"
+            wine "$exe" "$(winepath -w "$PWD/$name/SDRadio.asi")" 2> "$name.wine.txt" || failed+=("$name")
+            echo "-- Wine's messages:"
+            cat "$name.wine.txt"
+            echo "::endgroup::"
+          done
+          messages=$(grep -E '^[0-9a-f]+:(fixme|err):' *.wine.txt | sed -E 's/^([a-z_]+)\.wine\.txt:[0-9a-f]+:/\1 /' | sort | uniq -c | head -100)
+          {
+            echo "### ${{ matrix.name }}: $(wine --version)"
+            echo
+            if [ ${#failed[@]} -eq 0 ]; then echo "All tests passed."; else echo "**Failed: ${failed[*]}**"; fi
+            echo
+            echo "Wine's fixme/err lines by test (count, test, message):"
+            echo
+            echo '```'
+            echo "${messages:-(none)}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "::error::Failed under $(wine --version): ${failed[*]}"
+            exit 1
+          fi
+
   # SDRadio.zip, the download for players: unpacked into the game folder it gives dinput8.dll (Ultimate ASI
   # Loader, pinned in .github/asi-loader.env), plugins\SDRadio.asi and the music folder plugins\SDRadio with
   # a note saying what goes there (the library scan only picks up audio extensions).
