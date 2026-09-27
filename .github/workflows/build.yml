@@ -154,10 +154,12 @@ jobs:
   # itself): the .asi and test programs built above, on the newest stable Wine from WineHQ and on Ubuntu
   # 24.04's older Wine 9. File names, code pages, Media Foundation etc. are Wine's own implementations there,
   # which library_test exercises. Wine's fixme:/err: lines (functions it only stubs or can't do) are counted
-  # per test into the job summary.
+  # per test into the job summary. A failure here holds back the prerelease. The Wine here has no GStreamer
+  # plugins, so the Media Foundation fallback can't decode anything (Proton ships them).
   wine:
     name: Tests under ${{ matrix.name }}
     needs: build
+    # Named explicitly: the WineHQ repository below is per Ubuntu release (noble).
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
@@ -221,7 +223,10 @@ jobs:
             cat "$name.wine.txt"
             echo "::endgroup::"
           done
-          messages=$(grep -E '^[0-9a-f]+:(fixme|err):' *.wine.txt | sed -E 's/^([a-z_]+)\.wine\.txt:[0-9a-f]+:/\1 /' | sort | uniq -c | head -100)
+          # Without AppPolicyGet* (the static CRT's startup and exit in every MSVC program) and with addresses
+          # blanked, so a message repeated per thread counts once.
+          messages=$(grep -E '^[0-9a-f]+:(fixme|err):' *.wine.txt | grep -v ':AppPolicyGet' |
+            sed -E 's/^([a-z_]+)\.wine\.txt:[0-9a-f]+:/\1 /; s/\b(0x)?[0-9A-Fa-f]{8,16}\b/…/g' | sort | uniq -c | head -100)
           {
             echo "### ${{ matrix.name }}: $(wine --version)"
             echo
@@ -292,7 +297,7 @@ jobs:
   # releases/latest/download/SDRadio.zip (the newest full release).
   prerelease:
     name: Prerelease
-    needs: package
+    needs: [package, wine]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10

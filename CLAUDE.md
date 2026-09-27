@@ -63,7 +63,8 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
 - `core/library.*` — scan the music folder (sorted, ≤ 255 tracks: `TrackAsset` index is a byte), probe
   each file (format, exact length, tags).
 - `core/decoder.*` — bundled backends (dr_mp3/dr_flac/dr_wav/stb_vorbis) + `ToStereo`;
-  `core/decoder_mf.cc` — Media Foundation fallback (delay-loaded) with shell-property tags.
+  `core/decoder_mf.cc` — Media Foundation fallback (delay-loaded) with shell-property tags; logs once
+  whether it started (under Wine it may be missing, or start but open nothing without GStreamer plugins).
 - `core/tags.*` — ID3v2.2-2.4/ID3v1, Vorbis comments, RIFF INFO; legacy text: UTF-8, else GBK, else Latin-1.
 - `core/stream_io.*` — virtual files, decoder threads, completion thread.
 - `core/crash.*` — vectored exception handler (installed with logging on): logs the first 4 access
@@ -86,7 +87,10 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   game's top node; writes `station12.bnk`), `radios_test`, `tags_test`, `load_test` (also: the pack is
   written, one folder down from the test's "game folder"), `logo_test` (the `LOGO` resource of the built
   .asi decodes to 7 BC3 levels whose alpha matches the PNG; the pack's fields; the UID functions against
-  5 game packs; opaque pictures, fitting; includes stb by relative path since tests get no include paths).
+  5 game packs; opaque pictures, fitting; includes stb by relative path since tests get no include paths),
+  `library_test` (the .asi with music already in its folder: a Chinese subfolder and file name, WAV INFO tags
+  in GBK and UTF-8, mono, a broken `.m4a` that the Media Foundation fallback must reject, a `.txt` to ignore;
+  written for the Wine run below).
 - `.github/workflows/build.yml` — CI like SDIMEFix's (documented in `mods\SDIMEFix\CLAUDE.md`), without the
   Nexus job (no Nexus page yet; copy SDIMEFix's `nexus` job and `nexus-release.yml` when there is one). The
   `package` job builds `SDRadio.zip` for players: Ultimate ASI Loader as `dinput8.dll` (pinned in
@@ -97,6 +101,15 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   `.github/reference.env`: MinHook by release tag, dr_libs and stb by commits that change the files we compile
   (the decoders read player-supplied files, so their fixes matter). The `reference\` cache key includes the
   hash of `reference.env`, so adding a file to a `_FILES` list (and to the sparse checkout) refetches.
+  The `wine` job (2026-09-27) reruns the built `*_test.exe` on `ubuntu-24.04` under WineHQ's stable Wine
+  (11.0) and Ubuntu's Wine 9, each test next to its own `.asi` copy as on Windows; the prerelease waits for
+  it. Wine's `fixme:`/`err:` lines go to the job summary per test (the CRT's `AppPolicyGet*` fixmes are
+  dropped). Its Wine has no GStreamer plugins, so Media Foundation starts but opens nothing
+  (`0xC00D36BB`): a real M4A test would need `gstreamer1.0-plugins-base/good` + `gstreamer1.0-libav` and a
+  fixture. No X server: fine while no test creates a window (bank_test's first start logs explorer's
+  `nodrv_CreateWindow` errors, harmless); a window-creating test needs `xvfb-run`.
+  First run: all 6 tests pass on both; the scan, GBK (code page 936), Chinese paths and the logo pack behave
+  as on Windows.
 - `art/` — the station logo **私家台** (neon tubes; 私家 as in 私家車, the player's own car and music), final
   2026-09-26; `logo_512.png` is embedded as the default logo, so rerun `neon.py` before building after a
   change to it. `neon.py` generates `logo.svg` from tube skeletons (traced over Noto Sans SC
@@ -174,6 +187,7 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
 1. First in-game test — **passed** 2026-09-24 (Windows).
 2. Own HUD logo (5) — **passed** 2026-09-26 (Windows, with FileRedirector.asi installed: no conflict): 私家台
    on our station, HKPD keeps its own. A player `logo.png` in game not yet tried (the code path is tested).
-3. Next: Linux/macOS runs (the user has both; Wine/Proton/CrossOver), Chinese titles on the HUD (font
+3. Next: Linux/macOS runs in game (the user has both; Wine/Proton/CrossOver; the tests already pass under
+   Wine in CI), Chinese titles on the HUD (font
    glyphs), long-track seek behavior (`SeekMS` on resume reads far ahead: decode-to-position latency).
 4. Maybe: several stations (one per subfolder), shuffle/order option, M3U playlists.

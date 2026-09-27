@@ -30,7 +30,7 @@ WMA 等借助 Windows 的 Media Foundation，在 Wine/Proton 下是否可用取�
 comment、RIFF INFO 标签，没有标签时用文件名；GBK 编码的老式中文标签也能识别。日志里每首歌都写明用的是哪个解码器。
 
 状态：Windows 上已在游戏内验证（FLAC）；MP3/OGG/M4A、HUD 上的中文歌名、Linux / macOS（Proton、Wine、
-CrossOver）待测。
+CrossOver）上的游戏内表现待测（自动测试在 Wine 11 和 Wine 9 下都通过）。
 
 ### 需求
 
@@ -86,8 +86,10 @@ Visual Studio 2022（v143），Windows SDK 10.0.26100。项目需要放在工作
 `reference\minhook`（MinHook v1.3.4）、`reference\dr_libs` 和 `reference\stb`，它们的源码都随项目一起编译。
 
 GitHub Actions 会对推送和 PR 按同样的布局编译（`-warnAsError`）并运行自动测试，依赖的确切版本见
-`.github/reference.env`；然后打包 `SDRadio.zip`，其中 Ultimate ASI Loader 的版本和 SHA-256 固定在
-`.github/asi-loader.env`。推送到 `main` 且测试通过的构建会发布为预发布版 `build-<N>`。`asi-loader.yml` 每月检查
+`.github/reference.env`；同样的测试还会在 Linux 上用 Wine 再跑一遍（WineHQ 最新稳定版和 Ubuntu 24.04 自带的
+Wine 9），Wine 报告的未实现函数汇总在运行摘要里。然后打包 `SDRadio.zip`，其中 Ultimate ASI Loader 的版本和
+SHA-256 固定在 `.github/asi-loader.env`。推送到 `main` 且测试（包括 Wine 下的）通过的构建会发布为预发布版
+`build-<N>`。`asi-loader.yml` 每月检查
 一次 Ultimate ASI Loader 的新版本，有新版时开 PR 更新 `asi-loader.env`；`reference.yml` 对编译所用的依赖做
 同样的检查，开 PR 更新 `reference.env`；Dependabot 每月更新 Actions 的版本。
 
@@ -123,8 +125,8 @@ every platform; M4A/AAC, WMA and others go through Windows Media Foundation, whi
 on the build. Titles and artists come from ID3, Vorbis comments or RIFF INFO, else the file name; legacy GBK
 Chinese tags are recognized. The log names the decoder used for each track.
 
-Status: verified in game on Windows (FLAC); MP3/OGG/M4A, Chinese titles on the HUD and Linux / macOS (Proton,
-Wine, CrossOver) not yet tested.
+Status: verified in game on Windows (FLAC); MP3/OGG/M4A, Chinese titles on the HUD and the game on Linux /
+macOS (Proton, Wine, CrossOver) not yet tested (the automated tests pass under Wine 11 and Wine 9).
 
 ### Requirements
 
@@ -188,9 +190,11 @@ workspace that also has `reference\minhook` (MinHook v1.3.4), `reference\dr_libs
 compiled from source with the project.
 
 GitHub Actions builds pushes and pull requests in that same layout (with `-warnAsError`) and runs the
-automated tests; `.github/reference.env` lists the exact dependency versions. It then packages
-`SDRadio.zip`, with the Ultimate ASI Loader version and SHA-256 pinned in `.github/asi-loader.env`. Builds of
-`main` that pass are published as prereleases `build-<N>`. `asi-loader.yml` checks monthly for a new Ultimate
+automated tests; `.github/reference.env` lists the exact dependency versions. The same tests then run again
+on Linux under Wine (WineHQ's newest stable and Ubuntu 24.04's Wine 9), with the functions Wine reports as
+unimplemented summarized in the run summary. It then packages `SDRadio.zip`, with the Ultimate ASI Loader
+version and SHA-256 pinned in `.github/asi-loader.env`. Builds of `main` that pass (under Wine too) are
+published as prereleases `build-<N>`. `asi-loader.yml` checks monthly for a new Ultimate
 ASI Loader release and opens a PR that updates `asi-loader.env`, `reference.yml` does the same for the
 libraries the build compiles against (`reference.env`), and Dependabot updates the Actions monthly.
 
