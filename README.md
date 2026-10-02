@@ -2,6 +2,17 @@
 
 ![SDRadio: 私家台 in magenta neon tubes beside a music folder whose songs become a station on the game's radio HUD](assets/banner.png)
 
+> [!IMPORTANT]
+> **关于这个 mod**：它完全是用 Claude Code 里的 Claude Fable 和 Opus vibe coding 写出来的，几乎没有经过审查，请当作
+> 实验性质的 mod 使用，发现异常请反馈。它在很大程度上依赖 [SDmodding](https://github.com/SDmodding) 的成果，SDmodding 几乎全部出自 [sneakyevil](https://github.com/sneakyevil)
+> 之手，这个 mod 背后的逆向分析都从那里开始。这个仓库的 README 起初没有注明这些，是我的错，向 SDmodding 和
+> sneakyevil 道歉。完整致谢见页面底部的[致谢](#致谢)。
+>
+> **About this mod**: it was fully vibe-coded with Claude Fable and Opus in Claude Code, with little review, so treat
+> it as experimental and please report anything unusual. It relies heavily on [SDmodding](https://github.com/SDmodding), almost entirely the work of
+> [sneakyevil](https://github.com/sneakyevil): the reverse engineering behind it starts there. This repo's README didn't credit that at first, which
+> was my fault. Sorry, SDmodding team and sneakyevil. Full credits: [Credits](#credits), at the bottom.
+
 [中文](#中文) | [English](#english)
 
 ## 中文
