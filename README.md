@@ -31,6 +31,30 @@
    （它只在警用扫描模式下出现，届时可能显示最后一张封面）；`CoverArt = 0` 可关闭。
 5. 出问题时请附上 `plugins\SDRadio.log`。
 
+### 致谢
+
+这个分支用到或参考了下面这些人和项目的成果，在此致谢。
+
+- [SDmodding](https://github.com/SDmodding)，几乎全部出自 [sneakyevil](https://github.com/sneakyevil) 一人之手：SDmodding 分享的
+  游戏 v1.0 版 exe 和调试符号（PDB，Steam 首发版自带），游戏的电台系统、Wwise 的文件读取和界面都是从这里查到的；
+  读取游戏资源包（`.big`）的工具照 [BigFileSystem](https://github.com/SDmodding/BigFileSystem)、
+  [TheoryEngine](https://github.com/SDmodding/TheoryEngine)，以及 sneakyevil 的
+  [SD-BigFileExplorer](https://github.com/sneakyevil/SD-BigFileExplorer) 和 [Ekey](https://github.com/Ekey) 的 SDDEUnpacker
+  里的文件名列表写成，电台列表和电台图标都是用它找到的。
+- Audiokinetic 的 [Wwise](https://www.audiokinetic.com)（游戏用的是 Wwise 2012.2，音频库格式是对它逆向分析得到的）和
+  Autodesk 的 Scaleform（游戏界面用的中间件，封面图要经过它显示）。
+- mod 里包含的代码（许可证全文见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)）：
+  [MinHook](https://github.com/TsudaKageyu/minhook)（Tsuda Kageyu，内含 Vyacheslav Patkov 的 Hacker Disassembler Engine）、
+  [dr_libs](https://github.com/mackron/dr_libs)（David Reid；dr_mp3 含 lieff 的 [minimp3](https://github.com/lieff/minimp3)）、
+  [stb](https://github.com/nothings/stb)（Sean Barrett 等：stb_vorbis、stb_image、stb_image_resize2、stb_dxt）。
+- 需要另外安装的 [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)（ThirteenAG）。
+- 工具：[IDA Pro](https://hex-rays.com/ida-pro)（Hex-Rays）和 [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp)（mrexodia）；
+  [Claude Code](https://claude.com/claude-code)（Anthropic）：这个 mod 是在 AI 辅助下开发的，代码、文档和逆向分析由作者和
+  Claude 一起完成。
+
+《热血无赖：终极版》由 United Front Games 开发、Square Enix 发行，游戏及其内容的版权归 Square Enix 所有。Wwise 是
+Audiokinetic 的商标，Scaleform 是 Autodesk 的商标。与 Square Enix、United Front Games、Audiokinetic、Autodesk 均无关联。
+
 ## English
 
 Adds a station to the car radio that plays your own music from a folder. It runs through the game's own
@@ -61,4 +85,29 @@ Status: verified in game on Windows (FLAC); Linux / macOS (Proton, Wine, CrossOv
    `CoverArt = 0` turns it off.
 5. When reporting a problem, attach `plugins\SDRadio.log`.
 
-Third-party code and licenses: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+### Credits
+
+This branch uses or builds on the work of these people and projects. Thank you.
+
+- [SDmodding](https://github.com/SDmodding), almost all of it the work of one person,
+  [sneakyevil](https://github.com/sneakyevil): the game's v1.0 exe and its debug symbols (PDB, shipped with the
+  original Steam release), shared by SDmodding, from which the game's radio system, Wwise's file I/O and the UI were
+  worked out; our tool for reading the game's `.big` archives follows
+  [BigFileSystem](https://github.com/SDmodding/BigFileSystem), [TheoryEngine](https://github.com/SDmodding/TheoryEngine)
+  and the file name lists in sneakyevil's [SD-BigFileExplorer](https://github.com/sneakyevil/SD-BigFileExplorer) and in
+  [Ekey](https://github.com/Ekey)'s SDDEUnpacker; the station list and the station logos were found with it.
+- Audiokinetic's [Wwise](https://www.audiokinetic.com) (the game uses Wwise 2012.2; the bank format was
+  reverse-engineered from it) and Autodesk's Scaleform (the game's UI middleware, which the cover art goes through).
+- Code in the mod (full license texts in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)):
+  [MinHook](https://github.com/TsudaKageyu/minhook) (Tsuda Kageyu, with Vyacheslav Patkov's Hacker Disassembler Engine),
+  [dr_libs](https://github.com/mackron/dr_libs) (David Reid; dr_mp3 contains lieff's
+  [minimp3](https://github.com/lieff/minimp3)), [stb](https://github.com/nothings/stb) (Sean Barrett and others:
+  stb_vorbis, stb_image, stb_image_resize2, stb_dxt).
+- [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (ThirteenAG), installed separately.
+- Tools: [IDA Pro](https://hex-rays.com/ida-pro) (Hex-Rays) and [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp)
+  (mrexodia); [Claude Code](https://claude.com/claude-code) (Anthropic): this mod was developed with AI assistance; its
+  code, documentation and reverse engineering were done by the author together with Claude.
+
+Sleeping Dogs: Definitive Edition was developed by United Front Games and published by Square Enix; the game and its
+content are © Square Enix. Wwise is a trademark of Audiokinetic, Scaleform a trademark of Autodesk. Not affiliated
+with Square Enix, United Front Games, Audiokinetic or Autodesk.
