@@ -94,6 +94,14 @@ SHA-256 固定在 `.github/asi-loader.env`。推送到 `main` 且测试（包括
 （`nexus-release.yml`）。`asi-loader.yml` 每月检查一次 Ultimate ASI Loader 的新版本，有新版时开 PR 更新 `asi-loader.env`；`reference.yml` 对编译所用的依赖做
 同样的检查，开 PR 更新 `reference.env`；Dependabot 每月更新 Actions 的版本。
 
+### 致谢
+
+- [SDmodding](https://github.com/SDmodding)：旧版 PDB（游戏和 Wwise 的函数与数据结构）和 TheoryEngine 头文件
+  （电台图标贴图包的格式）。
+- [MinHook](https://github.com/TsudaKageyu/minhook)。
+- [dr_libs](https://github.com/mackron/dr_libs) 和 [stb](https://github.com/nothings/stb)：音频解码和图标处理。
+- [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)。
+
 第三方代码及其许可证见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
 
 与 Square Enix、United Front Games、Audiokinetic 均无关联。
@@ -201,6 +209,15 @@ published as prereleases `build-<N>` and uploaded to Nexus Mods as a new version
 a full release on GitHub uploads it to the Nexus main file (`nexus-release.yml`). `asi-loader.yml` checks
 monthly for a new Ultimate ASI Loader release and opens a PR that updates `asi-loader.env`, `reference.yml` does the same for the
 libraries the build compiles against (`reference.env`), and Dependabot updates the Actions monthly.
+
+### Credits
+
+- [SDmodding](https://github.com/SDmodding): the legacy PDB (the game's and Wwise's functions and data
+  structures) and the TheoryEngine headers (the texture pack format of the station logo).
+- [MinHook](https://github.com/TsudaKageyu/minhook).
+- [dr_libs](https://github.com/mackron/dr_libs) and [stb](https://github.com/nothings/stb): audio decoding and
+  the logo picture.
+- [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader).
 
 The third-party code and its licenses are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 

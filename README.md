@@ -120,6 +120,10 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 在 [GitHub Issues](https://github.com/aUsernameWoW/sleeping-dogs-custom-radio/issues) 或 Nexus Mods 页面的
 Bugs 标签里说明情况，并附上 `plugins\SDRadio.log`。
 
+### 致谢
+
+感谢 [SDmodding](https://github.com/SDmodding) 社区公开的《热血无赖》研究资料和工具，开发这个 mod 时用到了它们。
+
 与 Square Enix、United Front Games、Audiokinetic 均无关联。
 
 ## English
@@ -245,5 +249,10 @@ play under Proton; use MP3, FLAC or OGG.
 
 Describe it in [GitHub Issues](https://github.com/aUsernameWoW/sleeping-dogs-custom-radio/issues) or on the Bugs
 tab of the Nexus Mods page, and attach `plugins\SDRadio.log`.
+
+### Credits
+
+Thanks to the [SDmodding](https://github.com/SDmodding) community for the Sleeping Dogs research and tools they
+share, which went into making this mod.
 
 Not affiliated with Square Enix, United Front Games or Audiokinetic.
