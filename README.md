@@ -49,7 +49,7 @@
   [stb](https://github.com/nothings/stb)（Sean Barrett 等：stb_vorbis、stb_image、stb_image_resize2、stb_dxt）。
 - 需要另外安装的 [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)（ThirteenAG）。
 - 工具：[IDA Pro](https://hex-rays.com/ida-pro)（Hex-Rays）和 [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp)（mrexodia）；
-  [Claude Code](https://claude.com/claude-code)（Anthropic）：这个 mod 的代码、文档和逆向分析几乎全部由 Claude 完成；作者负责提出需求、把握方向和在游戏里测试，代码审查得很少。
+  [Claude Code](https://claude.com/claude-code)（Anthropic）：这个 mod 完全是用 Claude Fable 和 Opus vibe coding 写出来的，代码、文档和逆向分析都出自 Claude，几乎没有经过人工审查。
 
 《热血无赖：终极版》由 United Front Games 开发、Square Enix 发行，游戏及其内容的版权归 Square Enix 所有。Wwise 是
 Audiokinetic 的商标，Scaleform 是 Autodesk 的商标。与 Square Enix、United Front Games、Audiokinetic、Autodesk 均无关联。
@@ -91,7 +91,7 @@ This branch uses or builds on the work of these people and projects. Thank you.
 - [SDmodding](https://github.com/SDmodding), almost all of it the work of one person,
   [sneakyevil](https://github.com/sneakyevil): the game's v1.0 exe and its debug symbols (PDB, shipped with the
   original Steam release), shared by SDmodding, from which the game's radio system, Wwise's file I/O and the UI were
-  worked out; our tool for reading the game's `.big` archives follows
+  worked out; the tool that reads the game's `.big` archives follows
   [BigFileSystem](https://github.com/SDmodding/BigFileSystem), [TheoryEngine](https://github.com/SDmodding/TheoryEngine)
   and the file name lists in sneakyevil's [SD-BigFileExplorer](https://github.com/sneakyevil/SD-BigFileExplorer) and in
   [Ekey](https://github.com/Ekey)'s SDDEUnpacker; the station list and the station logos were found with it.
@@ -104,9 +104,8 @@ This branch uses or builds on the work of these people and projects. Thank you.
   stb_vorbis, stb_image, stb_image_resize2, stb_dxt).
 - [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (ThirteenAG), installed separately.
 - Tools: [IDA Pro](https://hex-rays.com/ida-pro) (Hex-Rays) and [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp)
-  (mrexodia); [Claude Code](https://claude.com/claude-code) (Anthropic): almost all of this mod's code, documentation and reverse
-  engineering was done by Claude; the author set the goals, steered and tested in game, and reviewed little of the
-  code.
+  (mrexodia); [Claude Code](https://claude.com/claude-code) (Anthropic): this mod was fully vibe-coded with Claude Fable and Opus; its code,
+  documentation and reverse engineering are all Claude's, with little human review.
 
 Sleeping Dogs: Definitive Edition was developed by United Front Games and published by Square Enix; the game and its
 content are © Square Enix. Wwise is a trademark of Audiokinetic, Scaleform a trademark of Autodesk. Not affiliated
