@@ -91,6 +91,7 @@ jobs:
             echo
             echo "- Asset: \`$ASSET\`, SHA-256 \`$sha\`"
             echo "- Changes: https://github.com/$LOADER_REPO/compare/$old...$tag"
+            echo "- Licenses: check what the x64 \`dinput8.dll\` compiles in (\`premake5.lua\` at $tag; at v9.7.4 MinHook, miniz and injector's FunctionHookMinHook) and update THIRD-PARTY-NOTICES.md, its version included, on this branch before merging."
             echo
             echo "The Build run on this branch downloads and checks it. Worth a quick start of the game with the new \`dinput8.dll\` before merging. Closing without merging skips $tag."
           } > body.md

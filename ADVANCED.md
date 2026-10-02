@@ -96,15 +96,47 @@ SHA-256 固定在 `.github/asi-loader.env`。推送到 `main` 且测试（包括
 
 ### 致谢
 
-- [SDmodding](https://github.com/SDmodding)：旧版 PDB（游戏和 Wwise 的函数与数据结构）和 TheoryEngine 头文件
-  （电台图标贴图包的格式）。
-- [MinHook](https://github.com/TsudaKageyu/minhook)。
-- [dr_libs](https://github.com/mackron/dr_libs) 和 [stb](https://github.com/nothings/stb)：音频解码和图标处理。
-- [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)。
+这个 mod 用到或参考了下面这些人和项目的成果，在此致谢。
 
-第三方代码及其许可证见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+**研究资料**
 
-与 Square Enix、United Front Games、Audiokinetic 均无关联。
+- [SDmodding](https://github.com/SDmodding)，几乎全部出自 [sneakyevil](https://github.com/sneakyevil) 一人之手。这个 mod 用到了：
+  - SDmodding 分享的游戏 v1.0 版 exe 和调试符号（PDB，Steam 首发版自带）：游戏的电台系统、Wwise 的文件读取和界面贴图包的结构都是从这里查到的；
+  - [TheoryEngine](https://github.com/SDmodding/TheoryEngine)：电台图标贴图包的格式和游戏的字符串哈希；
+  - [BigFileSystem](https://github.com/SDmodding/BigFileSystem)、[TheoryEngine](https://github.com/SDmodding/TheoryEngine)，以及 sneakyevil 的 [SD-BigFileExplorer](https://github.com/sneakyevil/SD-BigFileExplorer) 和 [Ekey](https://github.com/Ekey) 的 SDDEUnpacker 里的文件名列表：
+    我们照着它们写了读取游戏资源包（`.big`）的工具，电台列表 `Radios.xml`、电台 HUD 和横幅图参照的界面贴图都是用它找到的。
+- Audiokinetic 的 [Wwise](https://www.audiokinetic.com)：游戏用的是 Wwise 2012.2。mod 生成的音频库（bank）格式是对游戏里的
+  Wwise 逆向分析得到的，电台效果器的参数直接取自游戏自带的音频库。
+- ID3、Vorbis comment 和 RIFF INFO 标签的格式规范：读取歌名和歌手。
+- Scaleform（Autodesk）：游戏界面用的中间件，研究电台 HUD 时分析了它。
+
+**mod 里包含的代码**（许可证全文见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)）
+
+- [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)（ThirteenAG）：压缩包里的 `dinput8.dll`，让游戏加载 mod。它本身还包含 MinHook、
+  [miniz](https://github.com/richgel999/miniz)（Rich Geldreich 等）和 [praydog](https://github.com/praydog) 的 FunctionHookMinHook。
+- [MinHook](https://github.com/TsudaKageyu/minhook)（Tsuda Kageyu，内含 Vyacheslav Patkov 的 Hacker Disassembler Engine）：mod 靠它接入游戏。
+- [dr_libs](https://github.com/mackron/dr_libs)（David Reid；dr_mp3 含 lieff 的 [minimp3](https://github.com/lieff/minimp3)）：
+  解码 MP3、FLAC、WAV。
+- [stb](https://github.com/nothings/stb)（Sean Barrett 等；stb_dxt 原作者 Fabian Giesen，stb_image_resize2 作者 Jeff Roberts
+  和 Jorge L Rodriguez）：stb_vorbis 解码 OGG，stb_image、stb_image_resize2、stb_dxt 处理 PNG 图标。
+- Windows 的 Media Foundation（Microsoft，系统自带，不在 mod 里）：解码 M4A、WMA 等其他格式。
+
+**工具**
+
+- [Wine](https://www.winehq.org)：自动测试也在 Linux 上的 Wine 里运行。
+- [IDA Pro](https://hex-rays.com/ida-pro)（Hex-Rays）和 [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp)（mrexodia）：分析游戏程序。
+- [Pillow](https://python-pillow.org)：绘制「私家台」图标的脚本。
+- [Claude Code](https://claude.com/claude-code)（Anthropic）：这个 mod 是在 AI 辅助下开发的，代码、文档和逆向分析由作者和 Claude 一起完成。
+- 字体：「私家台」的灯管照 [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) Bold 的字形描出；
+  横幅图和图标用了 [Noto Sans SC/TC](https://fonts.google.com/noto)、[Teko](https://fonts.google.com/specimen/Teko)、[Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) 和 Microsoft 的 Bahnschrift。
+
+**游戏与商标**
+
+《热血无赖：终极版》（Sleeping Dogs: Definitive Edition）由 United Front Games 开发、Square Enix 发行，
+游戏及其内容的版权归 Square Enix 所有。游戏里的电台、音乐和电台图标归各自的权利人所有（ini 注释里列出的是游戏
+自带电台的图标名）。横幅图和图标仿照游戏的菜单界面重新绘制，没有使用游戏原图。Wwise 是 Audiokinetic 的商标，Scaleform 是 Autodesk 的商标。
+
+与 Square Enix、United Front Games、Audiokinetic、Autodesk 均无关联。
 
 ## English
 
@@ -212,13 +244,50 @@ libraries the build compiles against (`reference.env`), and Dependabot updates t
 
 ### Credits
 
-- [SDmodding](https://github.com/SDmodding): the legacy PDB (the game's and Wwise's functions and data
-  structures) and the TheoryEngine headers (the texture pack format of the station logo).
-- [MinHook](https://github.com/TsudaKageyu/minhook).
-- [dr_libs](https://github.com/mackron/dr_libs) and [stb](https://github.com/nothings/stb): audio decoding and
-  the logo picture.
-- [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader).
+This mod uses or builds on the work of these people and projects. Thank you.
 
-The third-party code and its licenses are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+**Research**
 
-Not affiliated with Square Enix, United Front Games or Audiokinetic.
+- [SDmodding](https://github.com/SDmodding), almost all of it the work of one person, [sneakyevil](https://github.com/sneakyevil). This mod used:
+  - the game's v1.0 exe and its debug symbols (PDB, shipped with the original Steam release), shared by
+    SDmodding: the game's radio system, Wwise's file I/O and the UI texture packs were worked out from them;
+  - [TheoryEngine](https://github.com/SDmodding/TheoryEngine): the format of the station logo's texture pack and the game's string hash;
+  - [BigFileSystem](https://github.com/SDmodding/BigFileSystem), [TheoryEngine](https://github.com/SDmodding/TheoryEngine), and the file name lists in sneakyevil's [SD-BigFileExplorer](https://github.com/sneakyevil/SD-BigFileExplorer) and in [Ekey](https://github.com/Ekey)'s
+    SDDEUnpacker: our tool for reading the game's `.big` archives follows them; the station list `Radios.xml`, the radio HUD and the UI textures the banner is modelled on were
+    found with it.
+- Audiokinetic's [Wwise](https://www.audiokinetic.com): the game uses Wwise 2012.2. The format of the bank the mod
+  generates was reverse-engineered from the game's Wwise, and the radio effect's parameters are copied from the
+  game's own banks.
+- The ID3, Vorbis comment and RIFF INFO tag specifications: reading titles and artists.
+- Scaleform (Autodesk): the game's UI middleware, analyzed while studying the radio HUD.
+
+**Code in the mod** (full license texts in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md))
+
+- [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (ThirteenAG): the `dinput8.dll` in the zip, which makes the game load mods.
+  It contains MinHook, [miniz](https://github.com/richgel999/miniz) (Rich Geldreich and others) and [praydog](https://github.com/praydog)'s FunctionHookMinHook.
+- [MinHook](https://github.com/TsudaKageyu/minhook) (Tsuda Kageyu, with Vyacheslav Patkov's Hacker Disassembler Engine): how the mod hooks into the game.
+- [dr_libs](https://github.com/mackron/dr_libs) (David Reid; dr_mp3 contains lieff's
+  [minimp3](https://github.com/lieff/minimp3)): decoding MP3, FLAC and WAV.
+- [stb](https://github.com/nothings/stb) (Sean Barrett and others; stb_dxt originally by Fabian Giesen,
+  stb_image_resize2 by Jeff Roberts and Jorge L Rodriguez): stb_vorbis decodes OGG; stb_image, stb_image_resize2
+  and stb_dxt handle the PNG logo.
+- Windows Media Foundation (Microsoft; part of Windows, not of the mod): decoding M4A, WMA and other formats.
+
+**Tools**
+
+- [Wine](https://www.winehq.org): the automated tests also run under Wine on Linux.
+- [IDA Pro](https://hex-rays.com/ida-pro) (Hex-Rays) and [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp) (mrexodia): analyzing the game's code.
+- [Pillow](https://python-pillow.org): the script that draws the 私家台 logo.
+- [Claude Code](https://claude.com/claude-code) (Anthropic): this mod was developed with AI assistance; its code, documentation and reverse
+  engineering were done by the author together with Claude.
+- Fonts: the 私家台 tubes are traced over [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) Bold;
+  the banner and the icon use [Noto Sans SC/TC](https://fonts.google.com/noto), [Teko](https://fonts.google.com/specimen/Teko), [Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) and Microsoft's Bahnschrift.
+
+**The game and trademarks**
+
+Sleeping Dogs: Definitive Edition was developed by United Front Games and published by Square Enix; the game
+and its content are © Square Enix. The game's stations, music and station logos belong to their owners (the
+ini's comments list the logo names of the game's stations). The banner and the icon redraw the look of the game's menus; no game art is used in them. Wwise is a trademark of Audiokinetic,
+Scaleform a trademark of Autodesk.
+
+Not affiliated with Square Enix, United Front Games, Audiokinetic or Autodesk.

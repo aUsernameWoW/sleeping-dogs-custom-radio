@@ -1,7 +1,8 @@
 # Third-party notices
 
 `SDRadio.asi` contains code from the following projects, and `SDRadio.zip` also ships Ultimate ASI Loader as
-`dinput8.dll`, under the licenses reproduced below.
+`dinput8.dll`, which itself contains MinHook, miniz and FunctionHookMinHook, under the licenses reproduced
+below.
 
 ## MinHook 1.3.4
 
@@ -201,10 +202,12 @@ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## Ultimate ASI Loader
+## Ultimate ASI Loader v9.7.4
 
 https://github.com/ThirteenAG/Ultimate-ASI-Loader — not compiled into `SDRadio.asi`; its x64 release binary
-is included unmodified as `dinput8.dll` in `SDRadio.zip` (version: `.github/asi-loader.env`).
+(`Ultimate-ASI-Loader-NoPDB_x64.zip`) is included unmodified as `dinput8.dll` in `SDRadio.zip` (pinned in
+`.github/asi-loader.env`). That binary also contains MinHook (the MinHook license above), praydog's FunctionHookMinHook and miniz,
+whose licenses follow the loader's own, and LINK/2012's public-domain exception tracer, which needs no notice.
 
 ```text
 MIT License
@@ -228,4 +231,61 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+### FunctionHookMinHook (in `dinput8.dll`)
+
+https://github.com/ThirteenAG/injector — `utility/FunctionHookMinHook.cpp`.
+
+```text
+MIT License
+
+Copyright (c) 2019 praydog
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### miniz (in `dinput8.dll`)
+
+https://github.com/richgel999/miniz — the copy in Ultimate ASI Loader's `external/miniz`.
+
+```text
+Copyright 2013-2014 RAD Game Tools and Valve Software
+Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC
+
+All Rights Reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 ```
