@@ -49,8 +49,7 @@
   [stb](https://github.com/nothings/stb)（Sean Barrett 等：stb_vorbis、stb_image、stb_image_resize2、stb_dxt）。
 - 需要另外安装的 [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)（ThirteenAG）。
 - 工具：[IDA Pro](https://hex-rays.com/ida-pro)（Hex-Rays）和 [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp)（mrexodia）；
-  [Claude Code](https://claude.com/claude-code)（Anthropic）：这个 mod 是在 AI 辅助下开发的，代码、文档和逆向分析由作者和
-  Claude 一起完成。
+  [Claude Code](https://claude.com/claude-code)（Anthropic）：这个 mod 的代码、文档和逆向分析几乎全部由 Claude 完成；作者负责提出需求、把握方向和在游戏里测试，代码审查得很少。
 
 《热血无赖：终极版》由 United Front Games 开发、Square Enix 发行，游戏及其内容的版权归 Square Enix 所有。Wwise 是
 Audiokinetic 的商标，Scaleform 是 Autodesk 的商标。与 Square Enix、United Front Games、Audiokinetic、Autodesk 均无关联。
@@ -105,8 +104,9 @@ This branch uses or builds on the work of these people and projects. Thank you.
   stb_vorbis, stb_image, stb_image_resize2, stb_dxt).
 - [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (ThirteenAG), installed separately.
 - Tools: [IDA Pro](https://hex-rays.com/ida-pro) (Hex-Rays) and [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp)
-  (mrexodia); [Claude Code](https://claude.com/claude-code) (Anthropic): this mod was developed with AI assistance; its
-  code, documentation and reverse engineering were done by the author together with Claude.
+  (mrexodia); [Claude Code](https://claude.com/claude-code) (Anthropic): almost all of this mod's code, documentation and reverse
+  engineering was done by Claude; the author set the goals, steered and tested in game, and reviewed little of the
+  code.
 
 Sleeping Dogs: Definitive Edition was developed by United Front Games and published by Square Enix; the game and its
 content are © Square Enix. Wwise is a trademark of Audiokinetic, Scaleform a trademark of Autodesk. Not affiliated
