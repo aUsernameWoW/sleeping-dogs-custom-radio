@@ -104,7 +104,7 @@ SHA-256 固定在 `.github/asi-loader.env`。推送到 `main` 且测试（包括
   - SDmodding 分享的游戏 v1.0 版 exe 和调试符号（PDB，Steam 首发版自带）：游戏的电台系统、Wwise 的文件读取和界面贴图包的结构都是从这里查到的；
   - [TheoryEngine](https://github.com/SDmodding/TheoryEngine)：电台图标贴图包的格式和游戏的字符串哈希；
   - [BigFileSystem](https://github.com/SDmodding/BigFileSystem)、[TheoryEngine](https://github.com/SDmodding/TheoryEngine)，以及 sneakyevil 的 [SD-BigFileExplorer](https://github.com/sneakyevil/SD-BigFileExplorer) 和 [Ekey](https://github.com/Ekey) 的 SDDEUnpacker 里的文件名列表：
-    我们照着它们写了读取游戏资源包（`.big`）的工具，电台列表 `Radios.xml`、电台 HUD 和横幅图参照的界面贴图都是用它找到的。
+    读取游戏资源包（`.big`）的工具是照着它们写的，电台列表 `Radios.xml`、电台 HUD 和横幅图参照的界面贴图都是用它找到的。
 - Audiokinetic 的 [Wwise](https://www.audiokinetic.com)：游戏用的是 Wwise 2012.2。mod 生成的音频库（bank）格式是对游戏里的
   Wwise 逆向分析得到的，电台效果器的参数直接取自游戏自带的音频库。
 - ID3、Vorbis comment 和 RIFF INFO 标签的格式规范：读取歌名和歌手。
@@ -126,7 +126,7 @@ SHA-256 固定在 `.github/asi-loader.env`。推送到 `main` 且测试（包括
 - [Wine](https://www.winehq.org)：自动测试也在 Linux 上的 Wine 里运行。
 - [IDA Pro](https://hex-rays.com/ida-pro)（Hex-Rays）和 [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp)（mrexodia）：分析游戏程序。
 - [Pillow](https://python-pillow.org)：绘制「私家台」图标的脚本。
-- [Claude Code](https://claude.com/claude-code)（Anthropic）：这个 mod 的代码、文档和逆向分析几乎全部由 Claude 完成；作者负责提出需求、把握方向和在游戏里测试，代码审查得很少。
+- [Claude Code](https://claude.com/claude-code)（Anthropic）：这个 mod 完全是用 Claude Fable 和 Opus vibe coding 写出来的，代码、文档和逆向分析都出自 Claude，几乎没有经过人工审查。
 - 字体：「私家台」的灯管照 [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) Bold 的字形描出；
   横幅图和图标用了 [Noto Sans SC/TC](https://fonts.google.com/noto)、[Teko](https://fonts.google.com/specimen/Teko)、[Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) 和 Microsoft 的 Bahnschrift。
 
@@ -253,7 +253,7 @@ This mod uses or builds on the work of these people and projects. Thank you.
     SDmodding: the game's radio system, Wwise's file I/O and the UI texture packs were worked out from them;
   - [TheoryEngine](https://github.com/SDmodding/TheoryEngine): the format of the station logo's texture pack and the game's string hash;
   - [BigFileSystem](https://github.com/SDmodding/BigFileSystem), [TheoryEngine](https://github.com/SDmodding/TheoryEngine), and the file name lists in sneakyevil's [SD-BigFileExplorer](https://github.com/sneakyevil/SD-BigFileExplorer) and in [Ekey](https://github.com/Ekey)'s
-    SDDEUnpacker: our tool for reading the game's `.big` archives follows them; the station list `Radios.xml`, the radio HUD and the UI textures the banner is modelled on were
+    SDDEUnpacker: the tool that reads the game's `.big` archives follows them; the station list `Radios.xml`, the radio HUD and the UI textures the banner is modelled on were
     found with it.
 - Audiokinetic's [Wwise](https://www.audiokinetic.com): the game uses Wwise 2012.2. The format of the bank the mod
   generates was reverse-engineered from the game's Wwise, and the radio effect's parameters are copied from the
@@ -278,9 +278,8 @@ This mod uses or builds on the work of these people and projects. Thank you.
 - [Wine](https://www.winehq.org): the automated tests also run under Wine on Linux.
 - [IDA Pro](https://hex-rays.com/ida-pro) (Hex-Rays) and [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp) (mrexodia): analyzing the game's code.
 - [Pillow](https://python-pillow.org): the script that draws the 私家台 logo.
-- [Claude Code](https://claude.com/claude-code) (Anthropic): almost all of this mod's code, documentation and reverse
-  engineering was done by Claude; the author set the goals, steered and tested in game, and reviewed little of the
-  code.
+- [Claude Code](https://claude.com/claude-code) (Anthropic): this mod was fully vibe-coded with Claude Fable and Opus; its code,
+  documentation and reverse engineering are all Claude's, with little human review.
 - Fonts: the 私家台 tubes are traced over [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) Bold;
   the banner and the icon use [Noto Sans SC/TC](https://fonts.google.com/noto), [Teko](https://fonts.google.com/specimen/Teko), [Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) and Microsoft's Bahnschrift.
 
