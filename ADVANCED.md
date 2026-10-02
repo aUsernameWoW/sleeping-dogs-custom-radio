@@ -126,7 +126,7 @@ SHA-256 固定在 `.github/asi-loader.env`。推送到 `main` 且测试（包括
 - [Wine](https://www.winehq.org)：自动测试也在 Linux 上的 Wine 里运行。
 - [IDA Pro](https://hex-rays.com/ida-pro)（Hex-Rays）和 [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp)（mrexodia）：分析游戏程序。
 - [Pillow](https://python-pillow.org)：绘制「私家台」图标的脚本。
-- [Claude Code](https://claude.com/claude-code)（Anthropic）：这个 mod 是在 AI 辅助下开发的，代码、文档和逆向分析由作者和 Claude 一起完成。
+- [Claude Code](https://claude.com/claude-code)（Anthropic）：这个 mod 的代码、文档和逆向分析几乎全部由 Claude 完成；作者负责提出需求、把握方向和在游戏里测试，代码审查得很少。
 - 字体：「私家台」的灯管照 [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) Bold 的字形描出；
   横幅图和图标用了 [Noto Sans SC/TC](https://fonts.google.com/noto)、[Teko](https://fonts.google.com/specimen/Teko)、[Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) 和 Microsoft 的 Bahnschrift。
 
@@ -278,8 +278,9 @@ This mod uses or builds on the work of these people and projects. Thank you.
 - [Wine](https://www.winehq.org): the automated tests also run under Wine on Linux.
 - [IDA Pro](https://hex-rays.com/ida-pro) (Hex-Rays) and [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp) (mrexodia): analyzing the game's code.
 - [Pillow](https://python-pillow.org): the script that draws the 私家台 logo.
-- [Claude Code](https://claude.com/claude-code) (Anthropic): this mod was developed with AI assistance; its code, documentation and reverse
-  engineering were done by the author together with Claude.
+- [Claude Code](https://claude.com/claude-code) (Anthropic): almost all of this mod's code, documentation and reverse
+  engineering was done by Claude; the author set the goals, steered and tested in game, and reviewed little of the
+  code.
 - Fonts: the 私家台 tubes are traced over [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) Bold;
   the banner and the icon use [Noto Sans SC/TC](https://fonts.google.com/noto), [Teko](https://fonts.google.com/specimen/Teko), [Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) and Microsoft's Bahnschrift.
 
