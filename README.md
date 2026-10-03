@@ -138,6 +138,7 @@ Bugs 标签里说明情况，并附上 `plugins\SDRadio.log`。
 **研究资料**
 
 - [SDmodding](https://github.com/SDmodding)，几乎全部出自 [sneakyevil](https://github.com/sneakyevil) 一人之手。这个 mod 用到了：
+  - SDmodding 随 [SDK](https://github.com/SDmodding/SDK) 发布的 [Visual Studio 2022 项目模板](https://github.com/SDmodding/SDK/releases/tag/vs2022)：这个 mod 的 Visual Studio 工程源自这个模板，编译设置和以 `dllmain.cc` 为起点的源文件结构都来自它；
   - SDmodding 分享的游戏 v1.0 版 exe 和调试符号（PDB，Steam 首发版自带）：游戏的电台系统、Wwise 的文件读取和界面贴图包的结构都是从这里查到的；
   - [TheoryEngine](https://github.com/SDmodding/TheoryEngine)：电台图标贴图包的格式和游戏的字符串哈希；
   - [BigFileSystem](https://github.com/SDmodding/BigFileSystem)、[TheoryEngine](https://github.com/SDmodding/TheoryEngine)，以及 sneakyevil 的 [SD-BigFileExplorer](https://github.com/sneakyevil/SD-BigFileExplorer) 和 [Ekey](https://github.com/Ekey) 的 SDDEUnpacker 里的文件名列表：
@@ -306,6 +307,7 @@ This mod uses or builds on the work of these people and projects. Thank you.
 **Research**
 
 - [SDmodding](https://github.com/SDmodding), almost all of it the work of one person, [sneakyevil](https://github.com/sneakyevil). This mod used:
+  - the [Visual Studio 2022 project template](https://github.com/SDmodding/SDK/releases/tag/vs2022) released with SDmodding's [SDK](https://github.com/SDmodding/SDK): the mod's Visual Studio project derives from it, including its build settings and the source layout that starts at `dllmain.cc`;
   - the game's v1.0 exe and its debug symbols (PDB, shipped with the original Steam release), shared by
     SDmodding: the game's radio system, Wwise's file I/O and the UI texture packs were worked out from them;
   - [TheoryEngine](https://github.com/SDmodding/TheoryEngine): the format of the station logo's texture pack and the game's string hash;
