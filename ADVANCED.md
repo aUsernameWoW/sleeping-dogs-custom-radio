@@ -24,23 +24,19 @@
 
 1. **电台列表**：游戏从 `Global.big` 的 XML 缓存里读 `Radios.xml`。mod hook 了读取函数，在末尾加一个
    `<Station>`，每个音乐文件对应一个 `<Track>`。HUD 和切台逻辑自动跟上。
-2. **音频库（bank）**：mod 在运行时生成这个电台的 Wwise bank（每首歌一个流式 Sound + Play 事件），挂在车载电台
-   原本的总线、效果和 RTPC 下面，所以音量、车内音效、暂停和对话压低都和原版一样。
+2. **音频库（bank）**：mod 在运行时生成这个电台的 Wwise bank（每首歌一个流式 Sound + Play 事件），挂在车载电台原本的总线、效果和 RTPC 下面，所以音量、车内音效、暂停和对话压低都和原版一样。
 3. **音频流**：hook Wwise 的底层文件 I/O，把我们的文件 ID 变成虚拟文件：bank 本身，或者每首歌实时解码成的
    16 位立体声 WAV。
 4. 一首结束后由游戏自己的逻辑随机挑下一首。
 5. **图标**：mod 启动时把图标做成游戏格式的 UI 贴图包，写成 `.asi` 旁边的 `SDRadio-logo.perm.bin` 和
-   `.temp.bin`，电台列表里写上这个包的相对路径。游戏的归档里没有这个路径，就会从磁盘读取，和加载自带电台的
-   图标完全一样，不需要任何 hook，也不占用别的电台的图标。见下面的[自定义图标](#自定义图标)。
+   `.temp.bin`，电台列表里写上这个包的相对路径。游戏的归档里没有这个路径，就会从磁盘读取，和加载自带电台的图标完全一样，不需要任何 hook，也不占用别的电台的图标。见下面的[自定义图标](#自定义图标)。
 
 实现细节和逆向笔记见 [CLAUDE.md](CLAUDE.md) 和 [docs/radio-internals.md](docs/radio-internals.md)（英文）。
 
-**格式**：MP3、FLAC、WAV、OGG Vorbis 由 mod 自带的解码器（dr_libs、stb_vorbis）处理，任何平台都一样；M4A/AAC、
-WMA 等借助 Windows 的 Media Foundation，在 Wine/Proton 下是否可用取决于其版本。歌名和歌手取自 ID3、Vorbis
+**格式**：MP3、FLAC、WAV、OGG Vorbis 由 mod 自带的解码器（dr_libs、stb_vorbis）处理，任何平台都一样；M4A/AAC、WMA 等借助 Windows 的 Media Foundation，在 Wine/Proton 下是否可用取决于其版本。歌名和歌手取自 ID3、Vorbis
 comment、RIFF INFO 标签，没有标签时用文件名；GBK 编码的老式中文标签也能识别。日志里每首歌都写明用的是哪个解码器。
 
-状态：Windows 上已在游戏内验证（FLAC）；MP3/OGG/M4A、HUD 上的中文歌名、Linux / macOS（Proton、Wine、
-CrossOver）上的游戏内表现待测（自动测试在 Wine 11 和 Wine 9 下都通过）。
+状态：Windows 上已在游戏内验证（FLAC）；MP3/OGG/M4A、HUD 上的中文歌名、Linux / macOS（Proton、Wine、CrossOver）上的游戏内表现待测（自动测试在 Wine 11 和 Wine 9 下都通过）。
 
 ### 需求
 
@@ -61,12 +57,9 @@ CrossOver）上的游戏内表现待测（自动测试在 Wine 11 和 Wine 9 下
 | `SDRadio.pdb` | 调试符号，只在分析崩溃转储时需要 |
 | `THIRD-PARTY-NOTICES.md` | 第三方代码的许可证 |
 
-`main` 上每次提交都会自动编译、测试并发布为预发布版 `build-<N>`（没有在游戏里测过）。在游戏里验证过的构建会被
-转为正式版；README 里的下载链接指向最新的正式版。Nexus Mods 上主文件 “SDRadio” 是正式版，
-“SDRadio GitHub CI Build” 是每次的预发布版，都是同一个 `SDRadio.zip`。
+`main` 上每次提交都会自动编译、测试并发布为预发布版 `build-<N>`（没有在游戏里测过）。在游戏里验证过的构建会被转为正式版；README 里的下载链接指向最新的正式版。Nexus Mods 上主文件 “SDRadio” 是正式版，“SDRadio GitHub CI Build” 是每次的预发布版，都是同一个 `SDRadio.zip`。
 
-已经有 ASI 加载器时，只需要把 `SDRadio.asi` 放进它加载插件的目录（通常是 `plugins\`）。`SDRadio.ini`、
-`SDRadio.log` 和默认的音乐文件夹 `SDRadio\` 都在 `.asi` 旁边。
+已经有 ASI 加载器时，只需要把 `SDRadio.asi` 放进它加载插件的目录（通常是 `plugins\`）。`SDRadio.ini`、`SDRadio.log` 和默认的音乐文件夹 `SDRadio\` 都在 `.asi` 旁边。
 
 ### 设置（`SDRadio.ini`，UTF-8）
 
@@ -82,8 +75,7 @@ CrossOver）上的游戏内表现待测（自动测试在 Wine 11 和 Wine 9 下
 
 把 PNG 命名为 `logo.png` 放进音乐文件夹（默认 `plugins\SDRadio`），重启游戏生效；删掉就回到自带的「私家台」。
 
-- HUD 会把所有电台图标染成白色（原版的彩色图标也一样），所以只有**透明度**会显示：不透明的部分是白色，半透明
-  的部分是半透明的白（可以做光晕），颜色会被忽略；
+- HUD 会把所有电台图标染成白色（原版的彩色图标也一样），所以只有**透明度**会显示：不透明的部分是白色，半透明的部分是半透明的白（可以做光晕），颜色会被忽略；
 - 比例 2:1，推荐 512×256；其他尺寸会等比缩放进 512×256 并居中，不裁切（每边最多 16384 像素）；
 - 没有透明背景的图会自动转成剪影：与图片边缘的明暗差越大越不透明，所以白纸上的黑色图案、黑底上的白色图案都可以；
 - 可以参考自带图标 [`art/logo_512.png`](art/logo_512.png)，它由 [`art/neon.py`](art/neon.py) 生成。
@@ -100,9 +92,7 @@ GitHub Actions 会对推送和 PR 按同样的布局编译（`-warnAsError`）�
 `.github/reference.env`；同样的测试还会在 Linux 上用 Wine 再跑一遍（WineHQ 最新稳定版和 Ubuntu 24.04 自带的
 Wine 9），Wine 报告的未实现函数汇总在运行摘要里。然后打包 `SDRadio.zip`，其中 Ultimate ASI Loader 的版本和
 SHA-256 固定在 `.github/asi-loader.env`。推送到 `main` 且测试（包括 Wine 下的）通过的构建会发布为预发布版
-`build-<N>`，并作为新版本上传到 Nexus Mods；在 GitHub 上把预发布版转为正式版，会把它上传到 Nexus 的主文件
-（`nexus-release.yml`）。`asi-loader.yml` 每月检查一次 Ultimate ASI Loader 的新版本，有新版时开 PR 更新 `asi-loader.env`；`reference.yml` 对编译所用的依赖做
-同样的检查，开 PR 更新 `reference.env`；Dependabot 每月更新 Actions 的版本。
+`build-<N>`，并作为新版本上传到 Nexus Mods；在 GitHub 上把预发布版转为正式版，会把它上传到 Nexus 的主文件（`nexus-release.yml`）。`asi-loader.yml` 每月检查一次 Ultimate ASI Loader 的新版本，有新版时开 PR 更新 `asi-loader.env`；`reference.yml` 对编译所用的依赖做同样的检查，开 PR 更新 `reference.env`；Dependabot 每月更新 Actions 的版本。
 
 ### 致谢
 
@@ -114,8 +104,7 @@ SHA-256 固定在 `.github/asi-loader.env`。推送到 `main` 且测试（包括
   - SDmodding 随 [SDK](https://github.com/SDmodding/SDK) 发布的 [Visual Studio 2022 项目模板](https://github.com/SDmodding/SDK/releases/tag/vs2022)：这个 mod 的 Visual Studio 工程源自这个模板，编译设置和以 `dllmain.cc` 为起点的源文件结构都来自它；
   - SDmodding 分享的游戏 v1.0 版 exe 和调试符号（PDB，Steam 首发版自带）：游戏的电台系统、Wwise 的文件读取和界面贴图包的结构都是从这里查到的；
   - [TheoryEngine](https://github.com/SDmodding/TheoryEngine)：电台图标贴图包的格式和游戏的字符串哈希；
-  - [BigFileSystem](https://github.com/SDmodding/BigFileSystem)、[TheoryEngine](https://github.com/SDmodding/TheoryEngine)，以及 sneakyevil 的 [SD-BigFileExplorer](https://github.com/sneakyevil/SD-BigFileExplorer) 和 [Ekey](https://github.com/Ekey) 的 SDDEUnpacker 里的文件名列表：
-    读取游戏资源包（`.big`）的工具是照着它们写的，电台列表 `Radios.xml`、电台 HUD 和横幅图参照的界面贴图都是用它找到的。
+  - [BigFileSystem](https://github.com/SDmodding/BigFileSystem)、[TheoryEngine](https://github.com/SDmodding/TheoryEngine)，以及 sneakyevil 的 [SD-BigFileExplorer](https://github.com/sneakyevil/SD-BigFileExplorer) 和 [Ekey](https://github.com/Ekey) 的 SDDEUnpacker 里的文件名列表：读取游戏资源包（`.big`）的工具是照着它们写的，电台列表 `Radios.xml`、电台 HUD 和横幅图参照的界面贴图都是用它找到的。
 - Audiokinetic 的 [Wwise](https://www.audiokinetic.com)：游戏用的是 Wwise 2012.2。mod 生成的音频库（bank）格式是对游戏里的
   Wwise 逆向分析得到的，电台效果器的参数直接取自游戏自带的音频库。
 - ID3、Vorbis comment 和 RIFF INFO 标签的格式规范：读取歌名和歌手。
@@ -123,11 +112,9 @@ SHA-256 固定在 `.github/asi-loader.env`。推送到 `main` 且测试（包括
 
 **mod 里包含的代码**（许可证全文见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)）
 
-- [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)（ThirteenAG）：压缩包里的 `dinput8.dll`，让游戏加载 mod。它本身还包含 MinHook、
-  [miniz](https://github.com/richgel999/miniz)（Rich Geldreich 等）和 [praydog](https://github.com/praydog) 的 FunctionHookMinHook。
+- [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)（ThirteenAG）：压缩包里的 `dinput8.dll`，让游戏加载 mod。它本身还包含 MinHook、[miniz](https://github.com/richgel999/miniz)（Rich Geldreich 等）和 [praydog](https://github.com/praydog) 的 FunctionHookMinHook。
 - [MinHook](https://github.com/TsudaKageyu/minhook)（Tsuda Kageyu，内含 Vyacheslav Patkov 的 Hacker Disassembler Engine）：mod 靠它接入游戏。
-- [dr_libs](https://github.com/mackron/dr_libs)（David Reid；dr_mp3 含 lieff 的 [minimp3](https://github.com/lieff/minimp3)）：
-  解码 MP3、FLAC、WAV。
+- [dr_libs](https://github.com/mackron/dr_libs)（David Reid；dr_mp3 含 lieff 的 [minimp3](https://github.com/lieff/minimp3)）：解码 MP3、FLAC、WAV。
 - [stb](https://github.com/nothings/stb)（Sean Barrett 等；stb_dxt 原作者 Fabian Giesen，stb_image_resize2 作者 Jeff Roberts
   和 Jorge L Rodriguez）：stb_vorbis 解码 OGG，stb_image、stb_image_resize2、stb_dxt 处理 PNG 图标。
 - Windows 的 Media Foundation（Microsoft，系统自带，不在 mod 里）：解码 M4A、WMA 等其他格式。
@@ -138,14 +125,11 @@ SHA-256 固定在 `.github/asi-loader.env`。推送到 `main` 且测试（包括
 - [IDA Pro](https://hex-rays.com/ida-pro)（Hex-Rays）和 [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp)（mrexodia）：分析游戏程序。
 - [Pillow](https://python-pillow.org)：绘制「私家台」图标的脚本。
 - [Claude Code](https://claude.com/claude-code)（Anthropic）：这个 mod 完全是用 Claude Fable 和 Opus vibe coding 写出来的，代码、文档和逆向分析都出自 Claude，几乎没有经过人工审查。
-- 字体：「私家台」的灯管照 [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) Bold 的字形描出；
-  横幅图和图标用了 [Noto Sans SC/TC](https://fonts.google.com/noto)、[Teko](https://fonts.google.com/specimen/Teko)、[Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) 和 Microsoft 的 Bahnschrift。
+- 字体：「私家台」的灯管照 [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) Bold 的字形描出；横幅图和图标用了 [Noto Sans SC/TC](https://fonts.google.com/noto)、[Teko](https://fonts.google.com/specimen/Teko)、[Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) 和 Microsoft 的 Bahnschrift。
 
 **游戏与商标**
 
-《热血无赖：终极版》（Sleeping Dogs: Definitive Edition）由 United Front Games 开发、Square Enix 发行，
-游戏及其内容的版权归 Square Enix 所有。游戏里的电台、音乐和电台图标归各自的权利人所有（ini 注释里列出的是游戏
-自带电台的图标名）。横幅图和图标仿照游戏的菜单界面重新绘制，没有使用游戏原图。Wwise 是 Audiokinetic 的商标，Scaleform 是 Autodesk 的商标。
+《热血无赖：终极版》（Sleeping Dogs: Definitive Edition）由 United Front Games 开发、Square Enix 发行，游戏及其内容的版权归 Square Enix 所有。游戏里的电台、音乐和电台图标归各自的权利人所有（ini 注释里列出的是游戏自带电台的图标名）。横幅图和图标仿照游戏的菜单界面重新绘制，没有使用游戏原图。Wwise 是 Audiokinetic 的商标，Scaleform 是 Autodesk 的商标。
 
 与 Square Enix、United Front Games、Audiokinetic、Autodesk 均无关联。
 

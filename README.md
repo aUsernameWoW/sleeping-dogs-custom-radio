@@ -16,21 +16,17 @@
 
 ## 中文
 
-给《热血无赖：终极版》的车载电台加一个新电台，播放你自己的音乐。它和游戏自带的电台完全一样：切台时显示台名、
-图标和“歌手 - 歌名”，一首放完自动换下一首（随机，避开刚放过的），音量、车内收音机的音效、暂停和对话时自动
-压低也都和原版电台一致。
+给《热血无赖：终极版》的车载电台加一个新电台，播放你自己的音乐。它和游戏自带的电台完全一样：切台时显示台名、图标和“歌手 - 歌名”，一首放完自动换下一首（随机，避开刚放过的），音量、车内收音机的音效、暂停和对话时自动压低也都和原版电台一致。
 
 状态：Windows 上已在游戏内验证（FLAC）；Linux / Steam Deck / macOS 还没测试。
 
-> 适用于**任何版本**的《热血无赖：终极版》，Windows 10/11 64 位。想了解原理、自己编译，或已经装过其他 mod，
-> 请看 [ADVANCED.md](ADVANCED.md)。
+> 适用于**任何版本**的《热血无赖：终极版》，Windows 10/11 64 位。想了解原理、自己编译，或已经装过其他 mod，请看 [ADVANCED.md](ADVANCED.md)。
 
 ### 安装（大约三分钟）
 
 **第 1 步：下载**
 
-点这里下载 **[SDRadio.zip](https://github.com/aUsernameWoW/sleeping-dogs-custom-radio/releases/latest/download/SDRadio.zip)**。
-也可以在 [Nexus Mods](https://www.nexusmods.com/sleepingdogsdefinitiveedition/mods/175?tab=files) 的 Files
+点这里下载 **[SDRadio.zip](https://github.com/aUsernameWoW/sleeping-dogs-custom-radio/releases/latest/download/SDRadio.zip)**。也可以在 [Nexus Mods](https://www.nexusmods.com/sleepingdogsdefinitiveedition/mods/175?tab=files) 的 Files
 页面下载主文件 “SDRadio”，内容相同。
 
 压缩包里只有这些：
@@ -54,8 +50,7 @@ plugins\
 
 1. 双击打开下载的 `SDRadio.zip`。
 2. 选中里面的 `dinput8.dll` 和 `plugins` 文件夹，一起拖进游戏文件夹。
-3. 如果 Windows 弹出「替换或跳过文件」，说明游戏文件夹里已经有 `dinput8.dll` 了（你以前装过别的 mod，
-   加载器已经在了），选「跳过该文件」。已有的 `plugins` 文件夹会自动合并，不用管。
+3. 如果 Windows 弹出「替换或跳过文件」，说明游戏文件夹里已经有 `dinput8.dll` 了（你以前装过别的 mod，加载器已经在了），选「跳过该文件」。已有的 `plugins` 文件夹会自动合并，不用管。
 
 **第 4 步：放入音乐**
 
@@ -79,17 +74,14 @@ SleepingDogsDefinitiveEdition\
 
 **第 5 步：在游戏里收听**
 
-照常从 Steam 启动游戏，上一辆车，像平时一样切换电台。新电台排在所有电台的**最后**，图标是霓虹灯风格的
-「私家台」，台名默认是 “SDRADIO”。
+照常从 Steam 启动游戏，上一辆车，像平时一样切换电台。新电台排在所有电台的**最后**，图标是霓虹灯风格的「私家台」，台名默认是 “SDRADIO”。
 
 ### 常见问题
 
 **切台时找不到新电台**
 
 - 看看 `plugins` 里有没有出现 `SDRadio.ini` 和 `SDRadio.log`。没有的话说明 mod 没被加载：检查 `dinput8.dll`
-  是否和 `sdhdship.exe` 在同一层（不要多套一层文件夹），杀毒软件有没有删掉它（ASI 加载器偶尔会被误报，可以从
-  隔离区还原并把游戏文件夹加入排除项）；如果第 3 步跳过了原有的 `dinput8.dll`，那个文件可能不是 ASI 加载器，
-  备份后换成压缩包里的；
+  是否和 `sdhdship.exe` 在同一层（不要多套一层文件夹），杀毒软件有没有删掉它（ASI 加载器偶尔会被误报，可以从隔离区还原并把游戏文件夹加入排除项）；如果第 3 步跳过了原有的 `dinput8.dll`，那个文件可能不是 ASI 加载器，备份后换成压缩包里的；
 - 确认 `plugins\SDRadio` 里有音乐文件。改动音乐文件夹后要重启游戏；
 - 还是不行的话，按下面的方法反馈，并附上 `plugins\SDRadio.log`。
 
@@ -111,19 +103,16 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 
 **更新**
 
-下载新的 `SDRadio.zip`，只把里面的 `plugins` 文件夹拖进游戏文件夹，Windows 询问时选「替换目标中的文件」。
-你的音乐和 `SDRadio.ini` 不会受影响。
+下载新的 `SDRadio.zip`，只把里面的 `plugins` 文件夹拖进游戏文件夹，Windows 询问时选「替换目标中的文件」。你的音乐和 `SDRadio.ini` 不会受影响。
 
 **卸载**
 
-删掉 `plugins` 里所有名字以 `SDRadio` 开头的文件，以及 `SDRadio` 文件夹（里面是你自己的音乐，需要的话先
-移走）。如果 `plugins` 里已经没有其他 `.asi` 文件了，`dinput8.dll` 也可以删掉。
+删掉 `plugins` 里所有名字以 `SDRadio` 开头的文件，以及 `SDRadio` 文件夹（里面是你自己的音乐，需要的话先移走）。如果 `plugins` 里已经没有其他 `.asi` 文件了，`dinput8.dll` 也可以删掉。
 
 **Linux / Steam Deck**
 
 还没测试。按上面的步骤装好后，在 Steam 里右键游戏 →「属性」→「启动选项」，填入
-`WINEDLLOVERRIDES="dinput8=n,b" %command%`，否则 Proton 不会加载 `dinput8.dll`。M4A/AAC、WMA 在 Proton 下
-不一定能播放，建议用 MP3、FLAC 或 OGG。
+`WINEDLLOVERRIDES="dinput8=n,b" %command%`，否则 Proton 不会加载 `dinput8.dll`。M4A/AAC、WMA 在 Proton 下不一定能播放，建议用 MP3、FLAC 或 OGG。
 
 **遇到问题怎么反馈**
 
@@ -140,8 +129,7 @@ Bugs 标签里说明情况，并附上 `plugins\SDRadio.log`。
   - SDmodding 随 [SDK](https://github.com/SDmodding/SDK) 发布的 [Visual Studio 2022 项目模板](https://github.com/SDmodding/SDK/releases/tag/vs2022)：这个 mod 的 Visual Studio 工程源自这个模板，编译设置和以 `dllmain.cc` 为起点的源文件结构都来自它；
   - SDmodding 分享的游戏 v1.0 版 exe 和调试符号（PDB，Steam 首发版自带）：游戏的电台系统、Wwise 的文件读取和界面贴图包的结构都是从这里查到的；
   - [TheoryEngine](https://github.com/SDmodding/TheoryEngine)：电台图标贴图包的格式和游戏的字符串哈希；
-  - [BigFileSystem](https://github.com/SDmodding/BigFileSystem)、[TheoryEngine](https://github.com/SDmodding/TheoryEngine)，以及 sneakyevil 的 [SD-BigFileExplorer](https://github.com/sneakyevil/SD-BigFileExplorer) 和 [Ekey](https://github.com/Ekey) 的 SDDEUnpacker 里的文件名列表：
-    读取游戏资源包（`.big`）的工具是照着它们写的，电台列表 `Radios.xml`、电台 HUD 和横幅图参照的界面贴图都是用它找到的。
+  - [BigFileSystem](https://github.com/SDmodding/BigFileSystem)、[TheoryEngine](https://github.com/SDmodding/TheoryEngine)，以及 sneakyevil 的 [SD-BigFileExplorer](https://github.com/sneakyevil/SD-BigFileExplorer) 和 [Ekey](https://github.com/Ekey) 的 SDDEUnpacker 里的文件名列表：读取游戏资源包（`.big`）的工具是照着它们写的，电台列表 `Radios.xml`、电台 HUD 和横幅图参照的界面贴图都是用它找到的。
 - Audiokinetic 的 [Wwise](https://www.audiokinetic.com)：游戏用的是 Wwise 2012.2。mod 生成的音频库（bank）格式是对游戏里的
   Wwise 逆向分析得到的，电台效果器的参数直接取自游戏自带的音频库。
 - ID3、Vorbis comment 和 RIFF INFO 标签的格式规范：读取歌名和歌手。
@@ -149,11 +137,9 @@ Bugs 标签里说明情况，并附上 `plugins\SDRadio.log`。
 
 **mod 里包含的代码**（许可证全文见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)）
 
-- [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)（ThirteenAG）：压缩包里的 `dinput8.dll`，让游戏加载 mod。它本身还包含 MinHook、
-  [miniz](https://github.com/richgel999/miniz)（Rich Geldreich 等）和 [praydog](https://github.com/praydog) 的 FunctionHookMinHook。
+- [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader)（ThirteenAG）：压缩包里的 `dinput8.dll`，让游戏加载 mod。它本身还包含 MinHook、[miniz](https://github.com/richgel999/miniz)（Rich Geldreich 等）和 [praydog](https://github.com/praydog) 的 FunctionHookMinHook。
 - [MinHook](https://github.com/TsudaKageyu/minhook)（Tsuda Kageyu，内含 Vyacheslav Patkov 的 Hacker Disassembler Engine）：mod 靠它接入游戏。
-- [dr_libs](https://github.com/mackron/dr_libs)（David Reid；dr_mp3 含 lieff 的 [minimp3](https://github.com/lieff/minimp3)）：
-  解码 MP3、FLAC、WAV。
+- [dr_libs](https://github.com/mackron/dr_libs)（David Reid；dr_mp3 含 lieff 的 [minimp3](https://github.com/lieff/minimp3)）：解码 MP3、FLAC、WAV。
 - [stb](https://github.com/nothings/stb)（Sean Barrett 等；stb_dxt 原作者 Fabian Giesen，stb_image_resize2 作者 Jeff Roberts
   和 Jorge L Rodriguez）：stb_vorbis 解码 OGG，stb_image、stb_image_resize2、stb_dxt 处理 PNG 图标。
 - Windows 的 Media Foundation（Microsoft，系统自带，不在 mod 里）：解码 M4A、WMA 等其他格式。
@@ -164,14 +150,11 @@ Bugs 标签里说明情况，并附上 `plugins\SDRadio.log`。
 - [IDA Pro](https://hex-rays.com/ida-pro)（Hex-Rays）和 [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp)（mrexodia）：分析游戏程序。
 - [Pillow](https://python-pillow.org)：绘制「私家台」图标的脚本。
 - [Claude Code](https://claude.com/claude-code)（Anthropic）：这个 mod 完全是用 Claude Fable 和 Opus vibe coding 写出来的，代码、文档和逆向分析都出自 Claude，几乎没有经过人工审查。
-- 字体：「私家台」的灯管照 [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) Bold 的字形描出；
-  横幅图和图标用了 [Noto Sans SC/TC](https://fonts.google.com/noto)、[Teko](https://fonts.google.com/specimen/Teko)、[Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) 和 Microsoft 的 Bahnschrift。
+- 字体：「私家台」的灯管照 [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) Bold 的字形描出；横幅图和图标用了 [Noto Sans SC/TC](https://fonts.google.com/noto)、[Teko](https://fonts.google.com/specimen/Teko)、[Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) 和 Microsoft 的 Bahnschrift。
 
 **游戏与商标**
 
-《热血无赖：终极版》（Sleeping Dogs: Definitive Edition）由 United Front Games 开发、Square Enix 发行，
-游戏及其内容的版权归 Square Enix 所有。游戏里的电台、音乐和电台图标归各自的权利人所有（ini 注释里列出的是游戏
-自带电台的图标名）。横幅图和图标仿照游戏的菜单界面重新绘制，没有使用游戏原图。Wwise 是 Audiokinetic 的商标，Scaleform 是 Autodesk 的商标。
+《热血无赖：终极版》（Sleeping Dogs: Definitive Edition）由 United Front Games 开发、Square Enix 发行，游戏及其内容的版权归 Square Enix 所有。游戏里的电台、音乐和电台图标归各自的权利人所有（ini 注释里列出的是游戏自带电台的图标名）。横幅图和图标仿照游戏的菜单界面重新绘制，没有使用游戏原图。Wwise 是 Audiokinetic 的商标，Scaleform 是 Autodesk 的商标。
 
 与 Square Enix、United Front Games、Audiokinetic、Autodesk 均无关联。
 
