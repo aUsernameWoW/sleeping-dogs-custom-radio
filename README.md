@@ -3,14 +3,14 @@
 ![SDRadio: 私家台 in magenta neon tubes beside a music folder whose songs become a station on the game's radio HUD](assets/banner.png)
 
 > [!IMPORTANT]
-> **关于这个 mod**：它完全是用 Claude Code 里的 Claude Fable 和 Opus vibe coding 写出来的，几乎没有经过审查，请当作实验性质的 mod 使用，发现异常请反馈。作为一个长期缺少 mod 而自己下场做 mod 的普通玩家，我在 vibe 的过程中收获了许多快乐，并建议所有人都可以试着 vibe 一下去实现自己的灵感。由于这些代码都是 vibe 出来的，所以我不会以我的 mod 盈利，也不接受捐助。如果你喜欢我的作品，请考虑向[致谢](#致谢)中提到的组织和个人捐赠，祝你游玩愉快！
+> **关于这个 mod**：它完全是用 Claude Code 里的 Claude Fable 和 Opus vibe coding 写出来的，几乎没有经过审查，请当作实验性质的 mod 使用，发现异常请反馈。作为一个长期缺少 mod 而自己下场做 mod 的普通玩家，我在 vibe 的过程中收获了许多快乐；如果你也有想实现的灵感，不妨也试着 vibe 一下。由于这些代码都是 vibe 出来的，所以我不会以我的 mod 盈利，也不接受捐助。如果你喜欢我的作品，请考虑向[致谢](#致谢)中提到的开源项目和作者捐赠，祝你游玩愉快！
 >
 > **About this mod**: it was fully vibe-coded with Claude Fable and Opus in Claude Code, with little review, so treat
 > it as experimental and please report anything unusual. I'm just an ordinary player who went a long time without
-> mods for this game and finally started making them myself. Vibe coding them has been a lot of fun, and I'd encourage
-> everyone to give it a try and bring their own ideas to life. Since all this code is vibe-coded, I won't make money
-> from my mods and don't accept donations. If you like my work, please consider donating to the organizations and
-> people listed in the [Credits](#credits) instead. Have fun!
+> mods for this game and finally started making them myself. Vibe coding them has been a lot of fun; if you have an
+> idea of your own, it might be for you too. Since all this code is vibe-coded, I won't make money from my mods and
+> don't accept donations. If you like my work, please consider donating to the open-source projects and authors
+> listed in the [Credits](#credits) instead. Have fun!
 
 [中文](#中文) | [English](#english)
 
