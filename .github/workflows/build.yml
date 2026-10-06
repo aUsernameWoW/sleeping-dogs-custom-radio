@@ -303,6 +303,9 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write
+      # actions/attest: an OIDC token for the signing certificate, and storing the attestation.
+      id-token: write
+      attestations: write
     steps:
       # Full history and tags: the build number and the change list since the previous build.
       - name: Check out history
@@ -318,8 +321,23 @@ jobs:
           merge-multiple: true
           path: dist
 
+      # Signed SLSA build provenance for the three files, made before the release so that none is published
+      # without it: a Sigstore certificate issued to this workflow run signs their digests, and GitHub keeps
+      # the result with the repository's attestations. `gh attestation verify SDRadio.zip -R <owner/repo>`
+      # checks that a file (by content, whatever its name) was built by this repository's workflow, and
+      # from which commit.
+      - name: Attest build provenance
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/SDRadio.zip
+            dist/SDRadio.asi
+            dist/SDRadio.pdb
+
       - name: Publish prerelease
         env:
+          ATTESTATION_URL: ${{ steps.attest.outputs.attestation-url }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
@@ -343,6 +361,8 @@ jobs:
             echo "- \`SDRadio.zip\`: unpack into the game folder. Contains the mod and Ultimate ASI Loader (\`dinput8.dll\`); see the [README](https://github.com/$GITHUB_REPOSITORY#readme)."
             echo "- \`SDRadio.asi\`: the mod alone, for the \`plugins\` folder of a game that already has an ASI loader. Music goes into \`plugins\\SDRadio\`."
             echo "- \`SDRadio.pdb\`: only needed to read crash dumps."
+            echo
+            echo "The three files have a signed [build provenance attestation]($ATTESTATION_URL): \`gh attestation verify <file> -R $GITHUB_REPOSITORY\` checks that a download was built here, and from which commit."
             echo
             if [ -n "$prev" ]; then
               echo "Changes since $prev:"
