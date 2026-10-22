@@ -4,6 +4,7 @@
 
 #include "core/config.hh"
 #include "core/crash.hh"
+#include "core/external.hh"
 #include "core/hooks.hh"
 #include "core/library.hh"
 #include "core/log.hh"
@@ -53,6 +54,7 @@ BOOL WINAPI DllMain(HMODULE module, DWORD reason, LPVOID)
 			logo::Start(dir, gConfig.mMusicFolder);
 		}
 		hooks::Install();
+		external::Start();
 	}
 
 	return TRUE;
