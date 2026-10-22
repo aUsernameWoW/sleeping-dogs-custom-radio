@@ -232,6 +232,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## FH6 Universal Radio (`gpl/external-audio` branch only)
+
+https://github.com/g0ldyy/fh6-universal-radio (g0ldyy) — the experimental external audio code on this branch is
+adapted from its `src/sources/external_media_session.cpp` (`core/media_session.cc`: the system's media sessions)
+and `src/sources/external_audio_source.cpp` (`core/pcm.cc`: format conversion and resampling; the endpoint
+loopback in `core/capture.cc`), at commit `bfaf3df`. It is licensed under the GNU General Public License v3, and
+so is SDRadio as built from this branch: the full text is in [LICENSE](LICENSE) (`SDRadio-LICENSE.txt` in the
+zip), the source is this branch.
+
 ## Ultimate ASI Loader v9.7.4
 
 https://github.com/ThirteenAG/Ultimate-ASI-Loader — not compiled into `SDRadio.asi`; its x64 release binary

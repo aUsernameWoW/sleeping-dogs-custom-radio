@@ -35,6 +35,15 @@ struct Config
 	std::string mSpotifyName = "SDRadio";
 	std::wstring mSpotifyCache;
 
+	// Experimental external audio, diagnostics only for now (external.hh).
+	bool mExternal = false;
+	// Media session to read: a part of the app's ID ("spotify"); empty = the current one.
+	std::string mMediaSession;
+	// Executable to capture ("Spotify.exe"); empty = everything the playback device below plays.
+	std::wstring mCaptureProcess;
+	// Playback device for that: part of its name; empty = the default device.
+	std::string mCaptureDevice;
+
 	// Write SDRadio.log next to the .asi.
 	bool mLogging = true;
 };

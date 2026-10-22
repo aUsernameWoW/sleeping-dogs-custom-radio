@@ -73,6 +73,7 @@ comment、RIFF INFO 标签，没有标签时用文件名；GBK 编码的老式�
 | `[Station]` | `CustomLogo` | 1 | HUD 图标：1 = 音乐文件夹里的 `logo.png`，没有就用自带的「私家台」；0 = 借用下面的游戏图标 |
 | `[Station]` | `TextureName`, `TexturePack` | `Logo_Softly`, `Radio_Softly_TexturePack` | `CustomLogo = 0` 时借用的游戏电台图标（可选值见 ini 注释） |
 | `[Live]` | `Enabled`, `Name`, `Source`, `Url`, `App`, `PauseApp`, `Librespot`, `SpotifyName` | 0, `SDRADIO LIVE`, `test`, 空, 空, 1, 空, `SDRadio` | 实验功能：再加一个播放实时音源的「直播」电台。`Source = test` 是测试信号（每秒一声提示音）；`Source = radio` 播放 `Url` 指向的网络电台：MP3 或 Ogg Vorbis 的流，或指向它的 .m3u / .pls（可以在 [radio-browser.info](https://www.radio-browser.info) 找台）。AAC、Opus、FLAC 的台暂不支持，日志里会写明。HUD 上显示当前歌名（还没有歌名时显示电台的域名），也写进日志。`Source = app` 播放 `App` 这个进程（例如 `AppleMusic.exe`、`cloudmusic.exe`）及其子进程的声音，需要 Windows 11（Microsoft Store 版的程序如果实际是由同一个应用包里的另一个进程出声，就抓那个进程：Apple Music 的声音来自 `AMPLibraryAgent.exe`）：把这个程序的输出设备改成一个不用的设备（设置 → 系统 → 声音 → 音量合成器），或者把那个设备静音，就只会通过游戏电台听到它；不要在音量合成器里把程序本身静音，那样抓到的也是静音（日志里每 10 秒的电平会只有 -90 dBFS 左右）。mod 每 5 秒查一次这个程序在音量合成器里的会话：被静音、音量为 0，或者在默认输出设备上播放（会听到两份）时，日志里写一行 `WARNING`；被静音时 HUD 的歌名行也显示这条提示。HUD 上的歌名取自 Windows 的媒体会话（SMTC），网易云要在设置里勾选「SMTC」。`PauseApp = 1` 时，游戏里没在放这个台（换台、关电台、下车、暂停菜单）就让程序暂停，回来时继续（只恢复 mod 暂停的）。`Source = spotify` 运行 `Librespot`（留空 = `.asi` 旁边的 `librespot.exe`），在 Spotify 的设备列表里显示为 `SpotifyName`；需要 Spotify Premium，登录凭据存在 `.asi` 旁边的 `SDRadio-spotify` 文件夹 |
+| `[External]` | `Enabled`, `MediaSession`, `CaptureProcess`, `CaptureDevice` | 0, 空, 空, 空 | 实验功能（仅 `gpl/external-audio` 分支），目前只写日志：系统媒体会话、指定程序（或播放设备）的声音电平，以及该程序在音量合成器里的音量和是否静音；详见 ini 注释 |
 | `[Debug]` | `Logging` | 1 | 写 `SDRadio.log`，出错时记录调用栈并写 `SDRadio-crash-<n>.dmp` |
 
 ### 自定义图标
@@ -128,6 +129,7 @@ SHA-256 固定在 `.github/asi-loader.env`。推送到 `main` 且测试（包括
   和 Jorge L Rodriguez）：stb_vorbis 解码 OGG，stb_image、stb_image_resize2、stb_dxt 处理 PNG 图标。
 - [C++/WinRT](https://github.com/microsoft/cppwinrt)（Microsoft）：读取系统媒体会话（SMTC），在 HUD 上显示其他程序正在放的歌名。
 - Windows 的 Media Foundation（Microsoft，系统自带，不在 mod 里）：解码 M4A、WMA 等其他格式。
+- [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio)（g0ldyy，GPL-3.0）：仅限 `gpl/external-audio` 分支：分支上的实验功能（读取系统媒体会话、抓取其他程序的声音）的代码改编自它，所以这个分支的构建按 GPL-3.0 发布（见 [LICENSE](LICENSE)）。
 
 **工具**
 
@@ -230,6 +232,7 @@ If you already have an ASI loader, just put `SDRadio.asi` where it loads plugins
 | `[Station]` | `CustomLogo` | 1 | HUD logo: 1 = `logo.png` from the music folder, else SDRadio's own (私家台); 0 = the game logo below |
 | `[Station]` | `TextureName`, `TexturePack` | `Logo_Softly`, `Radio_Softly_TexturePack` | With `CustomLogo = 0`, the game station logo to borrow (choices in the ini's comments) |
 | `[Live]` | `Enabled`, `Name`, `Source`, `Url`, `App`, `PauseApp`, `Librespot`, `SpotifyName` | 0, `SDRADIO LIVE`, `test`, empty, empty, 1, empty, `SDRadio` | Experimental: a second station playing a real-time source. `Source = test` is a test signal (a beep every second); `Source = radio` plays the internet radio at `Url`: an MP3 or Ogg Vorbis stream, or an .m3u / .pls pointing at one (find stations at [radio-browser.info](https://www.radio-browser.info)). AAC, Opus and FLAC stations aren't supported yet (the log says so). The HUD shows the current song title (the host name until the station names one); titles also go to the log. `Source = app` plays the sound of the process `App` (e.g. `AppleMusic.exe`, `cloudmusic.exe`) and its children; needs Windows 11 (for a Microsoft Store app whose sound really comes from another process of its package, that process: Apple Music plays from `AMPLibraryAgent.exe`). Send that program to an output device you don't listen to (Settings > System > Sound > Volume mixer) or mute that device, and you hear it only through the game's radio; don't mute the program itself in the mixer, that silences the capture too (the log's 10-second level then stays around -90 dBFS). Every 5 s the mod reads the program's volume mixer sessions and logs a `WARNING` when one plays muted, at 0, or on the default output device (heard twice); while it's muted the HUD's song line says so too. The HUD's song comes from the program's Windows media session (SMTC); NetEase Cloud Music needs "SMTC" ticked in its settings. With `PauseApp = 1` the program is paused while the game doesn't play this station (another station, radio off, out of the car, the pause menu) and resumed when it does (only a pause the mod made). `Source = spotify` runs `Librespot` (empty = `librespot.exe` next to the `.asi`), shown in Spotify's device list as `SpotifyName`; needs Spotify Premium; its credentials are kept in `SDRadio-spotify` next to the `.asi` |
+| `[External]` | `Enabled`, `MediaSession`, `CaptureProcess`, `CaptureDevice` | 0, empty, empty, empty | Experimental (`gpl/external-audio` branch only), diagnostics for now: logs the media sessions, the audio level captured from a program (or a playback device) and that program's volume-mixer volume and mute; see the ini comments |
 | `[Debug]` | `Logging` | 1 | Write `SDRadio.log`; on a crash, log the stack and write `SDRadio-crash-<n>.dmp` |
 
 ### Custom logo
@@ -311,6 +314,9 @@ This mod uses or builds on the work of these people and projects. Thank you.
 - [C++/WinRT](https://github.com/microsoft/cppwinrt) (Microsoft): reads the system media sessions (SMTC) for the
   song another program plays, shown on the HUD.
 - Windows Media Foundation (Microsoft; part of Windows, not of the mod): decoding M4A, WMA and other formats.
+- [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio) (g0ldyy, GPL-3.0): only on the
+  `gpl/external-audio` branch, whose experimental code (reading the system's media sessions, capturing another
+  program's audio) is adapted from it; that branch's builds are therefore under the GPL-3.0 ([LICENSE](LICENSE)).
 
 **Tools**
 

@@ -29,6 +29,32 @@ bug our shared logo triggers). See "Live station" and "Internet radio" below. Si
 The older GPL experiment is parked on branch `gpl/external-audio` (GPL,
 not to be merged without the user's licensing decision; its CLAUDE.md has the details).
 
+## Branch `gpl/external-audio` (2026-10-22)
+
+Experimental external audio: another app's sound (Spotify, a browser...) and its media session, meant to become a
+station later (PCM into the same virtual-file streams). Its code is adapted from
+[FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio) (GPL-3.0), so this branch carries the GPL
+(`LICENSE`, THIRD-PARTY-NOTICES, credits) and **must not be merged into `main`** until the user decides on the
+licensing (merging makes `main`'s builds GPL; the alternative is rewriting the adapted files). `main` has no license.
+
+- Keep it current: after pushing `main`, rebase this branch onto it **locally** (`git rebase main`, then
+  `git push --force-with-lease`), so the commits stay signed. Not in CI: GitHub's rebase drops signatures, and
+  `GITHUB_TOKEN` can't push the workflow changes Dependabot brings to `main`. A draft PR into `main` runs CI on
+  every push and shows when the branch falls behind (pushes to other branches don't trigger `build.yml`; PRs
+  build and package but never publish).
+- So far diagnostics only (`core/external.*`, `[External] Enabled = 1`): logs the SMTC sessions and the current
+  track, captures `CaptureProcess` (process loopback, Windows 10 20348+) or a playback device (endpoint
+  loopback), and every 5 s logs the captured level next to that app's volume-mixer volume/mute. Question it
+  answers: can an app muted in the mixer still be captured (then no virtual cable is needed)?
+- `core/media_session.*` (C++/WinRT, `runtimeobject.lib`; the two WinRT API sets are delay-loaded and checked
+  by `media::Open`, Wine has no Windows.Media.Control), `core/pcm.*` (pure: formats, resampler to 48 kHz
+  stereo, level meter; `pcm_test`), `core/capture.*` (`ActivateAudioInterfaceAsync` looked up at run time).
+- The session manager is leaked on purpose: released as a static in `DLL_PROCESS_DETACH` (a COM call after the
+  other threads are gone) it left `external_test` unable to exit for minutes, its last thread waiting for an LPC
+  reply, and the system's media sessions unresponsive meanwhile (`RequestAsync` didn't complete in 10 s).
+- `external_test` captures a child `ping.exe`, deletes the old log first (a stuck earlier run holding it would
+  let a stale log pass).
+
 ## How it works
 
 The game's radio is data-driven end to end, so the mod adds data and serves files; no game logic is patched.
