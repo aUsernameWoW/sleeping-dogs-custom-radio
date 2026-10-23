@@ -156,6 +156,10 @@ namespace live
 		std::shared_ptr<std::atomic<bool>> gStop;
 		std::thread gThread;
 
+		std::mutex gTitleLock;
+		std::string gTitle;
+		std::atomic<uint32_t> gTitleGeneration{ 0 };
+
 		// Under gLock.
 		void StartSource()
 		{
@@ -163,6 +167,7 @@ namespace live
 				return;
 			}
 			gStream.Reset();
+			SetNowPlaying({});
 			gStop = std::make_shared<std::atomic<bool>>(false);
 			gThread = std::thread([source = gSource, stop = gStop] { source(*stop); });
 			LOG("live: source \"%s\" started", gSourceName.c_str());
@@ -241,6 +246,26 @@ namespace live
 	{
 		std::lock_guard lock(gLock);
 		return gSourceName;
+	}
+
+	void SetNowPlaying(std::string title)
+	{
+		std::lock_guard lock(gTitleLock);
+		if (title != gTitle) {
+			gTitle = std::move(title);
+			++gTitleGeneration;
+		}
+	}
+
+	std::string NowPlaying()
+	{
+		std::lock_guard lock(gTitleLock);
+		return gTitle;
+	}
+
+	uint32_t NowPlayingGeneration()
+	{
+		return gTitleGeneration.load();
 	}
 
 	void Acquire()

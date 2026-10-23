@@ -185,8 +185,23 @@ namespace
 	}
 }
 
+namespace
+{
+	void TestNowPlaying()
+	{
+		const uint32_t before = live::NowPlayingGeneration();
+		live::SetNowPlaying("Artist - Title");
+		Check(live::NowPlaying() == "Artist - Title" && live::NowPlayingGeneration() == before + 1, "a new title counts");
+		live::SetNowPlaying("Artist - Title");
+		Check(live::NowPlayingGeneration() == before + 1, "the same title again doesn't");
+		live::SetNowPlaying({});
+		Check(live::NowPlaying().empty() && live::NowPlayingGeneration() == before + 2, "clearing it does");
+	}
+}
+
 int main()
 {
+	TestNowPlaying();
 	static_assert(live::kHeaderSize - 8 + live::kFrames * live::kBlockAlign <= 0xFFFFFFFFull, "RIFF size fits");
 	static_assert(live::kMaxLagMs > live::kPrerollMs && live::kMaxLagMs < live::kRingMs, "a jump lands inside the ring and below the lag limit");
 	TestStart();

@@ -113,6 +113,12 @@ namespace live
 	// others, at -12 dBFS.
 	void TestSignal(const std::atomic<bool>& stop);
 
+	// What the source plays now, for the HUD ("Artist - Title" in UTF-8; empty if it hasn't said), and a counter
+	// that changes with every new title. Cleared when a source starts.
+	void SetNowPlaying(std::string title);
+	std::string NowPlaying();
+	uint32_t NowPlayingGeneration();
+
 	// A live file was opened / closed. The source runs while any is open, and stops 10 s after the last
 	// closes (the game reopens the stream on every track start and station switch).
 	void Acquire();

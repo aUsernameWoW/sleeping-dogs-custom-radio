@@ -110,16 +110,13 @@ namespace netradio
 			return true;
 		}
 
-		std::mutex gLock;
-		std::string gNowPlaying;
-
+		// Only the feeder thread sets titles; the live station keeps them (cleared when a source starts) for the HUD.
 		void SetTitle(const std::string& title)
 		{
-			std::lock_guard lock(gLock);
-			if (title == gNowPlaying) {
+			if (title == live::NowPlaying()) {
 				return;
 			}
-			gNowPlaying = title;
+			live::SetNowPlaying(title);
 			LOG("netradio: now playing \"%s\"", title.c_str());
 		}
 
@@ -279,7 +276,7 @@ namespace netradio
 					LOG("netradio: playing (%llu ms buffered)", buffered);
 				}
 				wasPlaying = playing;
-				if (newTitle) {
+				if (newTitle && !stop.load()) {
 					SetTitle(title);
 				}
 				// Once stopped, a source may take seconds to wind down (a blocked network read) while the station
