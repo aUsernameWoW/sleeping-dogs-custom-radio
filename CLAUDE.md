@@ -54,6 +54,14 @@ licensing (merging makes `main`'s builds GPL; the alternative is rewriting the a
   reply, and the system's media sessions unresponsive meanwhile (`RequestAsync` didn't complete in 10 s).
 - `external_test` captures a child `ping.exe`, deletes the old log first (a stuck earlier run holding it would
   let a stale log pass).
+- **Answered 2026-10-22 (Windows 11, no game): muting the app's session kills its process loopback capture.** A
+  test player (`-40 dBFS` sine, its own session muted with `ISimpleAudioVolume::SetMute`, which is what the volume
+  mixer does) captured at -96.7 dBFS while muted, -40 dBFS peak once unmuted. Process loopback taps the stream
+  after the session volume, so "capture the app, mute it in the mixer" doesn't avoid hearing it twice. Untested
+  way out without a virtual cable: send the app to a spare output device (per-app output in Windows settings)
+  and mute that device; process loopback isn't tied to an endpoint, so it might survive the endpoint's mute.
+- CI (first run): Windows Server runner: process loopback activates, SMTC opens (0 sessions). Wine 9 and 11:
+  SMTC `0x80040154` (class not registered), process loopback `0x80070002`; both just logged.
 
 ## How it works
 
