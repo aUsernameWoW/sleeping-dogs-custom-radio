@@ -30,7 +30,7 @@
 4. 一首结束后由游戏自己的逻辑随机挑下一首。
 5. **图标**：mod 启动时把图标做成游戏格式的 UI 贴图包，写成 `.asi` 旁边的 `SDRadio-logo.perm.bin` 和
    `.temp.bin`，电台列表里写上这个包的相对路径。游戏的归档里没有这个路径，就会从磁盘读取，和加载自带电台的图标完全一样，不需要任何 hook，也不占用别的电台的图标。见下面的[自定义图标](#自定义图标)。
-6. **直播电台（实验功能，`[Live]`）**：再加一个电台，播放实时音源。它的曲目是一首声明长 1 小时的 WAV，游戏来读时，mod 不管读的是哪个位置，都从一个 10 秒的环形缓冲里取最新的音频，开播时落后最新音频 5 秒作为缓冲余量。读取总是立即完成、从不等待音源（音源来不及时先补静音，攒够再接着播），因为挂起的读取会占住游戏音频引擎的 I/O 名额，让游戏卡顿。音源目前有测试信号和**网络电台**：用 WinHTTP 拉 MP3 或 Ogg Vorbis 的流（走系统代理，支持 .m3u / .pls），从 ICY 元数据或 Vorbis 注释读曲名，重采样到 48 kHz，按实时速度送进缓冲，断线自动重连。HUD 上显示当前歌名（电台还没报歌名时显示它的域名），也写进日志。
+6. **直播电台（实验功能，`[Live]`）**：再加一个电台，播放实时音源。它的曲目是一首声明长 1 小时的 WAV，游戏来读时，mod 不管读的是哪个位置，都从一个 10 秒的环形缓冲里取最新的音频，开播时落后最新音频 5 秒作为缓冲余量。读取总是立即完成、从不等待音源（音源来不及时先补静音，攒够再接着播），因为挂起的读取会占住游戏音频引擎的 I/O 名额，让游戏卡顿。音源目前有测试信号、**另一个程序的声音**（Windows 11 的按进程捕获，见下面的设置）和**网络电台**：用 WinHTTP 拉 MP3 或 Ogg Vorbis 的流（走系统代理，支持 .m3u / .pls），从 ICY 元数据或 Vorbis 注释读曲名，重采样到 48 kHz，按实时速度送进缓冲，断线自动重连。HUD 上显示当前歌名（电台还没报歌名时显示它的域名），也写进日志。
 
 实现细节和逆向笔记见 [CLAUDE.md](CLAUDE.md) 和 [docs/radio-internals.md](docs/radio-internals.md)（英文）。
 
@@ -72,7 +72,7 @@ comment、RIFF INFO 标签，没有标签时用文件名；GBK 编码的老式�
 | `[Station]` | `MusicFolder` | 空 | 音乐文件夹；空 = `.asi` 旁边的 `SDRadio`，相对路径相对于 `plugins` |
 | `[Station]` | `CustomLogo` | 1 | HUD 图标：1 = 音乐文件夹里的 `logo.png`，没有就用自带的「私家台」；0 = 借用下面的游戏图标 |
 | `[Station]` | `TextureName`, `TexturePack` | `Logo_Softly`, `Radio_Softly_TexturePack` | `CustomLogo = 0` 时借用的游戏电台图标（可选值见 ini 注释） |
-| `[Live]` | `Enabled`, `Name`, `Source`, `Url` | 0, `SDRADIO LIVE`, `test`, 空 | 实验功能：再加一个播放实时音源的「直播」电台。`Source = test` 是测试信号（每秒一声提示音）；`Source = radio` 播放 `Url` 指向的网络电台：MP3 或 Ogg Vorbis 的流，或指向它的 .m3u / .pls（可以在 [radio-browser.info](https://www.radio-browser.info) 找台）。AAC、Opus、FLAC 的台暂不支持，日志里会写明。HUD 上显示当前歌名（还没有歌名时显示电台的域名），也写进日志 |
+| `[Live]` | `Enabled`, `Name`, `Source`, `Url`, `App` | 0, `SDRADIO LIVE`, `test`, 空, 空 | 实验功能：再加一个播放实时音源的「直播」电台。`Source = test` 是测试信号（每秒一声提示音）；`Source = radio` 播放 `Url` 指向的网络电台：MP3 或 Ogg Vorbis 的流，或指向它的 .m3u / .pls（可以在 [radio-browser.info](https://www.radio-browser.info) 找台）。AAC、Opus、FLAC 的台暂不支持，日志里会写明。HUD 上显示当前歌名（还没有歌名时显示电台的域名），也写进日志。`Source = app` 播放 `App` 这个进程（例如 `cloudmusic.exe`）及其子进程的声音，需要 Windows 11：把这个程序的输出设备改成一个不用的设备（设置 → 系统 → 声音 → 音量合成器），或者把那个设备静音，就只会通过游戏电台听到它；不要在音量合成器里把程序本身静音，那样抓到的也是静音 |
 | `[Debug]` | `Logging` | 1 | 写 `SDRadio.log`，出错时记录调用栈并写 `SDRadio-crash-<n>.dmp` |
 
 ### 自定义图标
@@ -114,7 +114,8 @@ SHA-256 固定在 `.github/asi-loader.env`。推送到 `main` 且测试（包括
 - ID3、Vorbis comment 和 RIFF INFO 标签的格式规范：读取歌名和歌手。
 - SHOUTcast / Icecast 的 ICY 元数据约定（流里每隔固定字节插入 `StreamTitle`）：网络电台的曲名。
 - [radio-browser.info](https://www.radio-browser.info)（社区维护的网络电台目录）：ini 里推荐用它找台，测试网络电台时也用它找了 MP3 / Ogg 的台。
-- [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio)（g0ldyy，Forza Horizon 6 的电台 mod）：「把各种音源都转成 PCM，送进游戏自己的电台」这个思路的参考；直播电台和网络电台的代码是独立编写的，没有用它的代码。
+- [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio)（g0ldyy，Forza Horizon 6 的电台 mod）：「把各种音源都转成 PCM，送进游戏自己的电台」以及「抓取其他程序的声音」这两个思路的参考；直播电台、网络电台和程序声音的代码是独立编写的，没有用它的代码。
+- Microsoft 的 [Application Loopback（按进程捕获）文档](https://learn.microsoft.com/windows/win32/api/audioclientactivationparams/ns-audioclientactivationparams-audioclient_activation_params)：抓取其他程序声音的代码照它编写。
 - Scaleform（Autodesk）：游戏界面用的中间件，研究电台 HUD 时分析了它。
 
 **mod 里包含的代码**（许可证全文见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)）
@@ -163,8 +164,8 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
    WAVs that declare an hour; whatever position the game reads, the mod hands it the next audio from a 10 s
    ring, starting 5 s behind the newest as a cushion. Reads complete at once and never wait for the source
    (silence while it is late, then it rebuffers), since a pending read holds one of the game's audio I/O
-   slots: waiting reads made the game hitch. Sources so far: a test signal and **internet
-   radio**: an MP3 or Ogg Vorbis stream fetched with WinHTTP (system proxy, .m3u / .pls followed), titles
+   slots: waiting reads made the game hitch. Sources so far: a test signal, **another program's sound** (Windows 11 process
+   loopback; see the settings below) and **internet radio**: an MP3 or Ogg Vorbis stream fetched with WinHTTP (system proxy, .m3u / .pls followed), titles
    from ICY metadata or Vorbis comments, resampled to 48 kHz, fed in real time, reconnecting on errors.
    The HUD shows the current title (the station's host name until it names one); titles also go to the log.
 
@@ -224,7 +225,7 @@ If you already have an ASI loader, just put `SDRadio.asi` where it loads plugins
 | `[Station]` | `MusicFolder` | empty | Music folder; empty = `SDRadio` next to the `.asi`, relative paths are relative to `plugins` |
 | `[Station]` | `CustomLogo` | 1 | HUD logo: 1 = `logo.png` from the music folder, else SDRadio's own (私家台); 0 = the game logo below |
 | `[Station]` | `TextureName`, `TexturePack` | `Logo_Softly`, `Radio_Softly_TexturePack` | With `CustomLogo = 0`, the game station logo to borrow (choices in the ini's comments) |
-| `[Live]` | `Enabled`, `Name`, `Source`, `Url` | 0, `SDRADIO LIVE`, `test`, empty | Experimental: a second station playing a real-time source. `Source = test` is a test signal (a beep every second); `Source = radio` plays the internet radio at `Url`: an MP3 or Ogg Vorbis stream, or an .m3u / .pls pointing at one (find stations at [radio-browser.info](https://www.radio-browser.info)). AAC, Opus and FLAC stations aren't supported yet (the log says so). The HUD shows the current song title (the host name until the station names one); titles also go to the log |
+| `[Live]` | `Enabled`, `Name`, `Source`, `Url`, `App` | 0, `SDRADIO LIVE`, `test`, empty, empty | Experimental: a second station playing a real-time source. `Source = test` is a test signal (a beep every second); `Source = radio` plays the internet radio at `Url`: an MP3 or Ogg Vorbis stream, or an .m3u / .pls pointing at one (find stations at [radio-browser.info](https://www.radio-browser.info)). AAC, Opus and FLAC stations aren't supported yet (the log says so). The HUD shows the current song title (the host name until the station names one); titles also go to the log. `Source = app` plays the sound of the process `App` (e.g. `cloudmusic.exe`) and its children; needs Windows 11. Send that program to an output device you don't listen to (Settings > System > Sound > Volume mixer) or mute that device, and you hear it only through the game's radio; don't mute the program itself in the mixer, that silences the capture too |
 | `[Debug]` | `Logging` | 1 | Write `SDRadio.log`; on a crash, log the stack and write `SDRadio-crash-<n>.dmp` |
 
 ### Custom logo
@@ -284,8 +285,10 @@ This mod uses or builds on the work of these people and projects. Thank you.
 - [radio-browser.info](https://www.radio-browser.info) (a community-run directory of internet radio): suggested
   in the ini for finding stations, and used to find MP3 / Ogg stations for testing.
 - [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio) (g0ldyy, a radio mod for Forza Horizon 6):
-  the idea of turning every source into PCM fed to the game's own radio; the live station and internet radio
-  were written independently, with none of its code.
+  the ideas of turning every source into PCM fed to the game's own radio and of capturing another program's
+  sound; the live station, internet radio and app capture were written independently, with none of its code.
+- Microsoft's [application loopback (process loopback) documentation](https://learn.microsoft.com/windows/win32/api/audioclientactivationparams/ns-audioclientactivationparams-audioclient_activation_params):
+  the app capture is written from it.
 - Scaleform (Autodesk): the game's UI middleware, analyzed while studying the radio HUD.
 
 **Code in the mod** (full license texts in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md))

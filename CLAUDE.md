@@ -22,7 +22,9 @@ Since 2026-10-23 also a **live station** (`[Live]`, off by default) that plays a
 signal or **internet radio** (MP3 / Ogg Vorbis over WinHTTP). Both play in game on Windows, with the
 current song title on the HUD. Two bugs found in game on 2026-10-23 are fixed and confirmed there: game hitches
 (reads that waited for the source) and the radio sticking after a switch between our two stations (a game HUD
-bug our shared logo triggers). See "Live station" and "Internet radio" below. Experimental capture of another app's audio is on branch `gpl/external-audio` (GPL,
+bug our shared logo triggers). See "Live station" and "Internet radio" below. Since 2026-10-23 the live station can also play
+**another app's sound** (`Source = app`, own code on `main`, Windows 11; not yet tried in game): see "App audio".
+The older GPL experiment is parked on branch `gpl/external-audio` (GPL,
 not to be merged without the user's licensing decision; its CLAUDE.md has the details).
 
 ## How it works
@@ -74,7 +76,8 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   whether it started (under Wine it may be missing, or start but open nothing without GStreamer plugins).
 - `core/tags.*` — ID3v2.2-2.4/ID3v1, Vorbis comments, RIFF INFO; legacy text: UTF-8, else GBK, else Latin-1.
 - `core/stream_io.*` — virtual files, decoder threads, completion thread. `core/live.*` — the live station's
-  ring, reader and sources (see "Live station"). `core/netradio.*`, `core/icy.*`, `core/stream_decoder.*`,
+  ring, reader and sources (see "Live station"). `core/app_audio.*` — another app's sound (see "App audio").
+  `core/netradio.*`, `core/icy.*`, `core/stream_decoder.*`,
   `core/pacer.*` — internet radio (see "Internet radio").
 - `core/crash.*` — vectored exception handler (installed with logging on): logs the first 4 access
   violations as `crash: access violation (read/write/execute 0x…) at <module>+0x…` plus the stack as
@@ -273,6 +276,38 @@ The live station's first real source. All own code (no GPL), works under Wine as
 - Not supported yet: AAC (many stations), Opus, Ogg FLAC; SHOUTcast 1's `ICY 200 OK` reply (not HTTP, WinHTTP
   rejects it; would need a raw socket).
 
+## App audio (2026-10-23, `[Live] Source = app`, `App = <process name>`; not yet tried in game)
+
+The sound of another program (NetEase Cloud Music, Spotify, a browser) on the live station. The user chose
+(2026-10-23) to write it on `main` as own code rather than merge the GPL branch, which stays parked. Someday
+probably also a Spotify Connect receiver like FH6's, through librespot (MIT; needs Spotify Premium, and is an
+unofficial client, against Spotify's terms: weigh that then).
+
+- `core/app_audio.*`, written from Microsoft's documentation of the API only (not from the GPL branch's code):
+  `FindProcess` takes the root of the process tree with that exe name (a same-named process whose parent isn't
+  one; Electron apps play from a child); `Capture` activates process loopback
+  (`ActivateAudioInterfaceAsync(VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK)` with `AUDIOCLIENT_ACTIVATION_PARAMS`,
+  include the target's tree; the function looked up in mmdevapi.dll at run time, the handler agile) and
+  initializes it shared, loopback + event + autoconvert, asking for 48 kHz 16-bit stereo (process loopback has
+  no mix format of its own), 200 ms buffer; `Run` (the live source) waits for the program (retries every 2 s,
+  5 s after a failed capture), captures until it exits or the capture fails, and pads silence by the clock
+  once no packet has come for 200 ms (packets only come while the app renders). Every 10 s the log has the
+  captured ms, peak dBFS and padded silence. The HUD title is the process name for now.
+- **Requirement: Windows 10 build 20348+** (`AUDIOCLIENT_ACTIVATION_PARAMS`), so in practice Windows 11 (or
+  Server 2022+). Wine: activation fails (the GPL branch's CI saw `0x80070002`); logged, the station stays silent.
+- **The mute question, answered 2026-10-23 on Windows 11 (`tests/app_audio_manual.cc`, no game)**: a child
+  playing a -20 dBFS sine on a spare output device (Steam Streaming Speakers) was captured at -20.0 dBFS, and
+  still at -20.0 with that **device muted** (`IAudioEndpointVolume::SetMute`, restored after). Process loopback
+  taps after the app's session volume (the GPL branch found a muted session captures silence) but before the
+  endpoint. So players send the app to an unused output device (Settings > System > Sound > Volume mixer, the
+  app's output device), or mute that device, and hear it only through the game's radio. Don't mute the app.
+  `app_audio_manual list` shows the output devices, `<index> mute` reruns the experiment.
+- `tests/app_audio_test.cc`: `FindProcess` (its own exe, case-insensitive; a missing one), and a capture that
+  opens and reads or fails with a reason (Wine). On Windows 11 a silent process still delivers a packet.
+- Next: try it in game; the app's title on the HUD from the system media session (SMTC, C++/WinRT; Wine has
+  none); maybe set the app's output device from the mod (only through undocumented policy-config interfaces,
+  as EarTrumpet does: risky).
+
 ## Design decisions (don't undo without reason)
 
 - **Inside Wwise via files, not voices**: serving a bank + PCM streams keeps every game behavior (bus,
@@ -347,6 +382,6 @@ The live station's first real source. All own code (no GPL), works under Wine as
    with a token and a Host check, LAN only as an option, no API that sets paths or starts programs (FH6's
    allows any origin and sets executable paths); `ShellExecute` to open it (Wine hands that to the Linux
    browser). WebView2: not needed, and it doesn't run under Wine.
-6. Another app's audio (Spotify...) is on branch `gpl/external-audio`, diagnostics only: process loopback
-   works but an app muted in the mixer is captured as silence, so it needs a virtual cable or a spare output
-   device (untested). GPL code from FH6 Universal Radio; the user hasn't decided on licensing.
+6. Another app's audio: own code on `main` since 2026-10-23 (see "App audio"); try it in game, then the media
+   session's title on the HUD. The GPL branch `gpl/external-audio` (code from FH6 Universal Radio) is parked;
+   keep rebasing it. Later maybe librespot (Spotify Connect).

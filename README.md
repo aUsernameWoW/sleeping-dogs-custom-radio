@@ -105,6 +105,10 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 
 用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `radio`，`Url` 填上电台的流地址（例如 `https://stream.radioparadise.com/mp3-128`），保存后重启游戏。旧版本生成的 ini 里没有 `[Live]` 这一段，在文件末尾自己加上 `[Live]` 和这三行就行。切台时会多出一个「SDRADIO LIVE」，连上后几秒内出声。目前只支持 MP3 和 Ogg Vorbis 格式的电台，可以在 [radio-browser.info](https://www.radio-browser.info) 按格式（codec）找台。HUD 上显示电台正在放的歌名（电台还没报歌名时显示它的网址）。
 
+**想在车里听网易云音乐、Spotify 等程序放的歌（实验功能，需要 Windows 11）**
+
+用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `app`，`App` 填上那个程序的进程名，例如 `cloudmusic.exe`（网易云音乐）或 `Spotify.exe`（不知道进程名的话，打开任务管理器的「详细信息」页找），保存后重启游戏。切到「SDRADIO LIVE」就能听到这个程序正在放的歌，带上游戏电台的效果。为了不同时听到两份声音：打开 Windows 的 设置 → 系统 → 声音 → 音量合成器，把这个程序的输出设备改成一个你不用的设备（例如显示器的扬声器、Steam Streaming Speakers），或者把那个设备静音。不要在音量合成器里把程序本身静音，那样游戏里也听不到了。
+
 **更新**
 
 下载新的 `SDRadio.zip`，只把里面的 `plugins` 文件夹拖进游戏文件夹，Windows 询问时选「替换目标中的文件」。你的音乐和 `SDRadio.ini` 不会受影响。
@@ -139,7 +143,8 @@ Bugs 标签里说明情况，并附上 `plugins\SDRadio.log`。
 - ID3、Vorbis comment 和 RIFF INFO 标签的格式规范：读取歌名和歌手。
 - SHOUTcast / Icecast 的 ICY 元数据约定（流里每隔固定字节插入 `StreamTitle`）：网络电台的曲名。
 - [radio-browser.info](https://www.radio-browser.info)（社区维护的网络电台目录）：ini 里推荐用它找台，测试网络电台时也用它找了 MP3 / Ogg 的台。
-- [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio)（g0ldyy，Forza Horizon 6 的电台 mod）：「把各种音源都转成 PCM，送进游戏自己的电台」这个思路的参考；直播电台和网络电台的代码是独立编写的，没有用它的代码。
+- [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio)（g0ldyy，Forza Horizon 6 的电台 mod）：「把各种音源都转成 PCM，送进游戏自己的电台」以及「抓取其他程序的声音」这两个思路的参考；直播电台、网络电台和程序声音的代码是独立编写的，没有用它的代码。
+- Microsoft 的 [Application Loopback（按进程捕获）文档](https://learn.microsoft.com/windows/win32/api/audioclientactivationparams/ns-audioclientactivationparams-audioclient_activation_params)：抓取其他程序声音的代码照它编写。
 - Scaleform（Autodesk）：游戏界面用的中间件，研究电台 HUD 时分析了它。
 
 **mod 里包含的代码**（许可证全文见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)）
@@ -276,6 +281,15 @@ end). A station "SDRADIO LIVE" joins the cycle and starts a few seconds after yo
 Ogg Vorbis stations work so far (search [radio-browser.info](https://www.radio-browser.info) by codec). The HUD
 shows the song the station is playing (its address until the station names one).
 
+**Listening to NetEase Cloud Music, Spotify or another program in the car (experimental, Windows 11)**
+
+Open `plugins\SDRadio.ini` in Notepad; in the `[Live]` section set `Enabled` to `1`, `Source` to `app` and `App`
+to the program's process name, e.g. `cloudmusic.exe` (NetEase Cloud Music) or `Spotify.exe` (Task Manager's
+Details tab lists them), save and restart the game. Tune to "SDRADIO LIVE" to hear what that program plays,
+through the game's radio effect. So you don't hear it twice: in Windows Settings > System > Sound > Volume
+mixer, set the program's output device to one you don't listen to (a monitor's speakers, Steam Streaming
+Speakers...), or mute that device. Don't mute the program itself in the mixer: the game would hear silence too.
+
 **Updating**
 
 Download the new `SDRadio.zip` and drag only its `plugins` folder into the game folder; when Windows asks,
@@ -321,8 +335,10 @@ This mod uses or builds on the work of these people and projects. Thank you.
 - [radio-browser.info](https://www.radio-browser.info) (a community-run directory of internet radio): suggested
   in the ini for finding stations, and used to find MP3 / Ogg stations for testing.
 - [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio) (g0ldyy, a radio mod for Forza Horizon 6):
-  the idea of turning every source into PCM fed to the game's own radio; the live station and internet radio
-  were written independently, with none of its code.
+  the ideas of turning every source into PCM fed to the game's own radio and of capturing another program's
+  sound; the live station, internet radio and app capture were written independently, with none of its code.
+- Microsoft's [application loopback (process loopback) documentation](https://learn.microsoft.com/windows/win32/api/audioclientactivationparams/ns-audioclientactivationparams-audioclient_activation_params):
+  the app capture is written from it.
 - Scaleform (Autodesk): the game's UI middleware, analyzed while studying the radio HUD.
 
 **Code in the mod** (full license texts in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md))
