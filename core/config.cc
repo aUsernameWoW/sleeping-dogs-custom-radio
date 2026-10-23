@@ -50,13 +50,18 @@ namespace config
 			"Enabled = 0\n"
 			"; 直播电台的台名。/ The live station's name.\n"
 			"Name = SDRADIO LIVE\n"
-			"; 音源：test = 测试信号（每秒一声提示音，每四声一声高音）；radio = 网络电台（下面的 Url）。\n"
-			"; Source: test = a test signal (a beep every second, every fourth one higher); radio = internet radio (Url).\n"
+			"; 音源：test = 测试信号（每秒一声提示音，每四声一声高音）；radio = 网络电台（下面的 Url）；\n"
+			"; app = 另一个程序的声音（下面的 App，需要 Windows 11）。\n"
+			"; Source: test = a test signal (a beep every second, every fourth one higher); radio = internet radio (Url);\n"
+			"; app = another program's sound (App below; needs Windows 11).\n"
 			"Source = test\n"
 			"; 网络电台的地址：MP3 或 Ogg Vorbis 的流，或指向它的 .m3u / .pls。可以在 https://www.radio-browser.info 找台。\n"
 			"; Internet radio stream: MP3 or Ogg Vorbis, or an .m3u / .pls pointing at one. Find stations at\n"
 			"; https://www.radio-browser.info\n"
 			"Url =\n"
+			"; Source = app 时要播放的程序的进程名，例如 cloudmusic.exe（网易云音乐）、Spotify.exe。\n"
+			"; For Source = app: the program's process name, e.g. cloudmusic.exe (NetEase Cloud Music), Spotify.exe.\n"
+			"App =\n"
 			"\n"
 			"[Debug]\n"
 			"; 在 .asi 旁边写 SDRadio.log。\n"
@@ -153,6 +158,9 @@ namespace config
 		get("Live.Name", gConfig.mLiveName);
 		get("Live.Source", gConfig.mLiveSource);
 		get("Live.Url", gConfig.mLiveUrl);
+		std::string app;
+		get("Live.App", app);
+		gConfig.mLiveApp = Widen(app);
 		if (auto it = values.find("Debug.Logging"); it != values.end()) {
 			gConfig.mLogging = it->second != "0";
 		}

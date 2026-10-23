@@ -11,6 +11,7 @@
 #include <unordered_set>
 
 #include "ak.hh"
+#include "app_audio.hh"
 #include "bank.hh"
 #include "config.hh"
 #include "library.hh"
@@ -222,6 +223,11 @@ namespace hooks
 					if (host != std::string::npos) {
 						title = gConfig.mLiveUrl.substr(host + 3, gConfig.mLiveUrl.find_first_of("/:?", host + 3) - host - 3);
 					}
+				}
+				else if (gConfig.mLiveSource == "app") {
+					const std::string app = logger::ToUtf8(gConfig.mLiveApp.c_str());
+					live::SetSource("app " + app, [exe = gConfig.mLiveApp](const std::atomic<bool>& stop) { appaudio::Run(exe, stop); });
+					title = app.empty() ? "app" : app;
 				}
 				else {
 					title.clear();
