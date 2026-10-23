@@ -23,7 +23,7 @@ signal or **internet radio** (MP3 / Ogg Vorbis over WinHTTP). Both play in game 
 current song title on the HUD. Two bugs found in game on 2026-10-23 are fixed and confirmed there: game hitches
 (reads that waited for the source) and the radio sticking after a switch between our two stations (a game HUD
 bug our shared logo triggers). See "Live station" and "Internet radio" below. Since 2026-10-23 the live station can also play
-**another app's sound** (`Source = app`, own code on `main`, Windows 11; not yet tried in game): see "App audio".
+**another app's sound** (`Source = app`, own code on `main`, Windows 11; works in game): see "App audio".
 The older GPL experiment is parked on branch `gpl/external-audio` (GPL,
 not to be merged without the user's licensing decision; its CLAUDE.md has the details).
 
@@ -276,7 +276,7 @@ The live station's first real source. All own code (no GPL), works under Wine as
 - Not supported yet: AAC (many stations), Opus, Ogg FLAC; SHOUTcast 1's `ICY 200 OK` reply (not HTTP, WinHTTP
   rejects it; would need a raw socket).
 
-## App audio (2026-10-23, `[Live] Source = app`, `App = <process name>`; not yet tried in game)
+## App audio (2026-10-23, `[Live] Source = app`, `App = <process name>`; works in game)
 
 The sound of another program (NetEase Cloud Music, Spotify, a browser) on the live station. The user chose
 (2026-10-23) to write it on `main` as own code rather than merge the GPL branch, which stays parked. Someday
@@ -302,9 +302,15 @@ unofficial client, against Spotify's terms: weigh that then).
   endpoint. So players send the app to an unused output device (Settings > System > Sound > Volume mixer, the
   app's output device), or mute that device, and hear it only through the game's radio. Don't mute the app.
   `app_audio_manual list` shows the output devices, `<index> mute` reruns the experiment.
+- **In game (2026-10-23, Windows 11, NetEase Cloud Music sent to Steam Streaming Speakers)**: plays through
+  the radio, 79 reads in a row without padded silence; the quick-return rebuffer edge as for internet radio.
+  The first try was silent because the user, unsure which of the two outputs they heard, had muted
+  cloudmusic in the volume mixer: the log then shows a capture at ~-90 dBFS (no padded silence: the app keeps
+  rendering, just muted). The docs now say it louder; a log/HUD warning when the app's session is muted
+  (`IAudioSessionManager2` -> the process's `ISimpleAudioVolume::GetMute`) would catch it at once.
 - `tests/app_audio_test.cc`: `FindProcess` (its own exe, case-insensitive; a missing one), and a capture that
   opens and reads or fails with a reason (Wine). On Windows 11 a silent process still delivers a packet.
-- Next: try it in game; the app's title on the HUD from the system media session (SMTC, C++/WinRT; Wine has
+- Next: the app's title on the HUD from the system media session (SMTC, C++/WinRT; Wine has
   none); maybe set the app's output device from the mod (only through undocumented policy-config interfaces,
   as EarTrumpet does: risky).
 
@@ -382,6 +388,6 @@ unofficial client, against Spotify's terms: weigh that then).
    with a token and a Host check, LAN only as an option, no API that sets paths or starts programs (FH6's
    allows any origin and sets executable paths); `ShellExecute` to open it (Wine hands that to the Linux
    browser). WebView2: not needed, and it doesn't run under Wine.
-6. Another app's audio: own code on `main` since 2026-10-23 (see "App audio"); try it in game, then the media
-   session's title on the HUD. The GPL branch `gpl/external-audio` (code from FH6 Universal Radio) is parked;
+6. Another app's audio: own code on `main` since 2026-10-23, works in game (see "App audio"); next the media
+   session's title on the HUD, a warning when the app is muted in the mixer. The GPL branch `gpl/external-audio` (code from FH6 Universal Radio) is parked;
    keep rebasing it. Later maybe librespot (Spotify Connect).

@@ -107,7 +107,7 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 
 **想在车里听网易云音乐、Spotify 等程序放的歌（实验功能，需要 Windows 11）**
 
-用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `app`，`App` 填上那个程序的进程名，例如 `cloudmusic.exe`（网易云音乐）或 `Spotify.exe`（不知道进程名的话，打开任务管理器的「详细信息」页找），保存后重启游戏。切到「SDRADIO LIVE」就能听到这个程序正在放的歌，带上游戏电台的效果。为了不同时听到两份声音：打开 Windows 的 设置 → 系统 → 声音 → 音量合成器，把这个程序的输出设备改成一个你不用的设备（例如显示器的扬声器、Steam Streaming Speakers），或者把那个设备静音。不要在音量合成器里把程序本身静音，那样游戏里也听不到了。
+用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `app`，`App` 填上那个程序的进程名，例如 `cloudmusic.exe`（网易云音乐）或 `Spotify.exe`（不知道进程名的话，打开任务管理器的「详细信息」页找），保存后重启游戏。切到「SDRADIO LIVE」就能听到这个程序正在放的歌，带上游戏电台的效果。为了不同时听到两份声音：打开 Windows 的 设置 → 系统 → 声音 → 音量合成器，把这个程序的输出设备改成一个你不用的设备（例如显示器的扬声器、Steam Streaming Speakers），或者把那个设备静音。**不要在音量合成器里把程序本身静音**，那样游戏里也听不到了：程序的声音本来就只该从游戏里听到，改完输出设备后程序那边「没声音」是正常的。
 
 **更新**
 
@@ -288,7 +288,8 @@ to the program's process name, e.g. `cloudmusic.exe` (NetEase Cloud Music) or `S
 Details tab lists them), save and restart the game. Tune to "SDRADIO LIVE" to hear what that program plays,
 through the game's radio effect. So you don't hear it twice: in Windows Settings > System > Sound > Volume
 mixer, set the program's output device to one you don't listen to (a monitor's speakers, Steam Streaming
-Speakers...), or mute that device. Don't mute the program itself in the mixer: the game would hear silence too.
+Speakers...), or mute that device. **Don't mute the program itself in the mixer**: the game would hear silence too. Once its output device is
+changed, the program sounding silent on its own is expected; you hear it in the game.
 
 **Updating**
 
