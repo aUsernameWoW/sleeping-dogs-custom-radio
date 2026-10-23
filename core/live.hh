@@ -2,7 +2,7 @@
 
 // The live station: audio that arrives in real time (a test signal now; internet radio, another app's audio
 // later) played as an endless track. A source pushes 48 kHz 16-bit stereo into a ring; the station's track
-// files are WAV images whose data chunk is as long as a WAV can say (~6.2 h), and Wwise's reads of them are
+// files are WAV images whose data chunk lasts an hour (see kFrames), and Wwise's reads of them are
 // served from the ring instead of the file position (Reader).
 //
 // Latency: a stream starts kPrerollMs behind the newest audio. Wwise keeps ~0.4 s read ahead of playback
@@ -23,9 +23,11 @@ namespace live
 	constexpr uint32_t kRate = 48000;
 	constexpr uint32_t kBlockAlign = 4;
 	constexpr uint32_t kHeaderSize = 68; // as streamio::kWavHeaderSize
-	// The longest data chunk a RIFF size field allows, in whole frames: ~6.2 h. The game then starts the
-	// station's other track, which plays the same stream.
-	constexpr uint64_t kFrames = (0xFFFFFFFFull - (kHeaderSize - 8)) / kBlockAlign;
+	// One hour (~690 MB of data); the game then starts the station's other track, which plays the same stream.
+	// The first try declared the longest data chunk a RIFF allows (~4 GB, ~6.2 h): in game Wwise read it only
+	// 9 times in 87 s and played a looping, dial-up-like noise, presumably a size or position overflowing a
+	// signed 32-bit value, so this stays far below 2 GB.
+	constexpr uint64_t kFrames = uint64_t{ kRate } * 3600;
 
 	constexpr uint32_t kRingMs = 10'000;
 	constexpr uint32_t kPrerollMs = 1'000;
@@ -76,6 +78,8 @@ namespace live
 			uint32_t mSeeks = 0;        // reads not following the previous one (the game's resume seek)
 		};
 		const Stats& GetStats() const { return mStats; }
+		// How far the reader is behind the newest audio, in bytes.
+		uint64_t Lead() const;
 
 	private:
 		// Starts or realigns the cursor so its byte phase matches the file position's frame phase.

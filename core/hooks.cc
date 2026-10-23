@@ -158,7 +158,7 @@ namespace hooks
 				}
 				else {
 					// Two tracks on the same stream: GetNextTrack avoids recently played tracks, and with only one
-					// it might find none when the endless track does end (after ~6 h).
+					// it might find none when the "endless" track does end (after an hour).
 					radios::Station station;
 					station.mName = gConfig.mLiveName;
 					std::vector<streamio::TrackSource> sources;

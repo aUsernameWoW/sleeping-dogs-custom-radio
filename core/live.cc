@@ -95,6 +95,12 @@ namespace live
 		}
 	}
 
+	uint64_t Reader::Lead() const
+	{
+		const uint64_t written = mRing.Written();
+		return written > mCursor ? written - mCursor : 0;
+	}
+
 	bool Reader::Ready(uint64_t position, uint32_t size, DWORD waitedMs)
 	{
 		const uint64_t end = position + size;

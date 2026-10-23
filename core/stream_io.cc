@@ -89,8 +89,20 @@ namespace streamio
 							const DWORD waited = GetTickCount() - it->mQueuedAt;
 							if (std::find(blocked.begin(), blocked.end(), &f) == blocked.end()
 								&& f.mLive->Ready(info.mFilePosition, info.mRequestedSize, waited)) {
+								const uint64_t silenceBefore = f.mLive->GetStats().mSilenceBytes;
 								f.mLive->Fill(info.mFilePosition, info.mRequestedSize, static_cast<uint8_t*>(info.mBuffer));
 								it->mFilled = true;
+								// How Wwise reads an endless stream (sizes, pacing) isn't known yet: log the first
+								// reads of each open, then every 100th.
+								const uint32_t n = f.mLive->GetStats().mReads;
+								if (n <= 60 || n % 100 == 0) {
+									const DWORD sinceOpen = GetTickCount() - f.mOpenedAt;
+									LOG("live: read %u at %lu ms: position %llu, %u bytes (%llu ms), waited %lu ms, %llu ms silence, now %llu ms behind live",
+										n, sinceOpen, info.mFilePosition, info.mRequestedSize,
+										static_cast<uint64_t>(info.mRequestedSize) * 1000 / (live::kRate * live::kBlockAlign), waited,
+										(f.mLive->GetStats().mSilenceBytes - silenceBefore) * 1000 / (live::kRate * live::kBlockAlign),
+										f.mLive->Lead() * 1000 / (live::kRate * live::kBlockAlign));
+								}
 								if (waited > f.mLongestWait) f.mLongestWait = waited;
 								ready.push_back(std::move(*it));
 								it = gPending.erase(it);
@@ -286,6 +298,9 @@ namespace streamio
 			info.mRequestedSize = info.mFilePosition < f.mSize ? static_cast<uint32_t>(f.mSize - info.mFilePosition) : 0;
 		}
 		++f.mReads;
+		if (f.mLive && (f.mReads <= 60 || f.mReads % 100 == 0)) {
+			LOG("live: request %u at %lu ms: position %llu, %u bytes", f.mReads, GetTickCount() - f.mOpenedAt, info.mFilePosition, info.mRequestedSize);
+		}
 		gPending.push_back({ it->second, &info, GetTickCount() });
 		gWake.notify_one();
 		return true;

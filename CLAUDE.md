@@ -158,7 +158,7 @@ fed by a test signal (`Source = test`: a 0.15 s beep each second, 880 Hz on ever
   the same stream: `GetNextTrack` avoids recently played tracks and might find none with one. `BuildStations`
   /`AddStation` in hooks.cc; `streamio::Register` now takes one call per station (banks by ID).
 - `core/live.*`: the source pushes 48 kHz 16-bit stereo into a 10 s `Ring` (absolute byte positions). A live
-  track's WAV header declares the longest data chunk a RIFF size allows (`live::kFrames`, ~6.2 h). Wwise's reads
+  track's WAV header declares an hour of data (`live::kFrames`, see why there). Wwise's reads
   ignore the file position and take the next ring bytes (`Reader`), starting 1 s behind the newest audio
   (`kPrerollMs`; Wwise reads ~0.4 s ahead by default, the rest absorbs jitter). A read the ring can't satisfy
   waits up to 250 ms, then completes with silence for the missing part (the cursor moves only over real audio);
