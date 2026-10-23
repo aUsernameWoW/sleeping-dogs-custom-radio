@@ -330,8 +330,18 @@ unofficial client, against Spotify's terms: weigh that then).
   (`IAudioSessionManager2` -> the process's `ISimpleAudioVolume::GetMute`) would catch it at once.
 - `tests/app_audio_test.cc`: `FindProcess` (its own exe, case-insensitive; a missing one), and a capture that
   opens and reads or fails with a reason (Wine). On Windows 11 a silent process still delivers a packet.
-- Next: a warning when the app is muted; maybe control
-  the app from the radio (SMTC `TrySkipNextAsync`...); maybe set the app's output device from the mod (only through undocumented policy-config interfaces,
+- **Pausing the app while the station isn't played** (`[Live] PauseApp`, default 1; 2026-10-23, not yet tried
+  in game; FH6 Universal Radio's idea): `live::Listening(3 s)` (a live file open and opened or read within
+  3 s; `stream_io` calls `live::NoteRead` per live read; the pause menu stops reads but keeps the file open,
+  as a 55 s gap in a log showed) drives `nowplaying`'s `Control`, every 250 ms on the session kept between
+  refreshes: not listening for 1.5 s while the app plays -> `TryPauseAsync`, flag `gPausedByUs` (a static:
+  the source run stops 10 s after the station is left, the next run must resume); listening again with the
+  flag set -> clear it, and `TryPlayAsync` if still paused. A pause the player made is never undone; an app
+  the player restarted meanwhile isn't paused again until the station is left again. The session's playback
+  status is logged on change (4 playing, 5 paused). `app_audio_manual control <exe>`: 5 s not listening, 5 s
+  listening (offline, NetEase was paused, so nothing to do: verify with it playing).
+- Next: a warning when the app is muted or plays on the default device; maybe next/previous track from the
+  radio (SMTC `TrySkipNextAsync`...); maybe set the app's output device from the mod (only through undocumented policy-config interfaces,
   as EarTrumpet does: risky).
 
 ## Design decisions (don't undo without reason)
