@@ -16,7 +16,9 @@ Status (2026-09-24): **works in game on Windows** (user: "works as expected"). F
 switch to the station, events play, a whole 3.5-min FLAC decodes in ~110 ms, longest read wait 47 ms (only
 at stream start), tracks alternate on end-of-track, and resuming the station starts mid-track (the game's
 `SeekMS(m_currentTrackTimer)`: the station "kept playing" meanwhile) without trouble. Not yet tried: MP3/OGG/
-M4A in game, Chinese titles on the HUD, Linux (Proton) and macOS (CrossOver/Wine).
+M4A in game, Linux (Proton) and macOS (CrossOver/Wine). Chinese titles show on the HUD (2026-10-23, live
+station, "G.E.M.邓紫棋 - 自由的你") with the Chinese translation pack's SDCNLoc.asi installed; without it,
+unknown (the glyphs may come from the pack's font).
 
 Since 2026-10-23 also a **live station** (`[Live]`, off by default) that plays a real-time source: a test
 signal or **internet radio** (MP3 / Ogg Vorbis over WinHTTP). Both play in game on Windows, with the
@@ -263,7 +265,8 @@ The live station's first real source. All own code (no GPL), works under Wine as
   `mVisible` (+5); the game sets it from `Radio::DoStartTrack` via `HandleNewSong`. A hook on `Update` sets it
   when the title's generation changed while visible. So, as for game stations, a new song shows if the widget is
   up (it fades 4 s after the last input) or the next time it opens; it doesn't pop up by itself. The title is
-  UTF-8 from ICY/Vorbis; Chinese glyphs on the HUD are as untested as for music files. Log: `hud: song title`.
+  UTF-8 from ICY/Vorbis or the media session; Chinese shows (with SDCNLoc installed, see the top). Log:
+  `hud: song title`.
 - `tests/netradio_manual.cc <url> [s]` (compiled, not run; needs the network): plays a station into the ring and
   prints the log and the fill rate, with Wwise emulated as the game reads (128 KB, one at a time, ~2.7 s kept):
   reads, waits, padded silence, starvation, the lowest buffer. After the stutter fix, Radio Paradise for 40 s:
@@ -305,7 +308,11 @@ unofficial client, against Spotify's terms: weigh that then).
   `api-ms-win-core-winrt-l1-1-0` / `-winrt-error-l1-1-1` delay-loaded (dumpbin: the only WinRT API sets it
   imports; `now_playing` checks both load before any WinRT call). Tests link `oleaut32.lib` too (C++/WinRT's
   error info) and delay-load the same. Offline with NetEase (SMTC on): "G.E.M.邓紫棋 - 自由的你"
-  (`app_audio_manual titles cloudmusic.exe`); in game, and so Chinese on the HUD, not yet seen.
+  (`app_audio_manual titles cloudmusic.exe`); in game the same on the HUD, Chinese included (2026-10-23).
+- **NetEase Cloud Music ignores Windows' per-app output device** (2026-10-23, user): it plays to the device
+  chosen in its own settings, so it had to be set there to "WASAPI: Steam Streaming Speakers"; the volume
+  mixer's choice alone didn't move it. Other apps (Spotify, browsers) follow the mixer's choice as far as
+  known. So setting the device from the mod (policy config, see Next) wouldn't help NetEase either.
 - **Requirement: Windows 10 build 20348+** (`AUDIOCLIENT_ACTIVATION_PARAMS`), so in practice Windows 11 (or
   Server 2022+). Wine: activation fails (the GPL branch's CI saw `0x80070002`); logged, the station stays silent.
 - **The mute question, answered 2026-10-23 on Windows 11 (`tests/app_audio_manual.cc`, no game)**: a child
@@ -323,7 +330,7 @@ unofficial client, against Spotify's terms: weigh that then).
   (`IAudioSessionManager2` -> the process's `ISimpleAudioVolume::GetMute`) would catch it at once.
 - `tests/app_audio_test.cc`: `FindProcess` (its own exe, case-insensitive; a missing one), and a capture that
   opens and reads or fails with a reason (Wine). On Windows 11 a silent process still delivers a packet.
-- Next: confirm the HUD title (and Chinese glyphs) in game; a warning when the app is muted; maybe control
+- Next: a warning when the app is muted; maybe control
   the app from the radio (SMTC `TrySkipNextAsync`...); maybe set the app's output device from the mod (only through undocumented policy-config interfaces,
   as EarTrumpet does: risky).
 
@@ -390,8 +397,8 @@ unofficial client, against Spotify's terms: weigh that then).
 2. Own HUD logo (5) — **passed** 2026-09-26 (Windows, with FileRedirector.asi installed: no conflict): 私家台
    on our station, HKPD keeps its own. A player `logo.png` in game not yet tried (the code path is tested).
 3. Next: Linux/macOS runs in game (the user has both; Wine/Proton/CrossOver; the tests already pass under
-   Wine in CI), Chinese titles on the HUD (font
-   glyphs), long-track seek behavior (`SeekMS` on resume reads far ahead: decode-to-position latency).
+   Wine in CI), Chinese titles on the HUD without SDCNLoc,
+   long-track seek behavior (`SeekMS` on resume reads far ahead: decode-to-position latency).
 4. Maybe: several stations (one per subfolder), shuffle/order option, M3U playlists.
 5. Live station / internet radio (2026-10-23, see their sections; hitches, stuck switch and HUD title done and
    confirmed in game): next AAC streams
@@ -402,5 +409,5 @@ unofficial client, against Spotify's terms: weigh that then).
    allows any origin and sets executable paths); `ShellExecute` to open it (Wine hands that to the Linux
    browser). WebView2: not needed, and it doesn't run under Wine.
 6. Another app's audio: own code on `main` since 2026-10-23, works in game (see "App audio"); the HUD title
-   from its media session is in (not yet seen in game); next a warning when the app is muted in the mixer. The GPL branch `gpl/external-audio` (code from FH6 Universal Radio) is parked;
+   from its media session too; next a warning when the app is muted in the mixer. The GPL branch `gpl/external-audio` (code from FH6 Universal Radio) is parked;
    keep rebasing it. Later maybe librespot (Spotify Connect).
