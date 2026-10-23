@@ -25,9 +25,10 @@ namespace streamio
 		std::wstring mPath;
 		uint32_t mSampleRate;
 		uint64_t mFrames;
+		bool mLive = false; // the live station's endless stream (live.hh) instead of a file
 	};
 
-	// Registers what can be opened. Called once, before Wwise can ask for any of it.
+	// Registers what can be opened, once per station, before Wwise can ask for any of it.
 	void Register(uint32_t bankId, std::vector<uint8_t> bank, std::vector<TrackSource> tracks);
 
 	bool IsOurs(uint32_t fileId);

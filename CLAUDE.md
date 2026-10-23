@@ -66,7 +66,8 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   `core/decoder_mf.cc` — Media Foundation fallback (delay-loaded) with shell-property tags; logs once
   whether it started (under Wine it may be missing, or start but open nothing without GStreamer plugins).
 - `core/tags.*` — ID3v2.2-2.4/ID3v1, Vorbis comments, RIFF INFO; legacy text: UTF-8, else GBK, else Latin-1.
-- `core/stream_io.*` — virtual files, decoder threads, completion thread.
+- `core/stream_io.*` — virtual files, decoder threads, completion thread. `core/live.*` — the live station's
+  ring, reader and sources (see "Live station").
 - `core/crash.*` — vectored exception handler (installed with logging on): logs the first 4 access
   violations as `crash: access violation (read/write/execute 0x…) at <module>+0x…` plus the stack as
   module+offset frames, and writes the first 2 as `SDRadio-crash-<n>.dmp` next to the .asi (open with
@@ -147,6 +148,28 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
 - `README.md` — for players with no modding experience (step-by-step install, where the music goes, FAQ incl.
   the Proton launch option); keep build/internals out of it. `ADVANCED.md` — everything else (how it works,
   formats/backends, downloads, settings table, building, CI). Both bilingual (Chinese first).
+
+## Live station (2026-10-22, `[Live] Enabled = 1`; not yet tried in game)
+
+The path every real-time source (internet radio next, then Jellyfin, another app's audio) will share, so far
+fed by a test signal (`Source = test`: a 0.15 s beep each second, 880 Hz on every fourth, -12 dBFS).
+
+- A second station appended after the music one (id max + 1 if there's no music), same logo, **two tracks** on
+  the same stream: `GetNextTrack` avoids recently played tracks and might find none with one. `BuildStations`
+  /`AddStation` in hooks.cc; `streamio::Register` now takes one call per station (banks by ID).
+- `core/live.*`: the source pushes 48 kHz 16-bit stereo into a 10 s `Ring` (absolute byte positions). A live
+  track's WAV header declares the longest data chunk a RIFF size allows (`live::kFrames`, ~6.2 h). Wwise's reads
+  ignore the file position and take the next ring bytes (`Reader`), starting 1 s behind the newest audio
+  (`kPrerollMs`; Wwise reads ~0.4 s ahead by default, the rest absorbs jitter). A read the ring can't satisfy
+  waits up to 250 ms, then completes with silence for the missing part (the cursor moves only over real audio);
+  a reader more than 3 s behind jumps back to the preroll distance; after a seek (the game's resume
+  `SeekMS`) the cursor takes the position's frame phase. Live reads complete in issue order per file (the
+  completer fills them under its lock). Close logs reads, padded silence, jumps and seeks.
+- The source runs while a live file is open and stops 10 s after the last close (station switches and track
+  starts reopen it); `Ring::Reset` on start. `live_test` covers ring and reader.
+- To check in game: the station appears after the music one, the beeps play through the car radio effect
+  without gaps (the close line: padded silence ~0), leaving and coming back resumes about 1 s behind live,
+  the source stops 10 s after switching away. Station 13's file IDs weren't checked against SFX.pck (12's were).
 
 ## Design decisions (don't undo without reason)
 

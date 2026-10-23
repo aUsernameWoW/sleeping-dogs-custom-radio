@@ -12,6 +12,7 @@
 #include <thread>
 
 #include "decoder.hh"
+#include "live.hh"
 #include "log.hh"
 
 namespace streamio
@@ -22,6 +23,7 @@ namespace streamio
 		{
 			uint32_t mId = 0;
 			const TrackSource* mTrack = nullptr; // null for the bank
+			std::unique_ptr<live::Reader> mLive; // a live track: reads come from the ring, not mData
 			uint64_t mSize = 0;
 			std::unique_ptr<uint8_t[]> mData;
 			std::atomic<uint64_t> mReady{ 0 }; // bytes [0, mReady) are valid
@@ -37,12 +39,12 @@ namespace streamio
 			std::shared_ptr<File> mFile;
 			ak::AsyncIOTransferInfo* mInfo;
 			DWORD mQueuedAt;
+			bool mFilled = false; // live reads are filled while gLock is held, in order
 		};
 
 		std::mutex gLock;
 		std::condition_variable gWake;
-		uint32_t gBankId = 0;
-		std::vector<uint8_t> gBank;
+		std::map<uint32_t, std::vector<uint8_t>> gBanks;
 		std::map<uint32_t, TrackSource> gTracks;
 		std::map<void*, std::shared_ptr<File>> gOpen;
 		std::vector<Request> gPending;
@@ -51,7 +53,7 @@ namespace streamio
 		void Complete(const Request& r, ak::AKRESULT result)
 		{
 			ak::AsyncIOTransferInfo& info = *r.mInfo;
-			if (result == ak::kSuccess) {
+			if (result == ak::kSuccess && !r.mFilled) {
 				const File& f = *r.mFile;
 				const uint64_t begin = info.mFilePosition;
 				const uint64_t end = begin + info.mRequestedSize;
@@ -77,8 +79,28 @@ namespace streamio
 				{
 					std::unique_lock lock(gLock);
 					gWake.wait(lock, [] { return !gPending.empty(); });
+					// A live file's reads take consecutive audio from the ring, so they complete in the order
+					// Wwise issued them: once one has to wait, the later ones of that file wait too.
+					std::vector<const File*> blocked;
 					for (auto it = gPending.begin(); it != gPending.end();) {
-						const File& f = *it->mFile;
+						File& f = *it->mFile;
+						if (f.mLive) {
+							const ak::AsyncIOTransferInfo& info = *it->mInfo;
+							const DWORD waited = GetTickCount() - it->mQueuedAt;
+							if (std::find(blocked.begin(), blocked.end(), &f) == blocked.end()
+								&& f.mLive->Ready(info.mFilePosition, info.mRequestedSize, waited)) {
+								f.mLive->Fill(info.mFilePosition, info.mRequestedSize, static_cast<uint8_t*>(info.mBuffer));
+								it->mFilled = true;
+								if (waited > f.mLongestWait) f.mLongestWait = waited;
+								ready.push_back(std::move(*it));
+								it = gPending.erase(it);
+							}
+							else {
+								blocked.push_back(&f);
+								++it;
+							}
+							continue;
+						}
 						const uint64_t end = it->mInfo->mFilePosition + it->mInfo->mRequestedSize;
 						if (f.mDone.load(std::memory_order_acquire) || f.mReady.load(std::memory_order_acquire) >= end) {
 							const DWORD waited = GetTickCount() - it->mQueuedAt;
@@ -171,8 +193,7 @@ namespace streamio
 	void Register(uint32_t bankId, std::vector<uint8_t> bank, std::vector<TrackSource> tracks)
 	{
 		std::lock_guard lock(gLock);
-		gBankId = bankId;
-		gBank = std::move(bank);
+		gBanks[bankId] = std::move(bank);
 		for (TrackSource& t : tracks) {
 			gTracks[t.mFileId] = std::move(t);
 		}
@@ -181,7 +202,7 @@ namespace streamio
 	bool IsOurs(uint32_t fileId)
 	{
 		std::lock_guard lock(gLock);
-		return (gBankId && fileId == gBankId) || gTracks.count(fileId);
+		return gBanks.count(fileId) || gTracks.count(fileId);
 	}
 
 	bool Open(uint32_t fileId, uint32_t deviceId, ak::FileDesc& desc)
@@ -191,10 +212,10 @@ namespace streamio
 		file->mOpenedAt = GetTickCount();
 		{
 			std::lock_guard lock(gLock);
-			if (gBankId && fileId == gBankId) {
-				file->mSize = gBank.size();
-				file->mData.reset(new uint8_t[gBank.size()]);
-				std::memcpy(file->mData.get(), gBank.data(), gBank.size());
+			if (auto bank = gBanks.find(fileId); bank != gBanks.end()) {
+				file->mSize = bank->second.size();
+				file->mData.reset(new uint8_t[file->mSize]);
+				std::memcpy(file->mData.get(), bank->second.data(), bank->second.size());
 				file->mReady = file->mSize;
 				file->mDone = true;
 			}
@@ -203,17 +224,28 @@ namespace streamio
 				if (it == gTracks.end()) {
 					return false;
 				}
-				// A 4-minute track is ~42 MB; new[] of that size only reserves pages, so this is cheap on
-				// whichever thread Wwise opens from. The decoder commits them as it goes.
-				file->mTrack = &it->second;
-				file->mSize = kWavHeaderSize + it->second.mFrames * decoder::kBlockAlign;
-				file->mData.reset(new (std::nothrow) uint8_t[file->mSize]);
-				if (!file->mData) {
-					LOG("stream: out of memory for %08X (%llu bytes)", fileId, file->mSize);
-					return false;
+				if (it->second.mLive) {
+					file->mTrack = &it->second;
+					file->mSize = kWavHeaderSize + live::kFrames * decoder::kBlockAlign;
+					uint8_t header[kWavHeaderSize];
+					WriteWavHeader(header, live::kRate, live::kFrames);
+					file->mLive = std::make_unique<live::Reader>(live::Stream(), header);
+					live::Stream().SetListener([] { gWake.notify_one(); });
+					live::Acquire();
 				}
-				WriteWavHeader(file->mData.get(), it->second.mSampleRate, it->second.mFrames);
-				file->mReady = kWavHeaderSize;
+				else {
+					// A 4-minute track is ~42 MB; new[] of that size only reserves pages, so this is cheap on
+					// whichever thread Wwise opens from. The decoder commits them as it goes.
+					file->mTrack = &it->second;
+					file->mSize = kWavHeaderSize + it->second.mFrames * decoder::kBlockAlign;
+					file->mData.reset(new (std::nothrow) uint8_t[file->mSize]);
+					if (!file->mData) {
+						LOG("stream: out of memory for %08X (%llu bytes)", fileId, file->mSize);
+						return false;
+					}
+					WriteWavHeader(file->mData.get(), it->second.mSampleRate, it->second.mFrames);
+					file->mReady = kWavHeaderSize;
+				}
 			}
 			gOpen[file.get()] = file;
 			if (!gCompleterRunning) {
@@ -228,7 +260,10 @@ namespace streamio
 		desc.mFile = file.get();
 		desc.mDeviceID = deviceId;
 
-		if (file->mTrack) {
+		if (file->mLive) {
+			LOG("stream: open live track %08X (source \"%s\")", fileId, live::SourceName().c_str());
+		}
+		else if (file->mTrack) {
 			LOG("stream: open track %08X %s (%llu bytes)", fileId, logger::ToUtf8(file->mTrack->mPath.c_str()).c_str(), file->mSize);
 			std::thread(Decode, file).detach();
 		}
@@ -282,6 +317,12 @@ namespace streamio
 		// Wwise closes only after its transfers completed; fail anything left rather than leave a caller hanging.
 		for (const Request& r : orphans) {
 			Complete(r, ak::kFail);
+		}
+		if (file->mLive) {
+			live::Release();
+			const live::Reader::Stats& s = file->mLive->GetStats();
+			LOG("stream: live track %08X: %u reads, %llu ms of silence padded, %u jumps ahead, %u seeks", file->mId, s.mReads,
+				s.mSilenceBytes * 1000 / (live::kRate * live::kBlockAlign), s.mJumps, s.mSeeks);
 		}
 		LOG("stream: close %08X after %lu ms, %u reads, longest wait %lu ms%s", file->mId, GetTickCount() - file->mOpenedAt, file->mReads,
 			file->mLongestWait, orphans.empty() ? "" : " (had pending reads)");

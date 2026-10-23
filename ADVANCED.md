@@ -71,6 +71,7 @@ comment、RIFF INFO 标签，没有标签时用文件名；GBK 编码的老式�
 | `[Station]` | `MusicFolder` | 空 | 音乐文件夹；空 = `.asi` 旁边的 `SDRadio`，相对路径相对于 `plugins` |
 | `[Station]` | `CustomLogo` | 1 | HUD 图标：1 = 音乐文件夹里的 `logo.png`，没有就用自带的「私家台」；0 = 借用下面的游戏图标 |
 | `[Station]` | `TextureName`, `TexturePack` | `Logo_Softly`, `Radio_Softly_TexturePack` | `CustomLogo = 0` 时借用的游戏电台图标（可选值见 ini 注释） |
+| `[Live]` | `Enabled`, `Name`, `Source` | 0, `SDRADIO LIVE`, `test` | 实验功能：再加一个播放实时音源的「直播」电台。目前只有测试信号 `test`（每秒一声提示音，每四声一声高音），用来验证直播通路；网络电台等音源随后加入 |
 | `[Debug]` | `Logging` | 1 | 写 `SDRadio.log`，出错时记录调用栈并写 `SDRadio-crash-<n>.dmp` |
 
 ### 自定义图标
@@ -208,6 +209,7 @@ If you already have an ASI loader, just put `SDRadio.asi` where it loads plugins
 | `[Station]` | `MusicFolder` | empty | Music folder; empty = `SDRadio` next to the `.asi`, relative paths are relative to `plugins` |
 | `[Station]` | `CustomLogo` | 1 | HUD logo: 1 = `logo.png` from the music folder, else SDRadio's own (私家台); 0 = the game logo below |
 | `[Station]` | `TextureName`, `TexturePack` | `Logo_Softly`, `Radio_Softly_TexturePack` | With `CustomLogo = 0`, the game station logo to borrow (choices in the ini's comments) |
+| `[Live]` | `Enabled`, `Name`, `Source` | 0, `SDRADIO LIVE`, `test` | Experimental: a second station playing a real-time source. For now only the test signal `test` (a beep every second, every fourth one higher), to try the live path; internet radio and other sources come next |
 | `[Debug]` | `Logging` | 1 | Write `SDRadio.log`; on a crash, log the stack and write `SDRadio-crash-<n>.dmp` |
 
 ### Custom logo

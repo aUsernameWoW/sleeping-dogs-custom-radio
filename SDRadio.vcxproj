@@ -111,6 +111,7 @@
     <ClCompile Include="core\decoder_mf.cc" />
     <ClCompile Include="core\hooks.cc" />
     <ClCompile Include="core\library.cc" />
+    <ClCompile Include="core\live.cc" />
     <ClCompile Include="core\log.cc" />
     <ClCompile Include="core\logo.cc" />
     <ClCompile Include="core\logo_image.cc" />
@@ -142,6 +143,7 @@
     <ClInclude Include="core\decoder.hh" />
     <ClInclude Include="core\hooks.hh" />
     <ClInclude Include="core\library.hh" />
+    <ClInclude Include="core\live.hh" />
     <ClInclude Include="core\log.hh" />
     <ClInclude Include="core\logo.hh" />
     <ClInclude Include="core\logo_image.hh" />

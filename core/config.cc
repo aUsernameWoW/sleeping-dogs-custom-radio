@@ -44,6 +44,16 @@ namespace config
 			"TextureName = Logo_Softly\n"
 			"TexturePack = Radio_Softly_TexturePack\n"
 			"\n"
+			"[Live]\n"
+			"; 实验功能：再加一个「直播」电台，播放实时音源（以后是网络电台等）。1 = 开启。\n"
+			"; Experimental: a second, live station playing a real-time source (internet radio and more later). 1 = on.\n"
+			"Enabled = 0\n"
+			"; 直播电台的台名。/ The live station's name.\n"
+			"Name = SDRADIO LIVE\n"
+			"; 音源：test = 测试信号（每秒一声提示音，每四声一声高音）。\n"
+			"; Source: test = a test signal (a beep every second, every fourth one higher).\n"
+			"Source = test\n"
+			"\n"
 			"[Debug]\n"
 			"; 在 .asi 旁边写 SDRadio.log。\n"
 			"; Write SDRadio.log next to the .asi.\n"
@@ -133,6 +143,11 @@ namespace config
 		if (auto it = values.find("Station.CustomLogo"); it != values.end()) {
 			gConfig.mCustomLogo = it->second != "0";
 		}
+		if (auto it = values.find("Live.Enabled"); it != values.end()) {
+			gConfig.mLive = it->second == "1";
+		}
+		get("Live.Name", gConfig.mLiveName);
+		get("Live.Source", gConfig.mLiveSource);
 		if (auto it = values.find("Debug.Logging"); it != values.end()) {
 			gConfig.mLogging = it->second != "0";
 		}

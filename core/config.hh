@@ -18,6 +18,12 @@ struct Config
 	std::string mTextureName = "Logo_Softly";
 	std::string mTexturePack = "Radio_Softly_TexturePack";
 
+	// A second station playing a live source (live.hh); off by default.
+	bool mLive = false;
+	std::string mLiveName = "SDRADIO LIVE";
+	// Which source: "test" (a beep each second) for now.
+	std::string mLiveSource = "test";
+
 	// Write SDRadio.log next to the .asi.
 	bool mLogging = true;
 };

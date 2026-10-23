@@ -13,6 +13,7 @@
 #include "bank.hh"
 #include "config.hh"
 #include "library.hh"
+#include "live.hh"
 #include "log.hh"
 #include "logo.hh"
 #include "radios.hh"
@@ -71,9 +72,8 @@ namespace hooks
 		std::atomic<uint32_t> gDeviceId{ 0 };
 
 		std::mutex gStationLock;
-		std::string gPatchedXml;        // Radios.xml with our station, built once
-		uint32_t gStation = 0;
-		uint32_t gBankId = 0;
+		std::string gPatchedXml;        // Radios.xml with our stations, built once
+		std::unordered_set<uint32_t> gBankIds;
 		std::unordered_set<uint32_t> gEventIds;
 		std::atomic<bool> gStationReady{ false };
 
@@ -93,48 +93,85 @@ namespace hooks
 			return true;
 		}
 
-		// Builds the station (XML, bank, streams) from the scanned library. Returns false if there's no station.
-		bool BuildStation(const char* original)
+		// Appends one station to gPatchedXml and registers its bank and streams.
+		bool AddStation(radios::Station station, uint32_t id, std::vector<streamio::TrackSource> sources)
 		{
-			// Radios.xml is read during the game's startup; the scan runs from DllMain, normally done by then.
-			const std::vector<library::Track>* tracks = library::Wait(30'000);
-			if (!tracks) {
-				LOG("radios: music scan still running after 30 s, starting without the station");
-				return false;
-			}
-			if (tracks->empty()) {
-				LOG("radios: no music found in %s, no station", logger::ToUtf8(gConfig.mMusicFolder.c_str()).c_str());
-				return false;
-			}
-
-			gStation = radios::MaxStationId(original) + 1;
-			radios::Station station;
-			station.mName = gConfig.mStationName;
 			// Our logo's texture pack, written at startup (long done by now); without one, a game station's logo.
 			const std::string pack = gConfig.mCustomLogo ? logo::Wait(10'000) : std::string();
 			station.mTextureName = pack.empty() ? gConfig.mTextureName : logo::kTextureName;
 			station.mTexturePack = pack.empty() ? gConfig.mTexturePack : pack;
-			std::vector<streamio::TrackSource> sources;
-			for (const library::Track& t : *tracks) {
-				station.mTracks.push_back({ t.mArtist, t.mTitle });
-				const uint32_t k = static_cast<uint32_t>(sources.size() + 1);
-				sources.push_back({ bank::TrackFileId(gStation, k), t.mPath, t.mSampleRate, t.mFrames });
-				gEventIds.insert(bank::TrackEventId(gStation, k));
-			}
 
-			gPatchedXml = radios::Append(original, station, gStation);
-			if (gPatchedXml.empty()) {
+			std::string xml = radios::Append(gPatchedXml, station, id);
+			if (xml.empty()) {
 				LOG("radios: no </Radios> in Radios.xml, no station");
 				return false;
 			}
+			gPatchedXml = std::move(xml);
 
-			gBankId = bank::BankId(gStation);
-			std::vector<uint8_t> image = bank::Build(gStation, static_cast<uint32_t>(sources.size()));
-			LOG("radios: station %u \"%s\" with %zu tracks, logo %s / %s; bank mus_radio_station_%u = %08X (%zu bytes)", gStation,
-				radios::TruncateUtf8(station.mName, 63).c_str(), sources.size(), station.mTextureName.c_str(), station.mTexturePack.c_str(), gStation,
-				gBankId, image.size());
-			streamio::Register(gBankId, std::move(image), std::move(sources));
+			for (uint32_t k = 1; k <= sources.size(); ++k) {
+				gEventIds.insert(bank::TrackEventId(id, k));
+			}
+			const uint32_t bankId = bank::BankId(id);
+			gBankIds.insert(bankId);
+			std::vector<uint8_t> image = bank::Build(id, static_cast<uint32_t>(sources.size()));
+			LOG("radios: station %u \"%s\" with %zu tracks, logo %s / %s; bank mus_radio_station_%u = %08X (%zu bytes)", id,
+				radios::TruncateUtf8(station.mName, 63).c_str(), sources.size(), station.mTextureName.c_str(), station.mTexturePack.c_str(), id,
+				bankId, image.size());
+			streamio::Register(bankId, std::move(image), std::move(sources));
 			return true;
+		}
+
+		// Builds the stations (XML, banks, streams): the music folder's, and the live one if enabled. Returns
+		// false if there's neither.
+		bool BuildStations(const char* original)
+		{
+			gPatchedXml = original;
+			uint32_t next = radios::MaxStationId(original) + 1;
+			bool any = false;
+
+			// Radios.xml is read during the game's startup; the scan runs from DllMain, normally done by then.
+			const std::vector<library::Track>* tracks = library::Wait(30'000);
+			if (!tracks) {
+				LOG("radios: music scan still running after 30 s, starting without the music station");
+			}
+			else if (tracks->empty()) {
+				LOG("radios: no music found in %s, no music station", logger::ToUtf8(gConfig.mMusicFolder.c_str()).c_str());
+			}
+			else {
+				radios::Station station;
+				station.mName = gConfig.mStationName;
+				std::vector<streamio::TrackSource> sources;
+				for (const library::Track& t : *tracks) {
+					station.mTracks.push_back({ t.mArtist, t.mTitle });
+					const uint32_t k = static_cast<uint32_t>(sources.size() + 1);
+					sources.push_back({ bank::TrackFileId(next, k), t.mPath, t.mSampleRate, t.mFrames });
+				}
+				if (AddStation(std::move(station), next, std::move(sources))) {
+					++next;
+					any = true;
+				}
+			}
+
+			if (gConfig.mLive) {
+				if (!live::Configure(gConfig.mLiveSource)) {
+					LOG("radios: unknown live source \"%s\", no live station", gConfig.mLiveSource.c_str());
+				}
+				else {
+					// Two tracks on the same stream: GetNextTrack avoids recently played tracks, and with only one
+					// it might find none when the endless track does end (after ~6 h).
+					radios::Station station;
+					station.mName = gConfig.mLiveName;
+					std::vector<streamio::TrackSource> sources;
+					for (uint32_t k = 1; k <= 2; ++k) {
+						station.mTracks.push_back({ "SDRadio", gConfig.mLiveSource });
+						sources.push_back({ bank::TrackFileId(next, k), L"", live::kRate, live::kFrames, true });
+					}
+					if (AddStation(std::move(station), next, std::move(sources))) {
+						any = true;
+					}
+				}
+			}
+			return any;
 		}
 
 		char* __fastcall ExtractFromCacheHook(const char* filename)
@@ -148,7 +185,7 @@ namespace hooks
 			static bool tried = false;
 			if (!tried) {
 				tried = true;
-				gStationReady = BuildStation(xml);
+				gStationReady = BuildStations(xml);
 			}
 			if (!gStationReady) {
 				return xml;
@@ -207,8 +244,8 @@ namespace hooks
 
 		void __fastcall BankLoadCallbackHook(uint32_t bankId, const void* inMemory, ak::AKRESULT result, int32_t poolId, void* cookie)
 		{
-			if (gStationReady && bankId == gBankId) {
-				LOG("bank: mus_radio_station_%u loaded with result %d (1 = success) in pool %d", gStation, result, poolId);
+			if (gStationReady && gBankIds.count(bankId)) {
+				LOG("bank: %08X loaded with result %d (1 = success) in pool %d", bankId, result, poolId);
 			}
 			gBankLoadCallback(bankId, inMemory, result, poolId, cookie);
 		}
