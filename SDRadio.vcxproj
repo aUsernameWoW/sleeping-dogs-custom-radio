@@ -77,6 +77,8 @@
       <!-- Media Foundation is loaded on first use (the scan thread), not at game start: on Windows N
            without the Media Feature Pack the game must still run, just without the station. The WinRT API
            sets (C++/WinRT, now_playing.cc) likewise, so the .asi loads where they're missing. -->
+      <!-- WinRT (C++/WinRT for the media sessions, gpl/external-audio branch) is only used with [External]
+           enabled; media::Open checks that it exists first. -->
       <DelayLoadDLLs>mfplat.dll;mfreadwrite.dll;api-ms-win-core-winrt-l1-1-0.dll;api-ms-win-core-winrt-error-l1-1-1.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
     </Link>
   </ItemDefinitionGroup>
@@ -107,10 +109,12 @@
     <ClCompile Include="dllmain.cc" />
     <ClCompile Include="core\app_audio.cc" />
     <ClCompile Include="core\bank.cc" />
+    <ClCompile Include="core\capture.cc" />
     <ClCompile Include="core\config.cc" />
     <ClCompile Include="core\crash.cc" />
     <ClCompile Include="core\decoder.cc" />
     <ClCompile Include="core\decoder_mf.cc" />
+    <ClCompile Include="core\external.cc" />
     <ClCompile Include="core\hooks.cc" />
     <ClCompile Include="core\icy.cc" />
     <ClCompile Include="core\library.cc" />
@@ -119,9 +123,11 @@
     <ClCompile Include="core\logo.cc" />
     <ClCompile Include="core\logo_image.cc" />
     <ClCompile Include="core\logo_pack.cc" />
+    <ClCompile Include="core\media_session.cc" />
     <ClCompile Include="core\netradio.cc" />
     <ClCompile Include="core\now_playing.cc" />
     <ClCompile Include="core\pacer.cc" />
+    <ClCompile Include="core\pcm.cc" />
     <ClCompile Include="core\radios.cc" />
     <ClCompile Include="core\scan.cc" />
     <ClCompile Include="core\spotify.cc" />
@@ -147,9 +153,11 @@
     <ClInclude Include="core\ak.hh" />
     <ClInclude Include="core\app_audio.hh" />
     <ClInclude Include="core\bank.hh" />
+    <ClInclude Include="core\capture.hh" />
     <ClInclude Include="core\config.hh" />
     <ClInclude Include="core\crash.hh" />
     <ClInclude Include="core\decoder.hh" />
+    <ClInclude Include="core\external.hh" />
     <ClInclude Include="core\hooks.hh" />
     <ClInclude Include="core\icy.hh" />
     <ClInclude Include="core\library.hh" />
@@ -158,10 +166,12 @@
     <ClInclude Include="core\logo.hh" />
     <ClInclude Include="core\logo_image.hh" />
     <ClInclude Include="core\logo_pack.hh" />
+    <ClInclude Include="core\media_session.hh" />
     <ClInclude Include="core\netradio.hh" />
     <ClInclude Include="core\now_playing.hh" />
     <ClInclude Include="core\spotify.hh" />
     <ClInclude Include="core\pacer.hh" />
+    <ClInclude Include="core\pcm.hh" />
     <ClInclude Include="core\radios.hh" />
     <ClInclude Include="core\scan.hh" />
     <ClInclude Include="core\stream_decoder.hh" />
