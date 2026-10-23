@@ -5,10 +5,12 @@
 // files are WAV images whose data chunk lasts an hour (see kFrames), and Wwise's reads of them are
 // served from the ring instead of the file position (Reader).
 //
-// Latency: a stream starts kPrerollMs behind the newest audio. Wwise keeps ~0.4 s read ahead of playback
-// (AkDeviceSettings' default target buffer), so the rest of the preroll absorbs the source's jitter. A read
-// the source can't satisfy within kMaxWaitMs completes with what there is plus silence, rather than starving
-// the voice; a reader more than kMaxLagMs behind (after a stall) jumps back to the preroll distance.
+// How the game reads it (in game, 2026-10-23): 128 KB (682 ms) per read; at open the header, then a seek to the
+// game's track timer, then a burst of 4 reads (~2.7 s of buffer), then one read every ~0.69 s, each asked for
+// while Wwise still holds ~2 s. So a stream runs at the live edge with Wwise's buffer as the cushion: a read
+// the source can't satisfy within kMaxWaitMs (well inside that cushion) completes with what there is plus
+// silence rather than starving the voice. A stream (re)opened while the source runs starts kPrerollMs behind
+// the newest audio; a reader more than kMaxLagMs behind (after a stall) jumps back to that distance.
 
 #include <Windows.h>
 
@@ -31,7 +33,9 @@ namespace live
 
 	constexpr uint32_t kRingMs = 10'000;
 	constexpr uint32_t kPrerollMs = 1'000;
-	constexpr uint32_t kMaxWaitMs = 250;
+	// Was 250 ms: in game every steady-state read waited that long and completed just in time, so source
+	// jitter beyond it would have become audible gaps although Wwise still had ~2 s buffered.
+	constexpr uint32_t kMaxWaitMs = 1'500;
 	constexpr uint32_t kMaxLagMs = 3'000;
 
 	constexpr uint64_t MsToBytes(uint64_t ms) { return ms * kRate / 1000 * kBlockAlign; }

@@ -149,7 +149,7 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   the Proton launch option); keep build/internals out of it. `ADVANCED.md` — everything else (how it works,
   formats/backends, downloads, settings table, building, CI). Both bilingual (Chinese first).
 
-## Live station (2026-10-22, `[Live] Enabled = 1`; not yet tried in game)
+## Live station (2026-10-22, `[Live] Enabled = 1`; works in game since 2026-10-23)
 
 The path every real-time source (internet radio next, then Jellyfin, another app's audio) will share, so far
 fed by a test signal (`Source = test`: a 0.15 s beep each second, 880 Hz on every fourth, -12 dBFS).
@@ -160,16 +160,21 @@ fed by a test signal (`Source = test`: a 0.15 s beep each second, 880 Hz on ever
 - `core/live.*`: the source pushes 48 kHz 16-bit stereo into a 10 s `Ring` (absolute byte positions). A live
   track's WAV header declares an hour of data (`live::kFrames`, see why there). Wwise's reads
   ignore the file position and take the next ring bytes (`Reader`), starting 1 s behind the newest audio
-  (`kPrerollMs`; Wwise reads ~0.4 s ahead by default, the rest absorbs jitter). A read the ring can't satisfy
-  waits up to 250 ms, then completes with silence for the missing part (the cursor moves only over real audio);
+  (`kPrerollMs`) when the source already runs. A read the ring can't satisfy waits up to 1.5 s
+  (`kMaxWaitMs`), then completes with silence for the missing part (the cursor moves only over real audio);
   a reader more than 3 s behind jumps back to the preroll distance; after a seek (the game's resume
   `SeekMS`) the cursor takes the position's frame phase. Live reads complete in issue order per file (the
-  completer fills them under its lock). Close logs reads, padded silence, jumps and seeks.
+  completer fills them under its lock). Each open logs its first 60 requests/reads, then every 100th; close
+  logs reads, padded silence, jumps and seeks.
 - The source runs while a live file is open and stops 10 s after the last close (station switches and track
   starts reopen it); `Ring::Reset` on start. `live_test` covers ring and reader.
-- To check in game: the station appears after the music one, the beeps play through the car radio effect
-  without gaps (the close line: padded silence ~0), leaving and coming back resumes about 1 s behind live,
-  the source stops 10 s after switching away. Station 13's file IDs weren't checked against SFX.pck (12's were).
+- **In game (2026-10-23, Windows)**: the first build declared ~4 GB (~6.2 h) of data and played a looping,
+  dial-up-like noise; Wwise read only 9 times in 87 s. With one hour it plays clean beeps through the radio
+  effect, switching away and back works. How Wwise reads: 128 KB (682 ms) per read; the header (position 0),
+  then a seek to the game's track timer, a burst of 4 reads (~2.7 s), then one every ~0.69 s, each issued
+  while ~2 s are still buffered; 0 ms padded in steady state, ~2.7 s at each start (the source starts with
+  the open, so the burst finds an empty ring). With the old 250 ms wait every steady-state read waited it out
+  and just made it, hence 1.5 s now. Station 13's file IDs weren't checked against SFX.pck (12's were).
 
 ## Design decisions (don't undo without reason)
 
