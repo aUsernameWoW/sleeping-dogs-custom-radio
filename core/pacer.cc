@@ -19,7 +19,8 @@ namespace netradio
 
 	bool Pacer::TakeTitle(std::string& title)
 	{
-		while (!mTitles.empty() && mTitles.front().first <= mTakenTotal) {
+		// A title marks the first frame of its audio: released once that frame is out.
+		while (!mTitles.empty() && mTitles.front().first < mTakenTotal) {
 			if (mTitles.front().second != mCurrent) {
 				mCurrent = std::move(mTitles.front().second);
 				mTitleChanged = true;
@@ -48,8 +49,11 @@ namespace netradio
 			mPlaying = mStarted = true;
 			mStartMs = nowMs;
 			mSentFrames = 0;
+			// What's buffered goes out at once, up to the live reader's preroll: a stream opening now then finds
+			// its preroll right away instead of waiting for it in real time.
+			mHeadFrames = (std::min)(static_cast<uint64_t>(mFifo.size() / 2), uint64_t{ live::kPrerollMs } * live::kRate / 1000);
 		}
-		const uint64_t dueFrames = (nowMs - mStartMs) * live::kRate / 1000;
+		const uint64_t dueFrames = mHeadFrames + (nowMs - mStartMs) * live::kRate / 1000;
 		if (dueFrames <= mSentFrames) {
 			return 0;
 		}

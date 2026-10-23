@@ -41,31 +41,35 @@ namespace
 	{
 		netradio::Pacer pacer;
 		std::vector<int16_t> out;
+		const size_t perMs = live::kRate / 1000 * 2;
 		AddMs(pacer, netradio::kStartMs - 100);
 		Check(pacer.Take(1000, out) == 0 && !pacer.Playing(), "waits until kStartMs are buffered");
-		pacer.Mark("First");
-		AddMs(pacer, 3000);
-		Check(pacer.Take(2000, out) == 0 && pacer.Playing(), "starts with nothing due yet");
 		std::string title;
-		Check(!pacer.TakeTitle(title), "no title before its audio");
+		Check(!pacer.TakeTitle(title), "no title yet");
+		pacer.Mark("Second");       // from 2900 ms of audio on
+		AddMs(pacer, 3000);         // 5900 ms buffered
 
-		pacer.Take(2500, out);
-		Check(out.size() == 500 * 48 * 2, "releases by the clock: 500 ms after 500 ms");
-		out.clear();
-		pacer.Take(4000, out); // up to 2000 ms out: the title's audio (after 1900 ms) has started
-		Check(pacer.TakeTitle(title) && title == "First", "the title comes with its audio");
+		Check(pacer.Take(2000, out) == live::kPrerollMs * perMs && pacer.Playing(), "hands over the live preroll at once");
+		Check(pacer.TakeTitle(title) && title == "Second", "the title comes with its audio (it was in the head start)");
 		Check(!pacer.TakeTitle(title), "a title is reported once");
+		out.clear();
+		Check(pacer.Take(2500, out) == 500 * perMs, "then releases by the clock: 500 ms after 500 ms");
+		out.clear();
+		Check(pacer.Take(2500, out) == 0, "nothing more until time passes");
 
-		pacer.Take(10'000, out); // more due than there is
+		pacer.Take(10'000, out);    // more due than there is
 		Check(!pacer.Playing() && pacer.Underruns() == 1, "an underrun stops it");
+		pacer.Mark("Third");        // from the audio after the underrun on
+		Check(!pacer.TakeTitle(title), "a title waits for its audio");
 		AddMs(pacer, netradio::kRebufferMs - 10);
 		out.clear();
 		Check(pacer.Take(11'000, out) == 0, "rebuffering waits for kRebufferMs");
 		AddMs(pacer, 20);
-		pacer.Take(11'100, out);
-		Check(pacer.Playing(), "then plays again");
-		pacer.Take(11'200, out);
-		Check(out.size() == 100 * 48 * 2, "with a fresh clock");
+		Check(pacer.Take(11'100, out) == (netradio::kRebufferMs + 10) * perMs && pacer.Playing(), "then hands over what it has");
+		Check(pacer.TakeTitle(title) && title == "Third", "and the title with it");
+		AddMs(pacer, 500);
+		out.clear();
+		Check(pacer.Take(11'200, out) == 100 * perMs, "with a fresh clock");
 	}
 
 	void TestResampler()

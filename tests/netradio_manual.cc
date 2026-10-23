@@ -35,6 +35,62 @@ int main(int argc, char** argv)
 	const std::string url = argv[1];
 	std::thread radio([&] { netradio::Run(url, stop); });
 
+	// Wwise as the game's log shows it reading a live track: 128 KB (682 ms) per read, one at a time, keeping
+	// ~4 reads (2.7 s) buffered; playback starts with the first completed read and drains in real time. Counts
+	// how long reads wait, the silence the reader pads, and how long the voice would starve.
+	struct Emulation
+	{
+		uint32_t mReads = 0;
+		DWORD mLongestWait = 0;
+		double mStarvedMs = 0;
+		double mLowestBufferMs = 1e9; // after the first 5 s
+		DWORD mFirstAudioAt = 0;
+	} emulation;
+	std::thread wwise([&] {
+		uint8_t header[live::kHeaderSize] = {};
+		live::Reader reader(live::Stream(), header);
+		std::vector<uint8_t> chunk(131072);
+		const double chunkMs = (131072.0 / live::kBlockAlign) * 1000 / live::kRate;
+		uint64_t position = 0;
+		double buffer = 0;
+		bool playing = false, inflight = false;
+		DWORD issued = 0, last = GetTickCount();
+		const DWORD begin = last;
+		while (!stop.load()) {
+			Sleep(5);
+			const DWORD now = GetTickCount();
+			if (playing) {
+				buffer -= now - last;
+				if (buffer < 0) {
+					emulation.mStarvedMs -= buffer;
+					buffer = 0;
+				}
+				if (now - begin > 5000 + emulation.mFirstAudioAt) emulation.mLowestBufferMs = (std::min)(emulation.mLowestBufferMs, buffer);
+			}
+			last = now;
+			if (!inflight && buffer < 4 * chunkMs) {
+				inflight = true;
+				issued = now;
+			}
+			if (inflight && reader.Ready(position, 131072, now - issued)) {
+				reader.Fill(position, 131072, chunk.data());
+				position += 131072;
+				emulation.mLongestWait = (std::max)(emulation.mLongestWait, now - issued);
+				++emulation.mReads;
+				buffer += chunkMs;
+				inflight = false;
+				if (!playing) {
+					playing = true;
+					emulation.mFirstAudioAt = now - begin;
+				}
+			}
+		}
+		const live::Reader::Stats& s = reader.GetStats();
+		std::printf("Wwise emulation: %u reads, first audio after %lu ms, longest wait %lu ms, %llu ms silence padded, %.0f ms starved, lowest buffer %.0f ms\n",
+			emulation.mReads, emulation.mFirstAudioAt, emulation.mLongestWait, s.mSilenceBytes * 1000 / (live::kRate * live::kBlockAlign),
+			emulation.mStarvedMs, emulation.mLowestBufferMs);
+	});
+
 	const DWORD start = GetTickCount();
 	uint64_t firstAt = 0, firstBytes = 0;
 	for (int i = 0; i < seconds; ++i) {
@@ -47,6 +103,7 @@ int main(int argc, char** argv)
 		std::printf("%2d s: %.2f s of audio in the ring\n", i + 1, written / double(live::kRate * live::kBlockAlign));
 	}
 	stop = true;
+	wwise.join();
 	radio.join();
 
 	const uint64_t written = live::Stream().Written();

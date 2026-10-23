@@ -6,11 +6,13 @@
 // served from the ring instead of the file position (Reader).
 //
 // How the game reads it (in game, 2026-10-23): 128 KB (682 ms) per read; at open the header, then a seek to the
-// game's track timer, then a burst of 4 reads (~2.7 s of buffer), then one read every ~0.69 s, each asked for
-// while Wwise still holds ~2 s. So a stream runs at the live edge with Wwise's buffer as the cushion: a read
-// the source can't satisfy within kMaxWaitMs (well inside that cushion) completes with what there is plus
-// silence rather than starving the voice. A stream (re)opened while the source runs starts kPrerollMs behind
-// the newest audio; a reader more than kMaxLagMs behind (after a stall) jumps back to that distance.
+// game's track timer, then a burst of 4 reads (~2.7 s), then one read every ~0.69 s. Wwise's buffer is the
+// cushion against a late source, and it only fills if that first burst finds audio: so a stream starts
+// kPrerollMs (more than the burst) behind the newest audio, and its reads wait up to kStartWaitMs for that
+// much to be there. Without it (internet radio, 2026-10-23) the burst found an empty ring, the stream ran at
+// the live edge with every read waiting a whole chunk's 0.68 s, and playback stuttered. After the start, a read
+// the source can't satisfy within kMaxWaitMs completes with what there is plus silence rather than starving
+// the voice; a reader more than kMaxLagMs behind (after a stall) jumps back to the preroll distance.
 
 #include <Windows.h>
 
@@ -33,11 +35,12 @@ namespace live
 	constexpr uint64_t kFrames = uint64_t{ kRate } * 3600;
 
 	constexpr uint32_t kRingMs = 10'000;
-	constexpr uint32_t kPrerollMs = 1'000;
-	// Was 250 ms: in game every steady-state read waited that long and completed just in time, so source
-	// jitter beyond it would have become audible gaps although Wwise still had ~2 s buffered.
+	constexpr uint32_t kPrerollMs = 3'000;
+	// A source just started (internet radio: connecting, then its own buffer) gets this long to deliver the
+	// preroll before the stream starts with silence instead.
+	constexpr uint32_t kStartWaitMs = 10'000;
 	constexpr uint32_t kMaxWaitMs = 1'500;
-	constexpr uint32_t kMaxLagMs = 3'000;
+	constexpr uint32_t kMaxLagMs = 6'000;
 
 	constexpr uint64_t MsToBytes(uint64_t ms) { return ms * kRate / 1000 * kBlockAlign; }
 

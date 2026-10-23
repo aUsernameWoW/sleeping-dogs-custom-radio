@@ -134,7 +134,7 @@ namespace
 		uint32_t counter = 0;
 		uint8_t header[live::kHeaderSize] = {};
 		live::Reader reader(ring, header);
-		PushMs(ring, 2000, counter);
+		PushMs(ring, live::kPrerollMs + 1000, counter);
 		std::vector<uint8_t> out(64);
 		reader.Fill(68 + 6, 16, out.data()); // frame phase 2
 		const uint64_t start = ring.Written() - live::MsToBytes(live::kPrerollMs);
@@ -142,8 +142,39 @@ namespace
 	}
 }
 
+namespace
+{
+	void TestStart()
+	{
+		// A source just started: the first audio read waits for the preroll (Wwise's opening burst must find
+		// real audio to buffer), up to kStartWaitMs.
+		live::Ring ring;
+		uint32_t counter = 0;
+		uint8_t header[live::kHeaderSize] = {};
+		live::Reader reader(ring, header);
+		PushMs(ring, live::kPrerollMs - 500, counter);
+		Check(reader.Ready(0, 68, 0), "the header alone doesn't wait");
+		Check(!reader.Ready(0, 131072, 0), "the first audio waits for the preroll");
+		Check(!reader.Ready(0, 131072, live::kMaxWaitMs), "longer than an ordinary read would");
+		Check(reader.Ready(0, 131072, live::kStartWaitMs), "but not forever");
+		PushMs(ring, 500, counter);
+		Check(reader.Ready(0, 131072, 0), "the preroll is there: go");
+		std::vector<uint8_t> out(131072);
+		reader.Fill(0, 131072, out.data());
+		Check(FromOffset(out.data() + 68, 0), "and the stream starts at its oldest audio, a preroll behind");
+		// Wwise's burst of 3 more reads (~2 s) is served from the preroll without waiting.
+		bool burst = true;
+		for (uint32_t i = 1; i <= 3; ++i) {
+			burst = burst && reader.Ready(131072u * i, 131072, 0);
+			reader.Fill(131072u * i, 131072, out.data());
+		}
+		Check(burst && reader.GetStats().mSilenceBytes == 0, "the opening burst doesn't wait and is all audio");
+	}
+}
+
 int main()
 {
+	TestStart();
 	static_assert(live::kHeaderSize - 8 + live::kFrames * live::kBlockAlign <= 0xFFFFFFFFull, "RIFF size fits");
 	TestRing();
 	TestReader();

@@ -1,8 +1,9 @@
 #pragma once
 
-// The FIFO between internet radio decoding and the live ring (netradio.hh): emptied by the clock once
-// kStartMs have collected (kRebufferMs after an underrun), with titles that wait for their audio. Pure, and
-// not thread-safe: netradio guards it with a lock. See pacer_test.
+// The FIFO between internet radio decoding and the live ring (netradio.hh): once kStartMs have collected
+// (kRebufferMs after an underrun) it hands over what it has, up to the live reader's preroll, at once, and the
+// rest by the clock; titles wait for their audio. Pure, and not thread-safe: netradio guards it with a lock.
+// See pacer_test.
 
 #include <cstddef>
 #include <cstdint>
@@ -13,7 +14,8 @@
 
 namespace netradio
 {
-	constexpr uint32_t kStartMs = 2'000;
+	// As much as the live reader's preroll (live::kPrerollMs), all of which then goes out at once.
+	constexpr uint32_t kStartMs = 3'000;
 	constexpr uint32_t kRebufferMs = 1'000;
 	constexpr uint32_t kMaxBufferedMs = 15'000;
 
@@ -39,6 +41,7 @@ namespace netradio
 		bool mStarted = false; // played before: rebuffering waits for kRebufferMs, not kStartMs
 		uint64_t mStartMs = 0;
 		uint64_t mSentFrames = 0; // since playing (re)started
+		uint64_t mHeadFrames = 0; // released at once when playing (re)started
 		uint64_t mAddedTotal = 0; // frames, ever
 		uint64_t mTakenTotal = 0;
 		std::deque<std::pair<uint64_t, std::string>> mTitles; // (from frame, title)

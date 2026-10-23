@@ -108,6 +108,10 @@ namespace live
 		if (end <= kHeaderSize) {
 			return true;
 		}
+		// The first audio waits for the preroll, so Wwise's opening burst fills its buffer with real audio.
+		if (!mStarted && mRing.Written() < MsToBytes(kPrerollMs) && waitedMs < kStartWaitMs) {
+			return false;
+		}
 		Prepare((std::max)(position, uint64_t{ kHeaderSize }));
 		const uint64_t need = end - (std::max)(position, uint64_t{ kHeaderSize });
 		return mRing.Written() >= mCursor + need || waitedMs >= kMaxWaitMs;

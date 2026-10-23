@@ -159,10 +159,11 @@ fed by a test signal (`Source = test`: a 0.15 s beep each second, 880 Hz on ever
   /`AddStation` in hooks.cc; `streamio::Register` now takes one call per station (banks by ID).
 - `core/live.*`: the source pushes 48 kHz 16-bit stereo into a 10 s `Ring` (absolute byte positions). A live
   track's WAV header declares an hour of data (`live::kFrames`, see why there). Wwise's reads
-  ignore the file position and take the next ring bytes (`Reader`), starting 1 s behind the newest audio
-  (`kPrerollMs`) when the source already runs. A read the ring can't satisfy waits up to 1.5 s
-  (`kMaxWaitMs`), then completes with silence for the missing part (the cursor moves only over real audio);
-  a reader more than 3 s behind jumps back to the preroll distance; after a seek (the game's resume
+  ignore the file position and take the next ring bytes (`Reader`), starting 3 s behind the newest audio
+  (`kPrerollMs`, more than Wwise's opening burst); the first audio read waits up to 10 s (`kStartWaitMs`) for
+  that much to be in the ring. Later, a read the ring can't satisfy waits up to 1.5 s (`kMaxWaitMs`), then
+  completes with silence for the missing part (the cursor moves only over real audio); a reader more than
+  6 s behind jumps back to the preroll distance; after a seek (the game's resume
   `SeekMS`) the cursor takes the position's frame phase. Live reads complete in issue order per file (the
   completer fills them under its lock). Each open logs its first 60 requests/reads, then every 100th; close
   logs reads, padded silence, jumps and seeks.
@@ -175,6 +176,11 @@ fed by a test signal (`Source = test`: a 0.15 s beep each second, 880 Hz on ever
   while ~2 s are still buffered; 0 ms padded in steady state, ~2.7 s at each start (the source starts with
   the open, so the burst finds an empty ring). With the old 250 ms wait every steady-state read waited it out
   and just made it, hence 1.5 s now. Station 13's file IDs weren't checked against SFX.pck (12's were).
+- **Stutter with internet radio (2026-10-23)**: the preroll was 1 s, and a source that starts with the open
+  had nothing for Wwise's burst anyway, so the stream ran at the live edge: every steady-state read waited a
+  whole chunk (671-704 ms), Wwise had ~no cushion, and playback stuttered (no pacer underruns: the network was
+  fine). The test signal had hidden it: its first reads padded ~2.7 s of silence, which became the cushion.
+  Fixed by the 3 s preroll the first read waits for, plus the pacer handing its first 3 s over at once.
 
 ## Internet radio (2026-10-23, `[Live] Source = radio`, `Url = ...`; not yet tried in game)
 
@@ -191,13 +197,18 @@ The live station's first real source. All own code (no GPL), works under Wine as
   first sync), Ogg Vorbis through stb_vorbis pushdata (reopened at each new logical stream's BOS page, where
   Icecast puts the next song's comments: the title for Ogg). A decoder that hasn't produced a sample after
   256 KB refuses the stream. `Resampler`: linear, to 48 kHz. Its own `ToStereo` (no decoder.cc in tests).
-- `core/pacer.*` (pure, `pacer_test`, also the resampler and junk refusal): starts after 2 s buffered, after an
-  underrun waits for 1 s; titles are marked at the audio position where they arrived and released when that
-  audio goes out (up to 15 s queued, so ICY titles would otherwise be early).
+- `core/pacer.*` (pure, `pacer_test`, also the resampler and junk refusal): starts after 3 s buffered (1 s
+  after an underrun) and hands over what it has, up to the live preroll, at once (servers burst on connect, so
+  the reader's 3 s preroll is there ~1 s after connecting), then by the clock; titles are marked at the audio
+  position where they arrived and released when that audio goes out (up to 15 s queued, so ICY titles would
+  otherwise be early).
 - The HUD's song line is fixed in Radios.xml at startup, so the live track's title is the URL's host; titles go
   to the log only. A dynamic HUD title needs `UIHKRadioStationWidget`'s current-song lookup hooked (open).
 - `tests/netradio_manual.cc <url> [s]` (compiled, not run; needs the network): plays a station into the ring and
-  prints the log and the fill rate. 2026-10-23 on Windows: Radio Paradise MP3 128k (44.1 kHz, ICY titles), Radio
+  prints the log and the fill rate, with Wwise emulated as the game reads (128 KB, one at a time, ~2.7 s kept):
+  reads, waits, padded silence, starvation, the lowest buffer. After the stutter fix, Radio Paradise for 40 s:
+  first audio after 1.3 s, no silence, no starvation, never under 2.3 s buffered. 2026-10-23 on Windows: Radio
+  Paradise MP3 128k (44.1 kHz, ICY titles), Radio
   Paradise Ogg Vorbis 192k (title from the comments), NPO Radio 1 MP3 (HTTP/1.0, 48 kHz), Chinese Music World
   Ogg: all at rate 1.000 ± 0.004; a walmradio Opus stream says Opus isn't supported and stops. Run it outside the
   Bash tool's sandbox: inside it direct connections fail (the tool's proxy is in env vars, which WinHTTP doesn't
