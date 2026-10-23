@@ -76,7 +76,7 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   whether it started (under Wine it may be missing, or start but open nothing without GStreamer plugins).
 - `core/tags.*` — ID3v2.2-2.4/ID3v1, Vorbis comments, RIFF INFO; legacy text: UTF-8, else GBK, else Latin-1.
 - `core/stream_io.*` — virtual files, decoder threads, completion thread. `core/live.*` — the live station's
-  ring, reader and sources (see "Live station"). `core/app_audio.*` — another app's sound (see "App audio").
+  ring, reader and sources (see "Live station"). `core/app_audio.*`, `core/now_playing.*` — another app's sound and its song title (see "App audio").
   `core/netradio.*`, `core/icy.*`, `core/stream_decoder.*`,
   `core/pacer.*` — internet radio (see "Internet radio").
 - `core/crash.*` — vectored exception handler (installed with logging on): logs the first 4 access
@@ -292,7 +292,20 @@ unofficial client, against Spotify's terms: weigh that then).
   no mix format of its own), 200 ms buffer; `Run` (the live source) waits for the program (retries every 2 s,
   5 s after a failed capture), captures until it exits or the capture fails, and pads silence by the clock
   once no packet has come for 200 ms (packets only come while the app renders). Every 10 s the log has the
-  captured ms, peak dBFS and padded silence. The HUD title is the process name for now.
+  captured ms, peak dBFS and padded silence.
+- **HUD title** (`core/now_playing.*`, 2026-10-23): a thread started by `appaudio::Run` polls the system media
+  sessions every 2 s (`GlobalSystemMediaTransportControlsSessionManager`, C++/WinRT from the Windows SDK, MIT,
+  in THIRD-PARTY-NOTICES), takes the session whose `SourceAppUserModelId` contains the process name without
+  `.exe` (case-insensitive; one that plays wins), and sets `live::SetNowPlaying("Artist - Title")`, which the
+  HUD hooks already show; no match leaves the process name. Every async call waits at most 5 s (a broken
+  media service has hung `RequestAsync`); `REGDB_E_CLASSNOTREG` (Wine, pre-1809) ends the thread after one log
+  line. The sessions are logged when they change; no matching one logs a hint about NetEase's "SMTC" setting
+  (off by default there; Spotify and browsers always publish). The manager is released on that thread before
+  `CoUninitialize` (the GPL branch saw a hang releasing one at DLL detach). `.asi`: `runtimeobject.lib`, and
+  `api-ms-win-core-winrt-l1-1-0` / `-winrt-error-l1-1-1` delay-loaded (dumpbin: the only WinRT API sets it
+  imports; `now_playing` checks both load before any WinRT call). Tests link `oleaut32.lib` too (C++/WinRT's
+  error info) and delay-load the same. Offline with NetEase (SMTC on): "G.E.M.邓紫棋 - 自由的你"
+  (`app_audio_manual titles cloudmusic.exe`); in game, and so Chinese on the HUD, not yet seen.
 - **Requirement: Windows 10 build 20348+** (`AUDIOCLIENT_ACTIVATION_PARAMS`), so in practice Windows 11 (or
   Server 2022+). Wine: activation fails (the GPL branch's CI saw `0x80070002`); logged, the station stays silent.
 - **The mute question, answered 2026-10-23 on Windows 11 (`tests/app_audio_manual.cc`, no game)**: a child
@@ -310,8 +323,8 @@ unofficial client, against Spotify's terms: weigh that then).
   (`IAudioSessionManager2` -> the process's `ISimpleAudioVolume::GetMute`) would catch it at once.
 - `tests/app_audio_test.cc`: `FindProcess` (its own exe, case-insensitive; a missing one), and a capture that
   opens and reads or fails with a reason (Wine). On Windows 11 a silent process still delivers a packet.
-- Next: the app's title on the HUD from the system media session (SMTC, C++/WinRT; Wine has
-  none); maybe set the app's output device from the mod (only through undocumented policy-config interfaces,
+- Next: confirm the HUD title (and Chinese glyphs) in game; a warning when the app is muted; maybe control
+  the app from the radio (SMTC `TrySkipNextAsync`...); maybe set the app's output device from the mod (only through undocumented policy-config interfaces,
   as EarTrumpet does: risky).
 
 ## Design decisions (don't undo without reason)
@@ -388,6 +401,6 @@ unofficial client, against Spotify's terms: weigh that then).
    with a token and a Host check, LAN only as an option, no API that sets paths or starts programs (FH6's
    allows any origin and sets executable paths); `ShellExecute` to open it (Wine hands that to the Linux
    browser). WebView2: not needed, and it doesn't run under Wine.
-6. Another app's audio: own code on `main` since 2026-10-23, works in game (see "App audio"); next the media
-   session's title on the HUD, a warning when the app is muted in the mixer. The GPL branch `gpl/external-audio` (code from FH6 Universal Radio) is parked;
+6. Another app's audio: own code on `main` since 2026-10-23, works in game (see "App audio"); the HUD title
+   from its media session is in (not yet seen in game); next a warning when the app is muted in the mixer. The GPL branch `gpl/external-audio` (code from FH6 Universal Radio) is parked;
    keep rebasing it. Later maybe librespot (Spotify Connect).

@@ -107,7 +107,7 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 
 **想在车里听网易云音乐、Spotify 等程序放的歌（实验功能，需要 Windows 11）**
 
-用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `app`，`App` 填上那个程序的进程名，例如 `cloudmusic.exe`（网易云音乐）或 `Spotify.exe`（不知道进程名的话，打开任务管理器的「详细信息」页找），保存后重启游戏。切到「SDRADIO LIVE」就能听到这个程序正在放的歌，带上游戏电台的效果。为了不同时听到两份声音：打开 Windows 的 设置 → 系统 → 声音 → 音量合成器，把这个程序的输出设备改成一个你不用的设备（例如显示器的扬声器、Steam Streaming Speakers），或者把那个设备静音。**不要在音量合成器里把程序本身静音**，那样游戏里也听不到了：程序的声音本来就只该从游戏里听到，改完输出设备后程序那边「没声音」是正常的。
+用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `app`，`App` 填上那个程序的进程名，例如 `cloudmusic.exe`（网易云音乐）或 `Spotify.exe`（不知道进程名的话，打开任务管理器的「详细信息」页找），保存后重启游戏。切到「SDRADIO LIVE」就能听到这个程序正在放的歌，带上游戏电台的效果。为了不同时听到两份声音：打开 Windows 的 设置 → 系统 → 声音 → 音量合成器，把这个程序的输出设备改成一个你不用的设备（例如显示器的扬声器、Steam Streaming Speakers），或者把那个设备静音。**不要在音量合成器里把程序本身静音**，那样游戏里也听不到了：程序的声音本来就只该从游戏里听到，改完输出设备后程序那边「没声音」是正常的。HUD 上会显示程序正在放的歌名（取自 Windows 的媒体信息，也就是按音量键时弹出的那个浮窗里的内容）；网易云音乐需要在它的设置里勾选「SMTC」才会提供歌名，Spotify 默认就有。
 
 **更新**
 
@@ -154,6 +154,7 @@ Bugs 标签里说明情况，并附上 `plugins\SDRadio.log`。
 - [dr_libs](https://github.com/mackron/dr_libs)（David Reid；dr_mp3 含 lieff 的 [minimp3](https://github.com/lieff/minimp3)）：解码 MP3、FLAC、WAV。
 - [stb](https://github.com/nothings/stb)（Sean Barrett 等；stb_dxt 原作者 Fabian Giesen，stb_image_resize2 作者 Jeff Roberts
   和 Jorge L Rodriguez）：stb_vorbis 解码 OGG，stb_image、stb_image_resize2、stb_dxt 处理 PNG 图标。
+- [C++/WinRT](https://github.com/microsoft/cppwinrt)（Microsoft）：读取系统媒体会话（SMTC），在 HUD 上显示其他程序正在放的歌名。
 - Windows 的 Media Foundation（Microsoft，系统自带，不在 mod 里）：解码 M4A、WMA 等其他格式。
 
 **工具**
@@ -289,7 +290,9 @@ Details tab lists them), save and restart the game. Tune to "SDRADIO LIVE" to he
 through the game's radio effect. So you don't hear it twice: in Windows Settings > System > Sound > Volume
 mixer, set the program's output device to one you don't listen to (a monitor's speakers, Steam Streaming
 Speakers...), or mute that device. **Don't mute the program itself in the mixer**: the game would hear silence too. Once its output device is
-changed, the program sounding silent on its own is expected; you hear it in the game.
+changed, the program sounding silent on its own is expected; you hear it in the game. The HUD shows the song
+the program plays (from Windows' media info, what the volume keys' pop-up shows); NetEase Cloud Music provides
+it only with "SMTC" ticked in its settings, Spotify always does.
 
 **Updating**
 
@@ -352,6 +355,8 @@ This mod uses or builds on the work of these people and projects. Thank you.
 - [stb](https://github.com/nothings/stb) (Sean Barrett and others; stb_dxt originally by Fabian Giesen,
   stb_image_resize2 by Jeff Roberts and Jorge L Rodriguez): stb_vorbis decodes OGG; stb_image, stb_image_resize2
   and stb_dxt handle the PNG logo.
+- [C++/WinRT](https://github.com/microsoft/cppwinrt) (Microsoft): reads the system media sessions (SMTC) for the
+  song another program plays, shown on the HUD.
 - Windows Media Foundation (Microsoft; part of Windows, not of the mod): decoding M4A, WMA and other formats.
 
 **Tools**
