@@ -79,6 +79,7 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
 - `core/tags.*` — ID3v2.2-2.4/ID3v1, Vorbis comments, RIFF INFO; legacy text: UTF-8, else GBK, else Latin-1.
 - `core/stream_io.*` — virtual files, decoder threads, completion thread. `core/live.*` — the live station's
   ring, reader and sources (see "Live station"). `core/app_audio.*`, `core/now_playing.*` — another app's sound and its song title (see "App audio").
+  `core/spotify.*` — Spotify through librespot (see "Spotify").
   `core/netradio.*`, `core/icy.*`, `core/stream_decoder.*`,
   `core/pacer.*` — internet radio (see "Internet radio").
 - `core/crash.*` — vectored exception handler (installed with logging on): logs the first 4 access
@@ -344,6 +345,45 @@ unofficial client, against Spotify's terms: weigh that then).
   radio (SMTC `TrySkipNextAsync`...); maybe set the app's output device from the mod (only through undocumented policy-config interfaces,
   as EarTrumpet does: risky).
 
+## Spotify (2026-10-23, `[Live] Source = spotify`; not yet tried with an account)
+
+librespot (MIT, https://github.com/librespot-org/librespot) as a Spotify Connect device, the way FH6 Universal
+Radio does it (the idea; the code is ours). Asked for by the user on 2026-10-23 ("wire librespot in"), done
+while they slept, so only tested with a stand-in.
+
+- **Binary**: librespot publishes no binaries. Built here as FH6's CI does:
+  `cargo install librespot --version 0.8.0 --no-default-features --features "rustls-tls-webpki-roots,with-libmdns"
+  --locked --root build/librespot` (~3 min, 14.9 MB, the workspace's Rust 1.98) and copied to the game's
+  `plugins\librespot.exe` (the default path). Not in the zip (yet): bundling would need notices for its few
+  hundred Rust crates (e.g. `cargo about`) and a CI job; the user decides. Players are told to bring their own.
+- `core/spotify.*`: `Start` runs it with stdout/stderr on pipes (64 KB), stdin NUL, `CREATE_NO_WINDOW |
+  CREATE_SUSPENDED`, in a `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` job (ends with the game), environment ours plus
+  `RUST_LOG=libmdns=info,librespot=info,librespot::player_event_handler=debug`, and
+  `--name <SpotifyName> --backend pipe --format S16 --bitrate 320 --initial-volume 100 --volume-ctrl fixed
+  --disable-audio-cache --cache <.asi dir>\SDRadio-spotify --onevent "cmd /c rem"` (all accepted by 0.8.0).
+- Audio: the pipe sink writes 44.1 kHz S16 stereo to stdout with blocking writes, so it runs as fast as it's read.
+  `ReadAudio` resamples (`streamdec::Resampler`) into a queue and stops reading at 2.5 s queued; the feeder
+  (10 ms) hands 2 s at once when the game starts playing the station (`live::Listening(3 s)`; the reader's
+  2 s resume lead), then by the QueryPerformanceCounter clock, padding silence after 200 ms without data
+  (Spotify paused). While not listening it takes nothing: librespot blocks and the music holds. Delay from the
+  Spotify app to the ear ~2.5 s queue + ring lag + Wwise's buffer (several seconds). Known: coming back replays
+  up to ~3 s (the new reader starts 5 s behind the ring's end, which still holds the audio from before).
+- Titles: librespot 0.8's `player_event_handler` runs `--onevent` (split on whitespace, env vars `PLAYER_EVENT`,
+  `NAME`, `ARTISTS` one per line, `ALBUM`, ...) and first logs `debug!("Running {onevent} with environment
+  variables:\n{env_vars:#?}")`. `EventParser` reads that block from stderr (Rust Debug escapes, `Unescape`);
+  `track_changed` sets the HUD title "Artist A, Artist B - Name". `cmd /c rem` does nothing and, being a console
+  program started from librespot's hidden console, shows no window. Other INFO/WARN/ERROR lines are logged as
+  `spotify: ...`.
+- **Persistent source** (`live::SetSource(..., persistent)`): the live manager doesn't stop it 10 s after the
+  station is left (that would drop the phone's Connect session); it holds instead (above). librespot restarts
+  5 s after exiting; a missing librespot.exe is logged once and leaves the station silent.
+- `tests/spotify_test.cc`: parsing, and the whole source with `tests/librespot_fake_manual.exe` (compiled, not
+  run by itself) as librespot: arguments and RUST_LOG checked by the fake, the title (UTF-8, escapes, two
+  artists), 4.6 s in the ring after 3 s (2 s head + real time), nothing fed while not listening. Under Wine
+  (CI copies only the tests) the fake is missing and that part is skipped.
+- Untested: a real Spotify account, discovery through Windows Firewall (likely a prompt on first run), how
+  quickly librespot reacts after being held for minutes (its connection may time out), the replay on return.
+
 ## Design decisions (don't undo without reason)
 
 - **Inside Wwise via files, not voices**: serving a bank + PCM streams keeps every game behavior (bus,
@@ -420,4 +460,5 @@ unofficial client, against Spotify's terms: weigh that then).
    browser). WebView2: not needed, and it doesn't run under Wine.
 6. Another app's audio: own code on `main` since 2026-10-23, works in game (see "App audio"); the HUD title
    from its media session too; next a warning when the app is muted in the mixer. The GPL branch `gpl/external-audio` (code from FH6 Universal Radio) is parked;
-   keep rebasing it. Later maybe librespot (Spotify Connect).
+   keep rebasing it. Spotify through librespot since 2026-10-23 (see "Spotify"): try it with an account; decide
+   whether to build and bundle librespot in CI (notices for its crates).

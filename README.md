@@ -109,6 +109,10 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 
 用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `app`，`App` 填上那个程序的进程名，例如 `cloudmusic.exe`（网易云音乐）或 `Spotify.exe`（不知道进程名的话，打开任务管理器的「详细信息」页找），保存后重启游戏。切到「SDRADIO LIVE」就能听到这个程序正在放的歌，带上游戏电台的效果。为了不同时听到两份声音：打开 Windows 的 设置 → 系统 → 声音 → 音量合成器，把这个程序的输出设备改成一个你不用的设备（例如显示器的扬声器、Steam Streaming Speakers），或者把那个设备静音。**网易云音乐不听 Windows 的这个设置**，要在网易云自己的设置里把音频输出设备改成那个设备（例如「WASAPI: Steam Streaming Speakers」）。**不要在音量合成器里把程序本身静音**，那样游戏里也听不到了：程序的声音本来就只该从游戏里听到，改完输出设备后程序那边「没声音」是正常的。HUD 上会显示程序正在放的歌名（取自 Windows 的媒体信息，也就是按音量键时弹出的那个浮窗里的内容）；网易云音乐需要在它的设置里勾选「SMTC」才会提供歌名，Spotify 默认就有。同样借助 SMTC，换到别的台、关掉电台、下车或打开暂停菜单时，程序会自动暂停，回到这个台时继续播放（只恢复 mod 暂停的；不想要这个功能就在 ini 里把 `PauseApp` 改成 `0`）。
 
+**想在车里听 Spotify（实验功能，需要 Spotify Premium）**
+
+mod 可以运行 [librespot](https://github.com/librespot-org/librespot)（一个开源的 Spotify Connect 客户端），把游戏变成一个 Spotify 的播放设备。librespot 不在压缩包里，需要自己准备 `librespot.exe` 放到 `plugins` 文件夹（装了 Rust 的话可以用 `cargo install librespot` 编译）。然后用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `spotify`，保存后重启游戏。切到「SDRADIO LIVE」后，在同一网络里的手机或电脑上打开 Spotify，从「设备」列表里选「SDRadio」，歌就会从游戏电台里放出来，HUD 上显示歌名。第一次运行时 Windows 防火墙可能会询问是否允许 librespot 访问网络，需要允许，Spotify 才能找到它。离开这个台时音乐会停在原处，回来时继续。注意：librespot 是非官方客户端，使用它不符合 Spotify 的服务条款，请自行斟酌。
+
 **更新**
 
 下载新的 `SDRadio.zip`，只把里面的 `plugins` 文件夹拖进游戏文件夹，Windows 询问时选「替换目标中的文件」。你的音乐和 `SDRadio.ini` 不会受影响。
@@ -143,8 +147,9 @@ Bugs 标签里说明情况，并附上 `plugins\SDRadio.log`。
 - ID3、Vorbis comment 和 RIFF INFO 标签的格式规范：读取歌名和歌手。
 - SHOUTcast / Icecast 的 ICY 元数据约定（流里每隔固定字节插入 `StreamTitle`）：网络电台的曲名。
 - [radio-browser.info](https://www.radio-browser.info)（社区维护的网络电台目录）：ini 里推荐用它找台，测试网络电台时也用它找了 MP3 / Ogg 的台。
-- [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio)（g0ldyy，Forza Horizon 6 的电台 mod）：「把各种音源都转成 PCM，送进游戏自己的电台」以及「抓取其他程序的声音」这两个思路的参考；直播电台、网络电台和程序声音的代码是独立编写的，没有用它的代码。
+- [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio)（g0ldyy，Forza Horizon 6 的电台 mod）：「把各种音源都转成 PCM，送进游戏自己的电台」「抓取其他程序的声音」和「用 librespot 接入 Spotify」这几个思路的参考；直播电台、网络电台、程序声音和 Spotify 的代码是独立编写的，没有用它的代码。
 - Microsoft 的 [Application Loopback（按进程捕获）文档](https://learn.microsoft.com/windows/win32/api/audioclientactivationparams/ns-audioclientactivationparams-audioclient_activation_params)：抓取其他程序声音的代码照它编写。
+- [librespot](https://github.com/librespot-org/librespot)（librespot 的开发者们，MIT）：开源的 Spotify Connect 客户端。选择 Spotify 音源时 mod 会运行它；它是单独的程序，不在 mod 里，也不在压缩包里。
 - Scaleform（Autodesk）：游戏界面用的中间件，研究电台 HUD 时分析了它。
 
 **mod 里包含的代码**（许可证全文见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)）
@@ -297,6 +302,18 @@ it only with "SMTC" ticked in its settings, Spotify always does. Through SMTC to
 switch to another station, turn the radio off, leave the car or open the pause menu, and resumes when you're
 back (only a pause the mod made; set `PauseApp = 0` in the ini to turn this off).
 
+**Listening to Spotify in the car (experimental, Spotify Premium)**
+
+The mod can run [librespot](https://github.com/librespot-org/librespot) (an open-source Spotify Connect client),
+which makes the game a Spotify playback device. librespot isn't in the zip: put a `librespot.exe` into the
+`plugins` folder (with Rust installed, `cargo install librespot` builds one). Then open `plugins\SDRadio.ini` in
+Notepad, set `Enabled` to `1` and `Source` to `spotify` in the `[Live]` section, save and restart the game. Tune
+to "SDRADIO LIVE", open Spotify on a phone or computer on the same network and pick "SDRadio" in its device
+list: the music plays through the game's radio, with the song on the HUD. On the first run Windows Firewall may
+ask whether librespot may use the network: allow it, or Spotify won't find it. Leaving the station holds the
+music where it is; it goes on when you come back. Note that librespot is an unofficial client: using it is
+against Spotify's terms of service; your call.
+
 **Updating**
 
 Download the new `SDRadio.zip` and drag only its `plugins` folder into the game folder; when Windows asks,
@@ -342,10 +359,13 @@ This mod uses or builds on the work of these people and projects. Thank you.
 - [radio-browser.info](https://www.radio-browser.info) (a community-run directory of internet radio): suggested
   in the ini for finding stations, and used to find MP3 / Ogg stations for testing.
 - [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio) (g0ldyy, a radio mod for Forza Horizon 6):
-  the ideas of turning every source into PCM fed to the game's own radio and of capturing another program's
-  sound; the live station, internet radio and app capture were written independently, with none of its code.
+  the ideas of turning every source into PCM fed to the game's own radio, of capturing another program's sound
+  and of Spotify through librespot; the live station, internet radio, app capture and Spotify source were
+  written independently, with none of its code.
 - Microsoft's [application loopback (process loopback) documentation](https://learn.microsoft.com/windows/win32/api/audioclientactivationparams/ns-audioclientactivationparams-audioclient_activation_params):
   the app capture is written from it.
+- [librespot](https://github.com/librespot-org/librespot) (the librespot contributors, MIT): the open-source Spotify
+  Connect client the mod runs for the Spotify source; a separate program, in neither the mod nor the zip.
 - Scaleform (Autodesk): the game's UI middleware, analyzed while studying the radio HUD.
 
 **Code in the mod** (full license texts in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md))
