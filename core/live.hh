@@ -10,8 +10,7 @@
 // never waiting for the source: a pending transfer holds one of the Wwise device's concurrent I/O slots, which
 // every game stream and bank load on that device shares (CAkIOThread::IncrementIOCount closes the I/O gate at
 // uMaxConcurrentIO). Reads that waited for audio (up to 10 s at the start, ~0.4 s each in steady state at the
-// live edge, 1.5 s each while the network was down) made the game hitch and, once they piled up, kept the next
-// station's bank from loading, so the station couldn't be switched (2026-10-23). So the cushion is in the
+// live edge, 1.5 s each while the network was down) made the game hitch (2026-10-23). So the cushion is in the
 // ring instead: a stream starts kPrerollMs behind the newest audio (more than Wwise's burst plus a read), a
 // read the ring can't fill gets what there is plus silence and the reader rebuffers until kResumeMs are
 // there, then goes on where it stopped; a reader more than kMaxLagMs behind jumps back to the preroll distance.

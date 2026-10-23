@@ -19,9 +19,9 @@ at stream start), tracks alternate on end-of-track, and resuming the station sta
 M4A in game, Chinese titles on the HUD, Linux (Proton) and macOS (CrossOver/Wine).
 
 Since 2026-10-23 also a **live station** (`[Live]`, off by default) that plays a real-time source: a test
-signal or **internet radio** (MP3 / Ogg Vorbis over WinHTTP). Both play in game on Windows; the fix for the
-game hitches and the station that wouldn't switch (reads that never wait, 2026-10-23) isn't confirmed in game
-yet. See "Live station" and
+signal or **internet radio** (MP3 / Ogg Vorbis over WinHTTP). Both play in game on Windows; the game hitches
+are fixed (reads that never wait) and so is the radio sticking after a switch between our two stations (a game
+HUD bug, see "Stuck after switching between our stations"; not yet confirmed in game), 2026-10-23. See "Live station" and
 "Internet radio" below. Experimental capture of another app's audio is on branch `gpl/external-audio` (GPL,
 not to be merged without the user's licensing decision; its CLAUDE.md has the details).
 
@@ -194,20 +194,34 @@ fed by a test signal (`Source = test`: a 0.15 s beep each second, 880 Hz on ever
   fine). The test signal had hidden it: its first reads padded ~2.7 s of silence, which became the cushion.
   First fixed by a 3 s preroll the first read waited for, plus the pacer handing its first 3 s over at once;
   that didn't hold (next item).
-- **Hitches and a stuck station (2026-10-23)**: the user reported the game hitching now and then and, after
-  listening a while, the station not switching. The log showed the 3 s preroll eaten by the burst (reads 2-4
+- **Hitches (2026-10-23)**: the user reported the game hitching now and then and, after listening a while, the
+  station not switching (that turned out to be something else: next item). The log showed the 3 s preroll eaten by the burst (reads 2-4
   at once), then every steady read waiting ~0.4 s at the live edge again. Waiting itself was the bug: the game's
   streaming device is a `CAkDeviceDeferredLinedUp` shared by every game stream and bank load (ours included),
   and each pending transfer holds one of its `uMaxConcurrentIO` slots (`CAkIOThread::IncrementIOCount` resets
   the max-IO gate event, which `IOSchedThread` waits on before scheduling anything). So a read waiting 0.4 s
   (10 s at a start, 1.5 s each while the network is down, with Wwise queueing more) delays the game's own
-  streams, and enough of them keep the next station's bank from loading: `Radio::Update` waits for it.
-  (The cause of the stuck switch is inferred from this; the original log was overwritten.) Now reads complete
+  streams; enough of them could even keep the next station's bank from loading (`Radio::Update` waits for
+  it), which was first taken for the stuck switch, wrongly. Now reads complete
   at once and the cushion lives in the ring. The pacer keeps 1 s (`kRebufferMs`) of its own when it starts, so
   the first late packet isn't an underrun. A stopped source's feeder no longer pushes while it winds down
   (it could mix into the next source's ring after a quick switch back). `netradio_manual` with Radio
   Paradise, 40 s: no wait, no underrun, no jump, lowest Wwise buffer 2.7 s; ~4 s of silence at a cold start
-  (connecting + 2 s), none when the source is already running.
+  (connecting + 2 s), none when the source is already running. In game afterwards: 0 ms waits, ~2.2 s behind
+  live, no underruns.
+- **Stuck after switching between our stations (2026-10-23)**: the radio sometimes wouldn't leave the live
+  station; the user heard the click on every press, and re-entering the car fixed it. Station-switch logging
+  (hooks on `Radio::NextStation` / `PrevStation` / `SetStation`, every station's bank callback) showed only a few
+  presses reaching NextStation/PrevStation. `Radio::HandleInputs` switches only while the HUD widget is active
+  (`IsActive`: state not 0 or fading out); on a hidden widget a press plays the click and calls
+  `UIHKRadioStationWidget::ChangeStation(id)` to show it, which calls `LoadTextures(mCurrentStation, id - 1)`.
+  When the new station's texture pack equals the loaded one, LoadTextures activates the widget only if the new
+  index already is `mCurrentStation`, else does nothing and leaves `mCurrentStation` behind. Every game station
+  has its own pack; ours share one (our logo pack, or the borrowed `TexturePack`), so after a switch between
+  them (12 <-> 13) the widget never activated again until the car was re-entered. hooks.cc hooks LoadTextures:
+  unless a pack load is in flight (`mWaitingForTexture`, whose callback matches its index against
+  `mCurrentStation`) it sets `mCurrentStation` to the new index first; with a different pack the game sets it
+  anyway, so game stations are unaffected. The switch logging stays (diagnostics).
 
 ## Internet radio (2026-10-23, `[Live] Source = radio`, `Url = ...`; plays in game on Windows)
 
@@ -321,7 +335,7 @@ The live station's first real source. All own code (no GPL), works under Wine as
    Wine in CI), Chinese titles on the HUD (font
    glyphs), long-track seek behavior (`SeekMS` on resume reads far ahead: decode-to-position latency).
 4. Maybe: several stations (one per subfolder), shuffle/order option, M3U playlists.
-5. Live station / internet radio (2026-10-23, see their sections): confirm the never-waiting reads and the HUD song
+5. Live station / internet radio (2026-10-23, see their sections): confirm the never-waiting reads, the stuck-switch fix and the HUD song
    title in game; then AAC streams
    (many stations; needs a decoder: Media Foundation can't take a byte stream as simply, a bundled one would
    need a license check), several stations or a station list, SHOUTcast 1's `ICY 200 OK` (raw socket). A
