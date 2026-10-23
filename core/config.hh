@@ -21,8 +21,10 @@ struct Config
 	// A second station playing a live source (live.hh); off by default.
 	bool mLive = false;
 	std::string mLiveName = "SDRADIO LIVE";
-	// Which source: "test" (a beep each second) for now.
+	// Which source: "test" (a beep each second) or "radio" (internet radio at mLiveUrl, netradio.hh).
 	std::string mLiveSource = "test";
+	// The internet radio stream (or .m3u/.pls) for Source = radio.
+	std::string mLiveUrl;
 
 	// Write SDRadio.log next to the .asi.
 	bool mLogging = true;

@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstring>
+#include <memory>
 #include <thread>
 
 #include "log.hh"
@@ -153,53 +154,15 @@ namespace live
 	{
 		Ring gStream;
 
-		// A recognizable signal for testing the station: every second a 0.15 s beep, 880 Hz on the first beat of
-		// four and 440 Hz on the others, at -12 dBFS. Paced by the clock like a real source.
-		void TestSignal(const std::atomic<bool>& stop)
-		{
-			LARGE_INTEGER frequency, start, now;
-			QueryPerformanceFrequency(&frequency);
-			QueryPerformanceCounter(&start);
-			uint64_t produced = 0;
-			double phase = 0.0;
-			std::vector<int16_t> chunk;
-			while (!stop.load()) {
-				Sleep(10);
-				QueryPerformanceCounter(&now);
-				const uint64_t due = static_cast<uint64_t>((now.QuadPart - start.QuadPart) * kRate / frequency.QuadPart);
-				chunk.clear();
-				for (; produced < due; ++produced) {
-					const uint64_t inSecond = produced % kRate;
-					const bool accent = (produced / kRate) % 4 == 0;
-					float v = 0.0f;
-					if (inSecond < kRate * 15 / 100) {
-						// 5 ms fades so the beeps don't click.
-						const float fade = (std::min)({ 1.0f, inSecond / 240.0f, (kRate * 15 / 100 - inSecond) / 240.0f });
-						v = 0.25f * fade * static_cast<float>(std::sin(phase));
-						phase += 2.0 * 3.14159265358979 * (accent ? 880.0 : 440.0) / kRate;
-					}
-					else {
-						phase = 0.0;
-					}
-					const auto s = static_cast<int16_t>(v * 32767.0f);
-					chunk.push_back(s);
-					chunk.push_back(s);
-				}
-				if (!chunk.empty()) {
-					gStream.Push(chunk.data(), chunk.size());
-				}
-			}
-		}
-
-		using SourceFn = void (*)(const std::atomic<bool>& stop);
-
 		std::mutex gLock;
 		std::string gSourceName;
-		SourceFn gSource = nullptr;
+		Source gSource;
 		int gOpen = 0;
 		DWORD gLastClose = 0;
 		bool gManagerRunning = false;
-		std::atomic<bool> gStop{ false };
+		// Each run gets its own stop flag: a source still winding down (a network read can take a while) must
+		// not be revived by the next start.
+		std::shared_ptr<std::atomic<bool>> gStop;
 		std::thread gThread;
 
 		// Under gLock.
@@ -209,8 +172,8 @@ namespace live
 				return;
 			}
 			gStream.Reset();
-			gStop = false;
-			gThread = std::thread(gSource, std::cref(gStop));
+			gStop = std::make_shared<std::atomic<bool>>(false);
+			gThread = std::thread([source = gSource, stop = gStop] { source(*stop); });
 			LOG("live: source \"%s\" started", gSourceName.c_str());
 		}
 
@@ -223,7 +186,7 @@ namespace live
 				{
 					std::lock_guard lock(gLock);
 					if (gOpen == 0 && gThread.joinable() && GetTickCount() - gLastClose >= 10'000) {
-						gStop = true;
+						*gStop = true;
 						finished = std::move(gThread);
 					}
 				}
@@ -235,22 +198,52 @@ namespace live
 		}
 	}
 
+	void TestSignal(const std::atomic<bool>& stop)
+	{
+		LARGE_INTEGER frequency, start, now;
+		QueryPerformanceFrequency(&frequency);
+		QueryPerformanceCounter(&start);
+		uint64_t produced = 0;
+		double phase = 0.0;
+		std::vector<int16_t> chunk;
+		while (!stop.load()) {
+			Sleep(10);
+			QueryPerformanceCounter(&now);
+			const uint64_t due = static_cast<uint64_t>((now.QuadPart - start.QuadPart) * kRate / frequency.QuadPart);
+			chunk.clear();
+			for (; produced < due; ++produced) {
+				const uint64_t inSecond = produced % kRate;
+				const bool accent = (produced / kRate) % 4 == 0;
+				float v = 0.0f;
+				if (inSecond < kRate * 15 / 100) {
+					// 5 ms fades so the beeps don't click.
+					const float fade = (std::min)({ 1.0f, inSecond / 240.0f, (kRate * 15 / 100 - inSecond) / 240.0f });
+					v = 0.25f * fade * static_cast<float>(std::sin(phase));
+					phase += 2.0 * 3.14159265358979 * (accent ? 880.0 : 440.0) / kRate;
+				}
+				else {
+					phase = 0.0;
+				}
+				const auto s = static_cast<int16_t>(v * 32767.0f);
+				chunk.push_back(s);
+				chunk.push_back(s);
+			}
+			if (!chunk.empty()) {
+				gStream.Push(chunk.data(), chunk.size());
+			}
+		}
+	}
+
 	Ring& Stream()
 	{
 		return gStream;
 	}
 
-	bool Configure(const std::string& source)
+	void SetSource(std::string name, Source source)
 	{
 		std::lock_guard lock(gLock);
-		gSourceName = source;
-		if (source == "test") {
-			gSource = &TestSignal;
-		}
-		else {
-			gSource = nullptr;
-		}
-		return gSource != nullptr;
+		gSourceName = std::move(name);
+		gSource = std::move(source);
 	}
 
 	std::string SourceName()

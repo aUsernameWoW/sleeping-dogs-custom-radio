@@ -50,9 +50,13 @@ namespace config
 			"Enabled = 0\n"
 			"; 直播电台的台名。/ The live station's name.\n"
 			"Name = SDRADIO LIVE\n"
-			"; 音源：test = 测试信号（每秒一声提示音，每四声一声高音）。\n"
-			"; Source: test = a test signal (a beep every second, every fourth one higher).\n"
+			"; 音源：test = 测试信号（每秒一声提示音，每四声一声高音）；radio = 网络电台（下面的 Url）。\n"
+			"; Source: test = a test signal (a beep every second, every fourth one higher); radio = internet radio (Url).\n"
 			"Source = test\n"
+			"; 网络电台的地址：MP3 或 Ogg Vorbis 的流，或指向它的 .m3u / .pls。可以在 https://www.radio-browser.info 找台。\n"
+			"; Internet radio stream: MP3 or Ogg Vorbis, or an .m3u / .pls pointing at one. Find stations at\n"
+			"; https://www.radio-browser.info\n"
+			"Url =\n"
 			"\n"
 			"[Debug]\n"
 			"; 在 .asi 旁边写 SDRadio.log。\n"
@@ -148,6 +152,7 @@ namespace config
 		}
 		get("Live.Name", gConfig.mLiveName);
 		get("Live.Source", gConfig.mLiveSource);
+		get("Live.Url", gConfig.mLiveUrl);
 		if (auto it = values.find("Debug.Logging"); it != values.end()) {
 			gConfig.mLogging = it->second != "0";
 		}

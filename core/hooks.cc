@@ -14,6 +14,7 @@
 #include "config.hh"
 #include "library.hh"
 #include "live.hh"
+#include "netradio.hh"
 #include "log.hh"
 #include "logo.hh"
 #include "radios.hh"
@@ -153,7 +154,22 @@ namespace hooks
 			}
 
 			if (gConfig.mLive) {
-				if (!live::Configure(gConfig.mLiveSource)) {
+				// The HUD shows the track's title, fixed at startup: the source, or the radio's host.
+				std::string title = gConfig.mLiveSource;
+				if (gConfig.mLiveSource == "test") {
+					live::SetSource("test", &live::TestSignal);
+				}
+				else if (gConfig.mLiveSource == "radio") {
+					live::SetSource("radio " + gConfig.mLiveUrl, [url = gConfig.mLiveUrl](const std::atomic<bool>& stop) { netradio::Run(url, stop); });
+					const size_t host = gConfig.mLiveUrl.find("://");
+					if (host != std::string::npos) {
+						title = gConfig.mLiveUrl.substr(host + 3, gConfig.mLiveUrl.find_first_of("/:?", host + 3) - host - 3);
+					}
+				}
+				else {
+					title.clear();
+				}
+				if (title.empty()) {
 					LOG("radios: unknown live source \"%s\", no live station", gConfig.mLiveSource.c_str());
 				}
 				else {
@@ -163,7 +179,7 @@ namespace hooks
 					station.mName = gConfig.mLiveName;
 					std::vector<streamio::TrackSource> sources;
 					for (uint32_t k = 1; k <= 2; ++k) {
-						station.mTracks.push_back({ "SDRadio", gConfig.mLiveSource });
+						station.mTracks.push_back({ "SDRadio", title });
 						sources.push_back({ bank::TrackFileId(next, k), L"", live::kRate, live::kFrames, true });
 					}
 					if (AddStation(std::move(station), next, std::move(sources))) {

@@ -14,6 +14,7 @@
 
 #include <Windows.h>
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <mutex>
@@ -100,9 +101,16 @@ namespace live
 	// The ring the station plays.
 	Ring& Stream();
 
-	// Picks the source by its config name ("test"); false if there's no such source.
-	bool Configure(const std::string& source);
+	// A source runs on its own thread, pushes into Stream() at real-time pace, and returns once `stop` is set.
+	using Source = std::function<void(const std::atomic<bool>& stop)>;
+
+	// The station's source (set before the station can play) and its name for the log.
+	void SetSource(std::string name, Source source);
 	std::string SourceName();
+
+	// The "test" source: every second a 0.15 s beep, 880 Hz on the first beat of four and 440 Hz on the
+	// others, at -12 dBFS.
+	void TestSignal(const std::atomic<bool>& stop);
 
 	// A live file was opened / closed. The source runs while any is open, and stops 10 s after the last
 	// closes (the game reopens the stream on every track start and station switch).

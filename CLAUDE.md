@@ -176,6 +176,35 @@ fed by a test signal (`Source = test`: a 0.15 s beep each second, 880 Hz on ever
   the open, so the burst finds an empty ring). With the old 250 ms wait every steady-state read waited it out
   and just made it, hence 1.5 s now. Station 13's file IDs weren't checked against SFX.pck (12's were).
 
+## Internet radio (2026-10-23, `[Live] Source = radio`, `Url = ...`; not yet tried in game)
+
+The live station's first real source. All own code (no GPL), works under Wine as far as WinHTTP does.
+
+- `core/netradio.*`: WinHTTP GET with `Icy-MetaData: 1` (system proxy via `WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY`,
+  falling back to the default; 10 s timeouts bound every blocking call), playlists followed (≤ 3 hops), then
+  ICY demux → decoder → resampler → `Pacer`. A feeder thread empties the pacer into the live ring every 10 ms by
+  the clock. The network side stops reading while 15 s are queued. Reconnects with backoff (2 s doubling to
+  30 s, reset after a connection that decoded); an unsupported format gives up for good.
+- `core/icy.*` (pure, `icy_test`): ICY metadata demux, `StreamTitle` (to UTF-8 via `tags::LegacyToUtf8`: Latin-1
+  and GBK titles exist), M3U/PLS, format detection (Ogg's first page tells Vorbis from Opus / FLAC).
+- `core/stream_decoder.*`: MP3 through dr_mp3's low-level push API (`drmp3dec_decode_frame`, 16 KB before the
+  first sync), Ogg Vorbis through stb_vorbis pushdata (reopened at each new logical stream's BOS page, where
+  Icecast puts the next song's comments: the title for Ogg). A decoder that hasn't produced a sample after
+  256 KB refuses the stream. `Resampler`: linear, to 48 kHz. Its own `ToStereo` (no decoder.cc in tests).
+- `core/pacer.*` (pure, `pacer_test`, also the resampler and junk refusal): starts after 2 s buffered, after an
+  underrun waits for 1 s; titles are marked at the audio position where they arrived and released when that
+  audio goes out (up to 15 s queued, so ICY titles would otherwise be early).
+- The HUD's song line is fixed in Radios.xml at startup, so the live track's title is the URL's host; titles go
+  to the log only. A dynamic HUD title needs `UIHKRadioStationWidget`'s current-song lookup hooked (open).
+- `tests/netradio_manual.cc <url> [s]` (compiled, not run; needs the network): plays a station into the ring and
+  prints the log and the fill rate. 2026-10-23 on Windows: Radio Paradise MP3 128k (44.1 kHz, ICY titles), Radio
+  Paradise Ogg Vorbis 192k (title from the comments), NPO Radio 1 MP3 (HTTP/1.0, 48 kHz), Chinese Music World
+  Ogg: all at rate 1.000 ± 0.004; a walmradio Opus stream says Opus isn't supported and stops. Run it outside the
+  Bash tool's sandbox: inside it direct connections fail (the tool's proxy is in env vars, which WinHTTP doesn't
+  read). SomaFM refused this machine (403 / redirect to an alert MP3, its exit IP behind the user's proxy).
+- Not supported yet: AAC (many stations), Opus, Ogg FLAC; SHOUTcast 1's `ICY 200 OK` reply (not HTTP, WinHTTP
+  rejects it; would need a raw socket).
+
 ## Design decisions (don't undo without reason)
 
 - **Inside Wwise via files, not voices**: serving a bank + PCM streams keeps every game behavior (bus,

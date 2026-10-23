@@ -73,7 +73,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>ole32.lib;shell32.lib;propsys.lib;mfplat.lib;mfreadwrite.lib;mfuuid.lib;delayimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ole32.lib;shell32.lib;propsys.lib;mfplat.lib;mfreadwrite.lib;mfuuid.lib;winhttp.lib;delayimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <!-- Media Foundation is loaded on first use (the scan thread), not at game start: on Windows N
            without the Media Feature Pack the game must still run, just without the station. -->
       <DelayLoadDLLs>mfplat.dll;mfreadwrite.dll;%(DelayLoadDLLs)</DelayLoadDLLs>
@@ -110,14 +110,18 @@
     <ClCompile Include="core\decoder.cc" />
     <ClCompile Include="core\decoder_mf.cc" />
     <ClCompile Include="core\hooks.cc" />
+    <ClCompile Include="core\icy.cc" />
     <ClCompile Include="core\library.cc" />
     <ClCompile Include="core\live.cc" />
     <ClCompile Include="core\log.cc" />
     <ClCompile Include="core\logo.cc" />
     <ClCompile Include="core\logo_image.cc" />
     <ClCompile Include="core\logo_pack.cc" />
+    <ClCompile Include="core\netradio.cc" />
+    <ClCompile Include="core\pacer.cc" />
     <ClCompile Include="core\radios.cc" />
     <ClCompile Include="core\scan.cc" />
+    <ClCompile Include="core\stream_decoder.cc" />
     <ClCompile Include="core\stream_io.cc" />
     <ClCompile Include="core\tags.cc" />
   </ItemGroup>
@@ -142,14 +146,18 @@
     <ClInclude Include="core\crash.hh" />
     <ClInclude Include="core\decoder.hh" />
     <ClInclude Include="core\hooks.hh" />
+    <ClInclude Include="core\icy.hh" />
     <ClInclude Include="core\library.hh" />
     <ClInclude Include="core\live.hh" />
     <ClInclude Include="core\log.hh" />
     <ClInclude Include="core\logo.hh" />
     <ClInclude Include="core\logo_image.hh" />
     <ClInclude Include="core\logo_pack.hh" />
+    <ClInclude Include="core\netradio.hh" />
+    <ClInclude Include="core\pacer.hh" />
     <ClInclude Include="core\radios.hh" />
     <ClInclude Include="core\scan.hh" />
+    <ClInclude Include="core\stream_decoder.hh" />
     <ClInclude Include="core\stream_io.hh" />
     <ClInclude Include="core\tags.hh" />
   </ItemGroup>
