@@ -30,13 +30,14 @@
 4. 一首结束后由游戏自己的逻辑随机挑下一首。
 5. **图标**：mod 启动时把图标做成游戏格式的 UI 贴图包，写成 `.asi` 旁边的 `SDRadio-logo.perm.bin` 和
    `.temp.bin`，电台列表里写上这个包的相对路径。游戏的归档里没有这个路径，就会从磁盘读取，和加载自带电台的图标完全一样，不需要任何 hook，也不占用别的电台的图标。见下面的[自定义图标](#自定义图标)。
+6. **直播电台（实验功能，`[Live]`）**：再加一个电台，播放实时音源。它的曲目是一首声明长 1 小时的 WAV，游戏来读时，mod 不管读的是哪个位置，都从一个 10 秒的环形缓冲里取最新的音频，开播时落后最新音频 3 秒，让 Wwise 有足够的缓冲余量。音源目前有测试信号和**网络电台**：用 WinHTTP 拉 MP3 或 Ogg Vorbis 的流（走系统代理，支持 .m3u / .pls），从 ICY 元数据或 Vorbis 注释读曲名，重采样到 48 kHz，按实时速度送进缓冲，断线自动重连。曲名目前只写进日志，HUD 上显示的是电台的域名。
 
 实现细节和逆向笔记见 [CLAUDE.md](CLAUDE.md) 和 [docs/radio-internals.md](docs/radio-internals.md)（英文）。
 
 **格式**：MP3、FLAC、WAV、OGG Vorbis 由 mod 自带的解码器（dr_libs、stb_vorbis）处理，任何平台都一样；M4A/AAC、WMA 等借助 Windows 的 Media Foundation，在 Wine/Proton 下是否可用取决于其版本。歌名和歌手取自 ID3、Vorbis
 comment、RIFF INFO 标签，没有标签时用文件名；GBK 编码的老式中文标签也能识别。日志里每首歌都写明用的是哪个解码器。
 
-状态：Windows 上已在游戏内验证（FLAC）；MP3/OGG/M4A、HUD 上的中文歌名、Linux / macOS（Proton、Wine、CrossOver）上的游戏内表现待测（自动测试在 Wine 11 和 Wine 9 下都通过）。
+状态：Windows 上已在游戏内验证（FLAC）；MP3/OGG/M4A、HUD 上的中文歌名、Linux / macOS（Proton、Wine、CrossOver）上的游戏内表现待测（自动测试在 Wine 11 和 Wine 9 下都通过）。直播电台和网络电台在 Windows 游戏内能正常播放；修复偶尔卡顿的版本（开播前预留 3 秒缓冲）还待游戏内确认。AAC、Opus、FLAC 格式的网络电台暂不支持。
 
 ### 需求
 
@@ -111,6 +112,9 @@ SHA-256 固定在 `.github/asi-loader.env`。推送到 `main` 且测试（包括
 - Audiokinetic 的 [Wwise](https://www.audiokinetic.com)：游戏用的是 Wwise 2012.2。mod 生成的音频库（bank）格式是对游戏里的
   Wwise 逆向分析得到的，电台效果器的参数直接取自游戏自带的音频库。
 - ID3、Vorbis comment 和 RIFF INFO 标签的格式规范：读取歌名和歌手。
+- SHOUTcast / Icecast 的 ICY 元数据约定（流里每隔固定字节插入 `StreamTitle`）：网络电台的曲名。
+- [radio-browser.info](https://www.radio-browser.info)（社区维护的网络电台目录）：ini 里推荐用它找台，测试网络电台时也用它找了 MP3 / Ogg 的台。
+- [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio)（g0ldyy，Forza Horizon 6 的电台 mod）：「把各种音源都转成 PCM，送进游戏自己的电台」这个思路的参考；直播电台和网络电台的代码是独立编写的，没有用它的代码。
 - Scaleform（Autodesk）：游戏界面用的中间件，研究电台 HUD 时分析了它。
 
 **mod 里包含的代码**（许可证全文见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)）
@@ -155,6 +159,12 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
    `SDRadio-logo.perm.bin` and `.temp.bin` next to the `.asi`, and the station list names that pack by a
    relative path. No archive has that path, so the game reads the files from disk, just as it loads its own
    stations' logos: no hooks, and no other station's logo is touched. See [Custom logo](#custom-logo) below.
+6. **Live station (experimental, `[Live]`)**: a second station playing a real-time source. Its tracks are
+   WAVs that declare an hour; whatever position the game reads, the mod hands it the next audio from a 10 s
+   ring, starting 3 s behind the newest so Wwise has a cushion. Sources so far: a test signal and **internet
+   radio**: an MP3 or Ogg Vorbis stream fetched with WinHTTP (system proxy, .m3u / .pls followed), titles
+   from ICY metadata or Vorbis comments, resampled to 48 kHz, fed in real time, reconnecting on errors.
+   Titles only go to the log for now; the HUD shows the station's host name.
 
 Details and reverse-engineering notes: [CLAUDE.md](CLAUDE.md) and
 [docs/radio-internals.md](docs/radio-internals.md).
@@ -165,7 +175,9 @@ on the build. Titles and artists come from ID3, Vorbis comments or RIFF INFO, el
 Chinese tags are recognized. The log names the decoder used for each track.
 
 Status: verified in game on Windows (FLAC); MP3/OGG/M4A, Chinese titles on the HUD and the game on Linux /
-macOS (Proton, Wine, CrossOver) not yet tested (the automated tests pass under Wine 11 and Wine 9).
+macOS (Proton, Wine, CrossOver) not yet tested (the automated tests pass under Wine 11 and Wine 9). The live
+station and internet radio play in game on Windows; the fix for occasional stutter (a 3 s cushion at the
+start) is yet to be confirmed in game. AAC, Opus and FLAC internet streams aren't supported yet.
 
 ### Requirements
 
@@ -264,6 +276,13 @@ This mod uses or builds on the work of these people and projects. Thank you.
   generates was reverse-engineered from the game's Wwise, and the radio effect's parameters are copied from the
   game's own banks.
 - The ID3, Vorbis comment and RIFF INFO tag specifications: reading titles and artists.
+- The SHOUTcast / Icecast ICY metadata convention (`StreamTitle` blocks every N bytes of the stream): internet
+  radio titles.
+- [radio-browser.info](https://www.radio-browser.info) (a community-run directory of internet radio): suggested
+  in the ini for finding stations, and used to find MP3 / Ogg stations for testing.
+- [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio) (g0ldyy, a radio mod for Forza Horizon 6):
+  the idea of turning every source into PCM fed to the game's own radio; the live station and internet radio
+  were written independently, with none of its code.
 - Scaleform (Autodesk): the game's UI middleware, analyzed while studying the radio HUD.
 
 **Code in the mod** (full license texts in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md))

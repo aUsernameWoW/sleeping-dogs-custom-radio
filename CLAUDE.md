@@ -18,6 +18,12 @@ at stream start), tracks alternate on end-of-track, and resuming the station sta
 `SeekMS(m_currentTrackTimer)`: the station "kept playing" meanwhile) without trouble. Not yet tried: MP3/OGG/
 M4A in game, Chinese titles on the HUD, Linux (Proton) and macOS (CrossOver/Wine).
 
+Since 2026-10-23 also a **live station** (`[Live]`, off by default) that plays a real-time source: a test
+signal or **internet radio** (MP3 / Ogg Vorbis over WinHTTP). Both play in game on Windows; the fix for the
+stutter internet radio showed (a 3 s cushion at the start) isn't confirmed in game yet. See "Live station" and
+"Internet radio" below. Experimental capture of another app's audio is on branch `gpl/external-audio` (GPL,
+not to be merged without the user's licensing decision; its CLAUDE.md has the details).
+
 ## How it works
 
 The game's radio is data-driven end to end, so the mod adds data and serves files; no game logic is patched.
@@ -67,7 +73,8 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   whether it started (under Wine it may be missing, or start but open nothing without GStreamer plugins).
 - `core/tags.*` — ID3v2.2-2.4/ID3v1, Vorbis comments, RIFF INFO; legacy text: UTF-8, else GBK, else Latin-1.
 - `core/stream_io.*` — virtual files, decoder threads, completion thread. `core/live.*` — the live station's
-  ring, reader and sources (see "Live station").
+  ring, reader and sources (see "Live station"). `core/netradio.*`, `core/icy.*`, `core/stream_decoder.*`,
+  `core/pacer.*` — internet radio (see "Internet radio").
 - `core/crash.*` — vectored exception handler (installed with logging on): logs the first 4 access
   violations as `crash: access violation (read/write/execute 0x…) at <module>+0x…` plus the stack as
   module+offset frames, and writes the first 2 as `SDRadio-crash-<n>.dmp` next to the .asi (open with
@@ -91,7 +98,9 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   5 game packs; opaque pictures, fitting; includes stb by relative path since tests get no include paths),
   `library_test` (the .asi with music already in its folder: a Chinese subfolder and file name, WAV INFO tags
   in GBK and UTF-8, mono, a broken `.m4a` that the Media Foundation fallback must reject, a `.txt` to ignore;
-  written for the Wine run below).
+  written for the Wine run below), `live_test` (the live ring and reader: preroll start, waits, padding,
+  jumps, frame phase), `icy_test` and `pacer_test` (internet radio's pure parts, see there), and
+  `netradio_manual` (compiled only: a real station with Wwise's reads emulated; needs the network).
 - `.github/workflows/build.yml` — CI like SDIMEFix's (documented in `mods\SDIMEFix\CLAUDE.md`), including
   its last job, `nexus` (each prerelease → the "SDRadio GitHub CI Build" file on Nexus). The
   `package` job builds `SDRadio.zip` for players: Ultimate ASI Loader as `dinput8.dll` (pinned in
@@ -182,7 +191,10 @@ fed by a test signal (`Source = test`: a 0.15 s beep each second, 880 Hz on ever
   fine). The test signal had hidden it: its first reads padded ~2.7 s of silence, which became the cushion.
   Fixed by the 3 s preroll the first read waits for, plus the pacer handing its first 3 s over at once.
 
-## Internet radio (2026-10-23, `[Live] Source = radio`, `Url = ...`; not yet tried in game)
+## Internet radio (2026-10-23, `[Live] Source = radio`, `Url = ...`; plays in game on Windows)
+
+In game (2026-10-23, Radio Paradise MP3): plays and switches fine, but stuttered now and then; the cause and the
+fix (not yet confirmed in game) are under "Live station". README's FAQ explains the ini for players.
 
 The live station's first real source. All own code (no GPL), works under Wine as far as WinHTTP does.
 
@@ -282,3 +294,14 @@ The live station's first real source. All own code (no GPL), works under Wine as
    Wine in CI), Chinese titles on the HUD (font
    glyphs), long-track seek behavior (`SeekMS` on resume reads far ahead: decode-to-position latency).
 4. Maybe: several stations (one per subfolder), shuffle/order option, M3U playlists.
+5. Live station / internet radio (2026-10-23, see their sections): confirm the stutter fix in game; then the
+   song on the HUD (hook the widget's current-song lookup: titles are fixed in Radios.xml today), AAC streams
+   (many stations; needs a decoder: Media Foundation can't take a byte stream as simply, a bundled one would
+   need a license check), several stations or a station list, SHOUTcast 1's `ICY 200 OK` (raw socket). A
+   browser dashboard was discussed (2026-10-22, like FH6 Universal Radio's): own code, localhost by default
+   with a token and a Host check, LAN only as an option, no API that sets paths or starts programs (FH6's
+   allows any origin and sets executable paths); `ShellExecute` to open it (Wine hands that to the Linux
+   browser). WebView2: not needed, and it doesn't run under Wine.
+6. Another app's audio (Spotify...) is on branch `gpl/external-audio`, diagnostics only: process loopback
+   works but an app muted in the mixer is captured as silence, so it needs a virtual cable or a spare output
+   device (untested). GPL code from FH6 Universal Radio; the user hasn't decided on licensing.

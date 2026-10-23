@@ -101,6 +101,10 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 
 游戏会把所有电台图标显示成白色，所以显示出来的是图案的形状，不是颜色。删掉 `logo.png` 就回到自带的图标。
 
+**想在车里听网络电台（实验功能）**
+
+用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `radio`，`Url` 填上电台的流地址（例如 `https://stream.radioparadise.com/mp3-128`），保存后重启游戏。旧版本生成的 ini 里没有 `[Live]` 这一段，在文件末尾自己加上 `[Live]` 和这三行就行。切台时会多出一个「SDRADIO LIVE」，连上后两三秒出声。目前只支持 MP3 和 Ogg Vorbis 格式的电台，可以在 [radio-browser.info](https://www.radio-browser.info) 按格式（codec）找台；HUD 上暂时显示电台的网址，不显示歌名。
+
 **更新**
 
 下载新的 `SDRadio.zip`，只把里面的 `plugins` 文件夹拖进游戏文件夹，Windows 询问时选「替换目标中的文件」。你的音乐和 `SDRadio.ini` 不会受影响。
@@ -133,6 +137,9 @@ Bugs 标签里说明情况，并附上 `plugins\SDRadio.log`。
 - Audiokinetic 的 [Wwise](https://www.audiokinetic.com)：游戏用的是 Wwise 2012.2。mod 生成的音频库（bank）格式是对游戏里的
   Wwise 逆向分析得到的，电台效果器的参数直接取自游戏自带的音频库。
 - ID3、Vorbis comment 和 RIFF INFO 标签的格式规范：读取歌名和歌手。
+- SHOUTcast / Icecast 的 ICY 元数据约定（流里每隔固定字节插入 `StreamTitle`）：网络电台的曲名。
+- [radio-browser.info](https://www.radio-browser.info)（社区维护的网络电台目录）：ini 里推荐用它找台，测试网络电台时也用它找了 MP3 / Ogg 的台。
+- [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio)（g0ldyy，Forza Horizon 6 的电台 mod）：「把各种音源都转成 PCM，送进游戏自己的电台」这个思路的参考；直播电台和网络电台的代码是独立编写的，没有用它的代码。
 - Scaleform（Autodesk）：游戏界面用的中间件，研究电台 HUD 时分析了它。
 
 **mod 里包含的代码**（许可证全文见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)）
@@ -260,6 +267,15 @@ the file. The name can be up to 63 bytes.
 The game shows every station logo in white, so what you see is your picture's shape, not its colors. Delete
 `logo.png` to get the original logo back.
 
+**Listening to internet radio in the car (experimental)**
+
+Open `plugins\SDRadio.ini` in Notepad; in the `[Live]` section set `Enabled` to `1`, `Source` to `radio` and
+`Url` to the station's stream address (e.g. `https://stream.radioparadise.com/mp3-128`), save and restart the
+game (an ini written by an older version has no `[Live]` section: add `[Live]` and those three lines at the
+end). A station "SDRADIO LIVE" joins the cycle and starts two or three seconds after you tune in. Only MP3 and
+Ogg Vorbis stations work so far (search [radio-browser.info](https://www.radio-browser.info) by codec); the HUD
+shows the station's address rather than the song for now.
+
 **Updating**
 
 Download the new `SDRadio.zip` and drag only its `plugins` folder into the game folder; when Windows asks,
@@ -300,6 +316,13 @@ This mod uses or builds on the work of these people and projects. Thank you.
   generates was reverse-engineered from the game's Wwise, and the radio effect's parameters are copied from the
   game's own banks.
 - The ID3, Vorbis comment and RIFF INFO tag specifications: reading titles and artists.
+- The SHOUTcast / Icecast ICY metadata convention (`StreamTitle` blocks every N bytes of the stream): internet
+  radio titles.
+- [radio-browser.info](https://www.radio-browser.info) (a community-run directory of internet radio): suggested
+  in the ini for finding stations, and used to find MP3 / Ogg stations for testing.
+- [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio) (g0ldyy, a radio mod for Forza Horizon 6):
+  the idea of turning every source into PCM fed to the game's own radio; the live station and internet radio
+  were written independently, with none of its code.
 - Scaleform (Autodesk): the game's UI middleware, analyzed while studying the radio HUD.
 
 **Code in the mod** (full license texts in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md))
