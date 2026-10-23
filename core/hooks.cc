@@ -226,7 +226,7 @@ namespace hooks
 				}
 				else if (gConfig.mLiveSource == "app") {
 					const std::string app = logger::ToUtf8(gConfig.mLiveApp.c_str());
-					live::SetSource("app " + app, [exe = gConfig.mLiveApp](const std::atomic<bool>& stop) { appaudio::Run(exe, stop); });
+					live::SetSource("app " + app, [exe = gConfig.mLiveApp, control = gConfig.mLivePauseApp](const std::atomic<bool>& stop) { appaudio::Run(exe, control, stop); });
 					title = app.empty() ? "app" : app;
 				}
 				else {

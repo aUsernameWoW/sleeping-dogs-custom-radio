@@ -1,7 +1,8 @@
 #pragma once
 
 // The title another app is playing, from the system media sessions (SMTC, Windows.Media.Control through
-// C++/WinRT), for the HUD while the live station plays that app (app_audio.hh). An app shows up there only if
+// C++/WinRT), for the HUD while the live station plays that app (app_audio.hh); and pausing that app while the
+// game doesn't play the station (an idea from FH6 Universal Radio, which does the same). An app shows up there only if
 // it publishes a session: Spotify and browsers do; NetEase Cloud Music only with its "SMTC" setting ticked.
 // Windows 10 1809+; Wine has no Windows.Media.Control, which is logged once. The WinRT API sets are
 // delay-loaded, so the .asi loads where they're missing.
@@ -19,6 +20,8 @@ namespace nowplaying
 	// "Artist - Title", or the title alone; empty without a title.
 	std::string Format(const std::string& artist, const std::string& title);
 
-	// Polls every 2 s and sets live::SetNowPlaying to the matching session's title. Returns once `stop` is set.
-	void Run(const std::wstring& exeName, const std::atomic<bool>& stop);
+	// Polls every 2 s and sets live::SetNowPlaying to the matching session's title. With `control`, also pauses
+	// the app while the game doesn't play the live station (live::Listening) and resumes it when it does again.
+	// Returns once `stop` is set.
+	void Run(const std::wstring& exeName, bool control, const std::atomic<bool>& stop);
 }

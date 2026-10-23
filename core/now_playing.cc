@@ -42,6 +42,40 @@ namespace nowplaying
 		{
 			return operation.wait_for(std::chrono::seconds(5)) == AsyncStatus::Completed;
 		}
+
+		// Whether the app is paused because the game stopped playing the live station. Outlives a source run (it
+		// stops 10 s after the station is left), so the next run knows to resume it.
+		std::atomic<bool> gPausedByUs{ false };
+
+		// Pauses the app once the game hasn't played the live station for a moment, and resumes it when the game
+		// plays it again, but only a pause of ours: a pause the player made stays, and a program the player
+		// restarted meanwhile isn't paused again until the next time the station is left.
+		void Control(const GlobalSystemMediaTransportControlsSession& session, DWORD now, DWORD& quietSince, const std::string& name)
+		{
+			constexpr DWORD kQuietMs = 3'000; // Wwise reads every ~0.7 s while it plays
+			constexpr DWORD kGraceMs = 1'500; // a track change closes and reopens the file at once
+			const bool listening = live::Listening(kQuietMs);
+			if (listening) {
+				quietSince = 0;
+			}
+			else if (!quietSince) {
+				quietSince = now ? now : 1;
+			}
+			const auto status = session.GetPlaybackInfo().PlaybackStatus();
+			if (!listening && !gPausedByUs.load() && now - quietSince >= kGraceMs && status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing) {
+				auto pause = session.TryPauseAsync();
+				if (Finish(pause) && pause.GetResults()) {
+					gPausedByUs = true;
+					LOG("media: paused %s (the game isn't playing the live station)", name.c_str());
+				}
+			}
+			else if (listening && gPausedByUs.exchange(false) && status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Paused) {
+				auto play = session.TryPlayAsync();
+				if (Finish(play) && play.GetResults()) {
+					LOG("media: resumed %s", name.c_str());
+				}
+			}
+		}
 	}
 
 	std::string MatchKey(const std::wstring& exeName)
@@ -66,7 +100,7 @@ namespace nowplaying
 		return artist.empty() ? title : artist + " - " + title;
 	}
 
-	void Run(const std::wstring& exeName, const std::atomic<bool>& stop)
+	void Run(const std::wstring& exeName, bool control, const std::atomic<bool>& stop)
 	{
 		const std::string key = MatchKey(exeName);
 		if (key.empty()) {
@@ -80,12 +114,25 @@ namespace nowplaying
 		const std::string name = logger::ToUtf8(exeName.c_str());
 
 		GlobalSystemMediaTransportControlsSessionManager manager{ nullptr };
+		GlobalSystemMediaTransportControlsSession session{ nullptr };
 		std::string loggedIds = "-";
 		std::string shown;
 		bool missingLogged = false;
+		int loggedStatus = -1;
 		bool unavailable = false;
+		DWORD refreshAt = GetTickCount();
+		DWORD quietSince = 0; // when the game stopped playing the live station, 0 while it plays
 		while (!stop.load() && !unavailable) {
 			try {
+				const DWORD now = GetTickCount();
+				if (control && session) {
+					Control(session, now, quietSince, name);
+				}
+				if (static_cast<int32_t>(now - refreshAt) < 0) {
+					Sleep(250);
+					continue;
+				}
+				refreshAt = now + 2'000;
 				if (!manager) {
 					auto request = GlobalSystemMediaTransportControlsSessionManager::RequestAsync();
 					if (Finish(request)) {
@@ -101,15 +148,15 @@ namespace nowplaying
 					GlobalSystemMediaTransportControlsSession found{ nullptr };
 					bool foundPlaying = false;
 					std::string ids;
-					for (const auto& session : manager.GetSessions()) {
-						const std::string id = winrt::to_string(session.SourceAppUserModelId());
+					for (const auto& candidate : manager.GetSessions()) {
+						const std::string id = winrt::to_string(candidate.SourceAppUserModelId());
 						ids += (ids.empty() ? "" : ", ") + id;
 						if (!Matches(id, key) || foundPlaying) {
 							continue;
 						}
-						const bool playing = session.GetPlaybackInfo().PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing;
+						const bool playing = candidate.GetPlaybackInfo().PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing;
 						if (!found || playing) {
-							found = session;
+							found = candidate;
 							foundPlaying = playing;
 						}
 					}
@@ -118,9 +165,16 @@ namespace nowplaying
 						loggedIds = ids;
 					}
 
+					session = found;
 					std::string title;
 					if (found) {
 						missingLogged = false;
+						const int status = static_cast<int>(found.GetPlaybackInfo().PlaybackStatus());
+						if (status != loggedStatus) {
+							// 4 = playing, 5 = paused (GlobalSystemMediaTransportControlsSessionPlaybackStatus)
+							LOG("media: %s's playback status %d", name.c_str(), status);
+							loggedStatus = status;
+						}
 						auto properties = found.TryGetMediaPropertiesAsync();
 						if (Finish(properties)) {
 							const auto media = properties.GetResults();
@@ -143,14 +197,14 @@ namespace nowplaying
 			catch (const winrt::hresult_error& e) {
 				LOG("media: %s (0x%08lX)", winrt::to_string(e.message()).c_str(), static_cast<unsigned long>(e.code().value));
 				manager = nullptr;
+				session = nullptr;
 				// No Windows.Media.Control (Wine, Windows before 1809): nothing will change.
 				unavailable = e.code() == REGDB_E_CLASSNOTREG;
 			}
-			for (int i = 0; i < 20 && !stop.load(); ++i) {
-				Sleep(100);
-			}
+			Sleep(250);
 		}
-		manager = nullptr; // released before COM is
+		session = nullptr; // released before COM is
+		manager = nullptr;
 		if (SUCCEEDED(com)) {
 			CoUninitialize();
 		}

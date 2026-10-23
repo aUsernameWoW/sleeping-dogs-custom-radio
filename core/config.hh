@@ -27,6 +27,8 @@ struct Config
 	std::string mLiveUrl;
 	// The program whose sound Source = app plays (process name, e.g. L"cloudmusic.exe"; app_audio.hh).
 	std::wstring mLiveApp;
+	// For Source = app: pause the program while the game doesn't play the live station, resume it after.
+	bool mLivePauseApp = true;
 
 	// Write SDRadio.log next to the .asi.
 	bool mLogging = true;

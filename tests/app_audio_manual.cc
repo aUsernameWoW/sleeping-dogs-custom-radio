@@ -5,6 +5,7 @@
 //   app_audio_manual list                 output devices
 //   app_audio_manual <index> [mute]       the experiment on that device (mute: also with the device muted)
 //   app_audio_manual titles <exe>         the HUD title for that program, from its media session
+//   app_audio_manual control <exe>        pausing and resuming that program as the station is left and played
 //   app_audio_manual play <index> <s>     (the child) play the sine
 
 #define NOMINMAX
@@ -175,11 +176,29 @@ int wmain(int argc, wchar_t** argv)
 		DeleteFileW(L"app_audio_manual.log");
 		logger::Open(L"app_audio_manual.log");
 		std::atomic<bool> stop{ false };
-		std::thread titles([&] { nowplaying::Run(argv[2], stop); });
+		std::thread titles([&] { nowplaying::Run(argv[2], false, stop); });
 		Sleep(5000);
 		stop = true;
 		titles.join();
 		std::printf("now playing: \"%s\"\n", live::NowPlaying().c_str());
+		return 0;
+	}
+	if (argc >= 3 && std::wstring(argv[1]) == L"control") {
+		// Pausing and resuming that program (it should be playing): 5 s with no live file open (paused after
+		// ~1.5 s), then 5 s as if the game read the station (resumed). Log in app_audio_manual.log.
+		DeleteFileW(L"app_audio_manual.log");
+		logger::Open(L"app_audio_manual.log");
+		std::atomic<bool> stop{ false };
+		std::thread control([&] { nowplaying::Run(argv[2], true, stop); });
+		Sleep(5000);
+		live::Acquire();
+		for (int i = 0; i < 10; ++i) {
+			live::NoteRead();
+			Sleep(500);
+		}
+		live::Release();
+		stop = true;
+		control.join();
 		return 0;
 	}
 	if (argc >= 4 && std::wstring(argv[1]) == L"play") {

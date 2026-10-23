@@ -304,13 +304,13 @@ namespace appaudio
 		}
 	}
 
-	void Run(const std::wstring& exeName, const std::atomic<bool>& stop)
+	void Run(const std::wstring& exeName, bool controlApp, const std::atomic<bool>& stop)
 	{
 		const HRESULT com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 		const std::string name = logger::ToUtf8(exeName.c_str());
 		// The song title for the HUD, on its own thread: its WinRT calls may block for seconds, the capture
 		// must not.
-		std::thread titles([&] { nowplaying::Run(exeName, stop); });
+		std::thread titles([&] { nowplaying::Run(exeName, controlApp, stop); });
 		Feeder feeder;
 		bool waitingLogged = false;
 		std::vector<int16_t> samples;

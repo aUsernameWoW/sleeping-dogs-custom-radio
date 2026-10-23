@@ -62,6 +62,10 @@ namespace config
 			"; Source = app 时要播放的程序的进程名，例如 cloudmusic.exe（网易云音乐）、Spotify.exe。\n"
 			"; For Source = app: the program's process name, e.g. cloudmusic.exe (NetEase Cloud Music), Spotify.exe.\n"
 			"App =\n"
+			"; 1 = 游戏里没在放这个台时（换台、关电台、下车、暂停菜单）让程序暂停，回来时继续播放；0 = 不控制程序。\n"
+			"; 1 = pause the program while the game doesn't play this station (another station, radio off, out of the car,\n"
+			"; the pause menu) and resume it when it does; 0 = leave the program alone.\n"
+			"PauseApp = 1\n"
 			"\n"
 			"[Debug]\n"
 			"; 在 .asi 旁边写 SDRadio.log。\n"
@@ -161,6 +165,9 @@ namespace config
 		std::string app;
 		get("Live.App", app);
 		gConfig.mLiveApp = Widen(app);
+		if (auto it = values.find("Live.PauseApp"); it != values.end()) {
+			gConfig.mLivePauseApp = it->second != "0";
+		}
 		if (auto it = values.find("Debug.Logging"); it != values.end()) {
 			gConfig.mLogging = it->second != "0";
 		}
