@@ -38,6 +38,42 @@ build is found by signature (see `core/hooks.cc`).
 - HUD: `UIHKRadioStationWidget` reads the station list (`img://%s`, `Data\UI\%s.perm.bin`), shows
   `LocalizeText(m_name)` and `LocalizeText(GetCurrentlyPlayingSong())`.
 
+## Switching stations and the HUD widget (installed build, 2026-10-23)
+
+- Station order is `sm_stationList` (file order): 01-11, then SDRadio's 12 and 13. `GetNextStationId` /
+  `GetPrevStationId` wrap around the list and skip cop-scanner stations (`RadioStation` +0x169) unless the radio
+  is a scanner (`m_radioType`), and vice versa. From 13, "next" goes to 01 H-KLUB; from 01, "previous" to 13.
+- `Radio::HandleInputs` (each `Radio::Update`): on `NextRadioStationReleased` / `PrevRadioStationReleased`, if
+  the HUD widget `IsActive()` (`mState` not 0 and not fading out) it calls the virtual `NextStation(true)` /
+  `PrevStation(true)`; otherwise it only plays the click (`PlayClick`) and calls
+  `UIHKRadioStationWidget::ChangeStation(m_curStation->m_id)` to show the widget. Holding the buttons (> 0.4 s)
+  changes the volume instead.
+- `Radio::NextStation` / `PrevStation(displayStationId)` act only while flag 0x01 (on) is set and 0x20 / 0x40
+  are clear (radio flags byte +0x158): `StopTrack(500 ms)`, Get{Next,Prev}StationId (unload the old bank, load
+  the new), click, `StartTrack` (flag 0x08), then set 0x20 (next) or 0x40 (previous). `Radio::Update` clears
+  0x20 / 0x40 with a `ChangeStation` on the widget, and starts the track (0x08), once the new station's bank is
+  loaded (or it is the scanner), the player is in a vehicle and 0.3 s have passed. Every
+  `sm_numStations - 1` consecutive steps one way, `AdvanceAllStations(180 s)`.
+- `Radio::SetStation(index)` (callers: `VehicleInteractTask::Begin`, the Skookum methods
+  `TSVehicle::set_radio_station` / `set_player_radio_station`, `VehicleAudioComponent::SetRadioStation` from its
+  `Init`): entering a car logs two, the car's station then the player's last one. `RadioFullyControlled` overrides
+  Next/PrevStation to call the base and `SetupScannerAndRadio` (police scanner audio on/off).
+- `UIHKRadioStationWidget` (+0 `mState`: 0 hidden, 1 `STATE_SHOULD_ACTIVATE`, 2 shown, 3 `STATE_FADING_OUT`; 0 and 2 are unnamed in the PDB; +4 `mChanged`, +5
+  `mVisible`, +6 `mShouldRefreshTextures`, +7 `mWaitingForTexture`, +8 `mCurrentStation` (index = id - 1),
+  +0xC `mTimeSinceLastInput`, +0x18 `mStationData` (texture, texturePack per station), +0x28
+  `mLoadedTexturePack`). `ChangeStation(id)` resets the input timer and calls
+  `LoadTextures(mCurrentStation, id - 1)`: a different pack is released and the new one queued
+  (`mCurrentStation` = new index, `mWaitingForTexture`; `TextureLoadedCallback(handle, index)` activates the
+  widget if the index still is `mCurrentStation`); the same pack activates the widget **only if the new index
+  already is `mCurrentStation`**, else nothing happens. With one pack per game station that never mattered;
+  SDRadio's two stations share one, which stuck the radio (SDRadio hooks LoadTextures, see CLAUDE.md).
+- `UIHKRadioStationWidget::Update`: in state 2, `Deactivate` (fade out) 4 s after the last input; a texture
+  wait over 2 s gives up with an empty texture; while `mChanged`, `Flash_SetVisible(mVisible)` and, if
+  visible, texture, `Flash_Intro` (state 1 -> 2), `Flash_SetSongTitle`, `Flash_SetStationName`.
+  `HandleNewSong` (from `Radio::DoStartTrack`) only sets `mChanged`, so a new song shows while the widget is up.
+- `RadioFullyControlled::GetCurrentlyPlayingSong`: `m_curStation` (+0x148) -> `m_currentlyPlaying` (+0x120)
+  ? `m_currentlyPlayingAssetName` (qString at +0xF0) : "". Only `Flash_SetSongTitle` calls it.
+
 ## The station banks (SFX.pck)
 
 AKPK v1; bank and stream tables have 24-byte entries (id, block size, size, 0, start block, language).

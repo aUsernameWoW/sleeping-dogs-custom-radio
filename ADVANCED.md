@@ -37,7 +37,7 @@
 **格式**：MP3、FLAC、WAV、OGG Vorbis 由 mod 自带的解码器（dr_libs、stb_vorbis）处理，任何平台都一样；M4A/AAC、WMA 等借助 Windows 的 Media Foundation，在 Wine/Proton 下是否可用取决于其版本。歌名和歌手取自 ID3、Vorbis
 comment、RIFF INFO 标签，没有标签时用文件名；GBK 编码的老式中文标签也能识别。日志里每首歌都写明用的是哪个解码器。
 
-状态：Windows 上已在游戏内验证（FLAC）；MP3/OGG/M4A、HUD 上的中文歌名、Linux / macOS（Proton、Wine、CrossOver）上的游戏内表现待测（自动测试在 Wine 11 和 Wine 9 下都通过）。直播电台和网络电台在 Windows 游戏内能正常播放；游戏偶尔卡顿的问题已修复（读取从不等待音源）；在 SDRadio 的两个台之间切换后偶尔换不了台的问题也已修复（两个台共用图标，触发了游戏 HUD 的一个 bug），待游戏内确认。AAC、Opus、FLAC 格式的网络电台暂不支持。
+状态：Windows 上已在游戏内验证（FLAC）；MP3/OGG/M4A、HUD 上的中文歌名、Linux / macOS（Proton、Wine、CrossOver）上的游戏内表现待测（自动测试在 Wine 11 和 Wine 9 下都通过）。直播电台和网络电台在 Windows 游戏内能正常播放；HUD 上显示当前歌名；游戏偶尔卡顿（读取在等音源）和在 SDRadio 的两个台之间切换后偶尔换不了台（两个台共用图标，触发了游戏 HUD 的一个 bug）这两个问题都已修复，并在游戏内确认。AAC、Opus、FLAC 格式的网络电台暂不支持。
 
 ### 需求
 
@@ -178,9 +178,9 @@ Chinese tags are recognized. The log names the decoder used for each track.
 
 Status: verified in game on Windows (FLAC); MP3/OGG/M4A, Chinese titles on the HUD and the game on Linux /
 macOS (Proton, Wine, CrossOver) not yet tested (the automated tests pass under Wine 11 and Wine 9). The live
-station and internet radio play in game on Windows; occasional game hitches are fixed (reads that never
-wait for the source), and so is the radio sometimes sticking after switching between SDRadio's two stations
-(a game HUD bug triggered by their shared logo; yet to be confirmed in game). AAC, Opus and FLAC internet streams aren't supported yet.
+station and internet radio play in game on Windows; the HUD shows the current song title; occasional game
+hitches (reads that waited for the source) and the radio sometimes sticking after switching between SDRadio's
+two stations (a game HUD bug triggered by their shared logo) are fixed and confirmed in game. AAC, Opus and FLAC internet streams aren't supported yet.
 
 ### Requirements
 
