@@ -90,6 +90,7 @@ namespace streamio
 							const live::Reader::Stats before = f.mLive->GetStats();
 							f.mLive->Fill(info.mFilePosition, info.mRequestedSize, static_cast<uint8_t*>(info.mBuffer));
 							it->mFilled = true;
+							live::NoteRead();
 							// The first reads of each open, every 100th, underruns and jumps; logged after the lock
 							// is released, since Wwise's I/O thread takes it in Read.
 							const live::Reader::Stats& after = f.mLive->GetStats();

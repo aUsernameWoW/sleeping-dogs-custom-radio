@@ -122,4 +122,11 @@ namespace live
 	// closes (the game reopens the stream on every track start and station switch).
 	void Acquire();
 	void Release();
+
+	// Called for every read of a live file (the stream completion thread).
+	void NoteRead();
+	// Whether the game plays the live station now: a live file is open and was opened or read within
+	// `quietMs`. Wwise reads every ~0.7 s while it plays; the game's pause menu (or losing focus) stops the reads
+	// but keeps the file open, a station switch or leaving the car closes it.
+	bool Listening(DWORD quietMs);
 }

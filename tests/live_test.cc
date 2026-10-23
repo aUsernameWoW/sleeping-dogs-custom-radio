@@ -197,11 +197,25 @@ namespace
 		live::SetNowPlaying({});
 		Check(live::NowPlaying().empty() && live::NowPlayingGeneration() == before + 2, "clearing it does");
 	}
+
+	void TestListening()
+	{
+		Check(!live::Listening(3000), "nothing open: not listening");
+		live::Acquire(); // no source set: nothing starts
+		Check(live::Listening(3000), "just opened: listening");
+		Sleep(200); // GetTickCount moves in ~16 ms steps
+		Check(!live::Listening(50), "open but not read for a while (the game's pause menu): not listening");
+		live::NoteRead();
+		Check(live::Listening(50), "read again: listening");
+		live::Release();
+		Check(!live::Listening(3000), "closed: not listening");
+	}
 }
 
 int main()
 {
 	TestNowPlaying();
+	TestListening();
 	static_assert(live::kHeaderSize - 8 + live::kFrames * live::kBlockAlign <= 0xFFFFFFFFull, "RIFF size fits");
 	static_assert(live::kMaxLagMs > live::kPrerollMs && live::kMaxLagMs < live::kRingMs, "a jump lands inside the ring and below the lag limit");
 	TestStart();

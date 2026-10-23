@@ -160,6 +160,9 @@ namespace live
 		std::string gTitle;
 		std::atomic<uint32_t> gTitleGeneration{ 0 };
 
+		std::atomic<int> gOpenCount{ 0 };         // gOpen, readable without gLock
+		std::atomic<DWORD> gLastActivity{ 0 };    // tick of the last open or read of a live file
+
 		// Under gLock.
 		void StartSource()
 		{
@@ -272,6 +275,8 @@ namespace live
 	{
 		std::lock_guard lock(gLock);
 		++gOpen;
+		gOpenCount = gOpen;
+		gLastActivity = GetTickCount();
 		StartSource();
 		if (!gManagerRunning) {
 			gManagerRunning = true;
@@ -285,6 +290,17 @@ namespace live
 		if (gOpen > 0) {
 			--gOpen;
 		}
+		gOpenCount = gOpen;
 		gLastClose = GetTickCount();
+	}
+
+	void NoteRead()
+	{
+		gLastActivity = GetTickCount();
+	}
+
+	bool Listening(DWORD quietMs)
+	{
+		return gOpenCount.load() > 0 && GetTickCount() - gLastActivity.load() < quietMs;
 	}
 }
