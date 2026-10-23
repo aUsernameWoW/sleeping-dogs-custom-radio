@@ -1,0 +1,24 @@
+#pragma once
+
+// The title another app is playing, from the system media sessions (SMTC, Windows.Media.Control through
+// C++/WinRT), for the HUD while the live station plays that app (app_audio.hh). An app shows up there only if
+// it publishes a session: Spotify and browsers do; NetEase Cloud Music only with its "SMTC" setting ticked.
+// Windows 10 1809+; Wine has no Windows.Media.Control, which is logged once. The WinRT API sets are
+// delay-loaded, so the .asi loads where they're missing.
+
+#include <atomic>
+#include <string>
+
+namespace nowplaying
+{
+	// What a session's app ID is matched against: the process name, lowercased, without ".exe".
+	std::string MatchKey(const std::wstring& exeName);
+	// Whether a session's SourceAppUserModelId (e.g. "cloudmusic.exe", "Spotify.exe", "Chrome", a packaged
+	// app's "SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify") belongs to the app with that key.
+	bool Matches(const std::string& appId, const std::string& key);
+	// "Artist - Title", or the title alone; empty without a title.
+	std::string Format(const std::string& artist, const std::string& title);
+
+	// Polls every 2 s and sets live::SetNowPlaying to the matching session's title. Returns once `stop` is set.
+	void Run(const std::wstring& exeName, const std::atomic<bool>& stop);
+}

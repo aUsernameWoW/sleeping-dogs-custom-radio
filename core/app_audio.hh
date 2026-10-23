@@ -47,6 +47,7 @@ namespace appaudio
 		HANDLE mEvent = nullptr;
 	};
 
-	// The live source: waits for the app, captures it, starts over when it exits. Returns once `stop` is set.
+	// The live source: waits for the app, captures it, starts over when it exits; meanwhile now_playing.hh puts
+	// the app's song on the HUD. Returns once `stop` is set.
 	void Run(const std::wstring& exeName, const std::atomic<bool>& stop);
 }

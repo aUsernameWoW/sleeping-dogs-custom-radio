@@ -4,12 +4,14 @@
 // afterwards). Compiled, not run by build.ps1 / CI (it plays sound and mutes a device).
 //   app_audio_manual list                 output devices
 //   app_audio_manual <index> [mute]       the experiment on that device (mute: also with the device muted)
+//   app_audio_manual titles <exe>         the HUD title for that program, from its media session
 //   app_audio_manual play <index> <s>     (the child) play the sine
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include "../core/app_audio.cc"
 #include "../core/live.cc"
+#include "../core/now_playing.cc"
 #include "../core/log.cc"
 
 #include <endpointvolume.h>
@@ -19,6 +21,8 @@
 #include <cstdlib>
 
 #pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "runtimeobject.lib")
+#pragma comment(lib, "oleaut32.lib")
 
 namespace
 {
@@ -164,6 +168,18 @@ int wmain(int argc, wchar_t** argv)
 		for (size_t i = 0; i < devices.size(); ++i) {
 			std::printf("%zu%s %s\n", i, devices[i].mDefault ? "*" : " ", logger::ToUtf8(devices[i].mName.c_str()).c_str());
 		}
+		return 0;
+	}
+	if (argc >= 3 && std::wstring(argv[1]) == L"titles") {
+		// What the HUD would show for that program: its media session's title, for 5 s (log in app_audio_manual.log).
+		DeleteFileW(L"app_audio_manual.log");
+		logger::Open(L"app_audio_manual.log");
+		std::atomic<bool> stop{ false };
+		std::thread titles([&] { nowplaying::Run(argv[2], stop); });
+		Sleep(5000);
+		stop = true;
+		titles.join();
+		std::printf("now playing: \"%s\"\n", live::NowPlaying().c_str());
 		return 0;
 	}
 	if (argc >= 4 && std::wstring(argv[1]) == L"play") {

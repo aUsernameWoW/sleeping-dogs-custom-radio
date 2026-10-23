@@ -6,10 +6,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <thread>
 #include <unordered_map>
 
 #include "live.hh"
 #include "log.hh"
+#include "now_playing.hh"
 
 namespace appaudio
 {
@@ -306,6 +308,9 @@ namespace appaudio
 	{
 		const HRESULT com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 		const std::string name = logger::ToUtf8(exeName.c_str());
+		// The song title for the HUD, on its own thread: its WinRT calls may block for seconds, the capture
+		// must not.
+		std::thread titles([&] { nowplaying::Run(exeName, stop); });
 		Feeder feeder;
 		bool waitingLogged = false;
 		std::vector<int16_t> samples;
@@ -366,6 +371,7 @@ namespace appaudio
 			}
 			CloseHandle(process);
 		}
+		titles.join();
 		if (SUCCEEDED(com)) {
 			CoUninitialize();
 		}
