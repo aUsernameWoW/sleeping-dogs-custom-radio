@@ -21,6 +21,7 @@
 #include "logo.hh"
 #include "radios.hh"
 #include "scan.hh"
+#include "spotify.hh"
 #include "stream_io.hh"
 
 namespace hooks
@@ -228,6 +229,12 @@ namespace hooks
 					const std::string app = logger::ToUtf8(gConfig.mLiveApp.c_str());
 					live::SetSource("app " + app, [exe = gConfig.mLiveApp, control = gConfig.mLivePauseApp](const std::atomic<bool>& stop) { appaudio::Run(exe, control, stop); });
 					title = app.empty() ? "app" : app;
+				}
+				else if (gConfig.mLiveSource == "spotify") {
+					spotify::Options options{ gConfig.mLibrespot, gConfig.mSpotifyName, gConfig.mSpotifyCache };
+					// Persistent: stopping librespot would drop the player's Spotify Connect session.
+					live::SetSource("spotify", [options](const std::atomic<bool>& stop) { spotify::Run(options, stop); }, true);
+					title = "Spotify";
 				}
 				else {
 					title.clear();

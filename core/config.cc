@@ -51,9 +51,9 @@ namespace config
 			"; 直播电台的台名。/ The live station's name.\n"
 			"Name = SDRADIO LIVE\n"
 			"; 音源：test = 测试信号（每秒一声提示音，每四声一声高音）；radio = 网络电台（下面的 Url）；\n"
-			"; app = 另一个程序的声音（下面的 App，需要 Windows 11）。\n"
+			"; app = 另一个程序的声音（下面的 App，需要 Windows 11）；spotify = Spotify（见下）。\n"
 			"; Source: test = a test signal (a beep every second, every fourth one higher); radio = internet radio (Url);\n"
-			"; app = another program's sound (App below; needs Windows 11).\n"
+			"; app = another program's sound (App below; needs Windows 11); spotify = Spotify (below).\n"
 			"Source = test\n"
 			"; 网络电台的地址：MP3 或 Ogg Vorbis 的流，或指向它的 .m3u / .pls。可以在 https://www.radio-browser.info 找台。\n"
 			"; Internet radio stream: MP3 or Ogg Vorbis, or an .m3u / .pls pointing at one. Find stations at\n"
@@ -66,6 +66,12 @@ namespace config
 			"; 1 = pause the program while the game doesn't play this station (another station, radio off, out of the car,\n"
 			"; the pause menu) and resume it when it does; 0 = leave the program alone.\n"
 			"PauseApp = 1\n"
+			"; Source = spotify：mod 启动 librespot，在 Spotify 里选择下面这个名字的设备即可在电台里播放（需要 Spotify Premium）。\n"
+			"; librespot.exe 的位置，留空 = .asi 旁边的 librespot.exe。\n"
+			"; For Source = spotify: the mod runs librespot, a Spotify Connect device you pick in the Spotify app (Premium).\n"
+			"; Where librespot.exe is; empty = librespot.exe next to the .asi.\n"
+			"Librespot =\n"
+			"SpotifyName = SDRadio\n"
 			"\n"
 			"[Debug]\n"
 			"; 在 .asi 旁边写 SDRadio.log。\n"
@@ -168,6 +174,11 @@ namespace config
 		if (auto it = values.find("Live.PauseApp"); it != values.end()) {
 			gConfig.mLivePauseApp = it->second != "0";
 		}
+		std::string librespot;
+		get("Live.Librespot", librespot);
+		gConfig.mLibrespot = librespot.empty() ? dir + L"\\librespot.exe" : Widen(librespot);
+		get("Live.SpotifyName", gConfig.mSpotifyName);
+		gConfig.mSpotifyCache = dir + L"\\SDRadio-spotify";
 		if (auto it = values.find("Debug.Logging"); it != values.end()) {
 			gConfig.mLogging = it->second != "0";
 		}

@@ -104,8 +104,10 @@ namespace live
 	// A source runs on its own thread, pushes into Stream() at real-time pace, and returns once `stop` is set.
 	using Source = std::function<void(const std::atomic<bool>& stop)>;
 
-	// The station's source (set before the station can play) and its name for the log.
-	void SetSource(std::string name, Source source);
+	// The station's source (set before the station can play) and its name for the log. A persistent source isn't
+	// stopped when nothing listens (Spotify Connect: stopping it would drop the player's connection); it should
+	// hold its audio back while live::Listening is false instead.
+	void SetSource(std::string name, Source source, bool persistent = false);
 	std::string SourceName();
 
 	// The "test" source: every second a 0.15 s beep, 880 Hz on the first beat of four and 440 Hz on the

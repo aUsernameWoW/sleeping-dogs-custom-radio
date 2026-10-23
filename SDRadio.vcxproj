@@ -124,6 +124,7 @@
     <ClCompile Include="core\pacer.cc" />
     <ClCompile Include="core\radios.cc" />
     <ClCompile Include="core\scan.cc" />
+    <ClCompile Include="core\spotify.cc" />
     <ClCompile Include="core\stream_decoder.cc" />
     <ClCompile Include="core\stream_io.cc" />
     <ClCompile Include="core\tags.cc" />
@@ -159,6 +160,7 @@
     <ClInclude Include="core\logo_pack.hh" />
     <ClInclude Include="core\netradio.hh" />
     <ClInclude Include="core\now_playing.hh" />
+    <ClInclude Include="core\spotify.hh" />
     <ClInclude Include="core\pacer.hh" />
     <ClInclude Include="core\radios.hh" />
     <ClInclude Include="core\scan.hh" />

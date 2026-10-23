@@ -29,6 +29,11 @@ struct Config
 	std::wstring mLiveApp;
 	// For Source = app: pause the program while the game doesn't play the live station, resume it after.
 	bool mLivePauseApp = true;
+	// For Source = spotify (spotify.hh): librespot.exe (default: next to the .asi), the Spotify Connect device
+	// name, and where librespot keeps its credentials (next to the .asi).
+	std::wstring mLibrespot;
+	std::string mSpotifyName = "SDRadio";
+	std::wstring mSpotifyCache;
 
 	// Write SDRadio.log next to the .asi.
 	bool mLogging = true;

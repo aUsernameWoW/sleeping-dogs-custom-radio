@@ -148,6 +148,7 @@ namespace live
 		std::mutex gLock;
 		std::string gSourceName;
 		Source gSource;
+		bool gPersistent = false;
 		int gOpen = 0;
 		DWORD gLastClose = 0;
 		bool gManagerRunning = false;
@@ -184,7 +185,7 @@ namespace live
 				std::thread finished;
 				{
 					std::lock_guard lock(gLock);
-					if (gOpen == 0 && gThread.joinable() && GetTickCount() - gLastClose >= 10'000) {
+					if (gOpen == 0 && !gPersistent && gThread.joinable() && GetTickCount() - gLastClose >= 10'000) {
 						*gStop = true;
 						finished = std::move(gThread);
 					}
@@ -238,10 +239,11 @@ namespace live
 		return gStream;
 	}
 
-	void SetSource(std::string name, Source source)
+	void SetSource(std::string name, Source source, bool persistent)
 	{
 		std::lock_guard lock(gLock);
 		gSourceName = std::move(name);
+		gPersistent = persistent;
 		gSource = std::move(source);
 	}
 
