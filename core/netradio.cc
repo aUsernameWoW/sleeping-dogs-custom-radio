@@ -282,7 +282,9 @@ namespace netradio
 				if (newTitle) {
 					SetTitle(title);
 				}
-				if (!chunk.empty()) {
+				// Once stopped, a source may take seconds to wind down (a blocked network read) while the station
+				// is switched back to and the next source has reset the ring: don't mix this one's audio into it.
+				if (!chunk.empty() && !stop.load()) {
 					live::Stream().Push(chunk.data(), chunk.size());
 				}
 			}

@@ -1,6 +1,6 @@
-// The live station's ring and reader (core/live.cc): wrapping, preroll, reads in order, the header, waiting for
-// a late source then padding silence, jumping ahead after a stall, seeks keeping the frame phase. Compiles
-// live.cc directly; argv[1] is unused.
+// The live station's ring and reader (core/live.cc): wrapping, preroll, reads in order, the header, a late source
+// padded with silence at once and rebuffered without losing audio, jumping ahead after a stall, seeks keeping the
+// frame phase, starting with a fresh or a running source. Compiles live.cc directly; argv[1] is unused.
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -40,6 +40,14 @@ namespace
 		return static_cast<uint64_t>(v) == ((offset / 2) & 0x7FFF);
 	}
 
+	bool AllZero(const uint8_t* bytes, size_t size)
+	{
+		for (size_t i = 0; i < size; ++i) {
+			if (bytes[i]) return false;
+		}
+		return true;
+	}
+
 	void TestRing()
 	{
 		live::Ring ring(1000);
@@ -71,14 +79,11 @@ namespace
 		live::Reader reader(ring, header);
 
 		std::vector<uint8_t> out(8192);
-		Check(reader.Ready(0, 68, 0), "the header alone is always ready");
 		reader.Fill(0, 68, out.data());
 		Check(out[0] == 0xA0 && out[67] == 0xA0 + 67, "header bytes");
 
-		PushMs(ring, 3000, counter);
-		const uint64_t written = ring.Written();
-		const uint64_t start = written - live::MsToBytes(live::kPrerollMs);
-		Check(reader.Ready(68, 4096, 0), "audio within the preroll is ready");
+		PushMs(ring, live::kPrerollMs + 1000, counter);
+		const uint64_t start = ring.Written() - live::MsToBytes(live::kPrerollMs);
 		reader.Fill(68, 4096, out.data());
 		Check(FromOffset(out.data(), start), "the stream starts one preroll behind the newest audio");
 		Check(FromOffset(out.data() + 4094, start + 4094), "a read is contiguous");
@@ -93,18 +98,21 @@ namespace
 			position += 4096;
 			cursor += 4096;
 		}
-		Check(!reader.Ready(position, 4096, 0), "a read past the newest audio waits");
-		Check(!reader.Ready(position, 4096, live::kMaxWaitMs - 1), "it waits up to the limit");
-		Check(reader.Ready(position, 4096, live::kMaxWaitMs), "then completes anyway");
 		const uint64_t short_by = 4096 - (ring.Written() - cursor);
 		reader.Fill(position, 4096, out.data());
-		Check(out[4095] == 0 && out[4094] == 0, "the missing part is silence");
-		Check(reader.GetStats().mSilenceBytes == short_by, "padded silence is counted");
+		Check(FromOffset(out.data(), cursor), "a read past the newest audio gets what there is at once");
+		Check(out[4095] == 0 && out[4094] == 0, "and silence for the rest");
+		Check(reader.GetStats().mSilenceBytes == short_by && reader.GetStats().mUnderruns == 1, "padded silence and the underrun are counted");
 		position += 4096;
 		cursor = ring.Written(); // the cursor only moved over real audio
 
+		// Rebuffering: silence until kResumeMs are there, then on from where the audio stopped.
+		PushMs(ring, live::kResumeMs - 100, counter);
+		reader.Fill(position, 4096, out.data());
+		Check(AllZero(out.data(), 4096), "a rebuffering reader reads silence");
+		Check(reader.GetStats().mUnderruns == 1, "one underrun, however long it rebuffers");
+		position += 4096;
 		PushMs(ring, 100, counter);
-		Check(reader.Ready(position, 4096, 0), "new audio makes the waiting reader ready");
 		reader.Fill(position, 4096, out.data());
 		Check(FromOffset(out.data(), cursor), "after an underrun the stream resumes without a gap in the audio");
 		position += 4096;
@@ -140,42 +148,48 @@ namespace
 		const uint64_t start = ring.Written() - live::MsToBytes(live::kPrerollMs);
 		Check(FromOffset(out.data(), start + 2), "the cursor takes the file position's frame phase");
 	}
-}
 
-namespace
-{
 	void TestStart()
 	{
-		// A source just started: the first audio read waits for the preroll (Wwise's opening burst must find
-		// real audio to buffer), up to kStartWaitMs.
-		live::Ring ring;
-		uint32_t counter = 0;
-		uint8_t header[live::kHeaderSize] = {};
-		live::Reader reader(ring, header);
-		PushMs(ring, live::kPrerollMs - 500, counter);
-		Check(reader.Ready(0, 68, 0), "the header alone doesn't wait");
-		Check(!reader.Ready(0, 131072, 0), "the first audio waits for the preroll");
-		Check(!reader.Ready(0, 131072, live::kMaxWaitMs), "longer than an ordinary read would");
-		Check(reader.Ready(0, 131072, live::kStartWaitMs), "but not forever");
-		PushMs(ring, 500, counter);
-		Check(reader.Ready(0, 131072, 0), "the preroll is there: go");
 		std::vector<uint8_t> out(131072);
-		reader.Fill(0, 131072, out.data());
-		Check(FromOffset(out.data() + 68, 0), "and the stream starts at its oldest audio, a preroll behind");
-		// Wwise's burst of 3 more reads (~2 s) is served from the preroll without waiting.
-		bool burst = true;
-		for (uint32_t i = 1; i <= 3; ++i) {
-			burst = burst && reader.Ready(131072u * i, 131072, 0);
-			reader.Fill(131072u * i, 131072, out.data());
+		uint8_t header[live::kHeaderSize] = {};
+
+		// A source just started (internet radio: connecting): Wwise's opening burst reads silence at once, and the
+		// stream starts with the source's oldest audio once kResumeMs are there.
+		{
+			live::Ring ring;
+			uint32_t counter = 0;
+			live::Reader reader(ring, header);
+			PushMs(ring, live::kResumeMs - 500, counter);
+			reader.Fill(0, 131072, out.data());
+			Check(AllZero(out.data() + 68, 131072 - 68), "a source still starting reads as silence");
+			Check(reader.GetStats().mUnderruns == 0, "which isn't an underrun");
+			PushMs(ring, 500, counter);
+			reader.Fill(131072, 131072, out.data());
+			Check(FromOffset(out.data(), 0), "then the stream starts at the source's oldest audio");
 		}
-		Check(burst && reader.GetStats().mSilenceBytes == 0, "the opening burst doesn't wait and is all audio");
+
+		// A source already running (switching back to the station): the header read and Wwise's burst of 4 reads
+		// (~3.4 s together) come out of the preroll, and enough is left for the next steady read.
+		{
+			live::Ring ring;
+			uint32_t counter = 0;
+			live::Reader reader(ring, header);
+			PushMs(ring, live::kRingMs, counter);
+			for (uint32_t i = 0; i < 5; ++i) {
+				reader.Fill(131072u * i, 131072, out.data());
+			}
+			Check(reader.GetStats().mSilenceBytes == 0, "the opening burst is all audio");
+			Check(reader.Lead() >= 131072 + live::MsToBytes(500), "and leaves more than a read plus 0.5 s behind live");
+		}
 	}
 }
 
 int main()
 {
-	TestStart();
 	static_assert(live::kHeaderSize - 8 + live::kFrames * live::kBlockAlign <= 0xFFFFFFFFull, "RIFF size fits");
+	static_assert(live::kMaxLagMs > live::kPrerollMs && live::kMaxLagMs < live::kRingMs, "a jump lands inside the ring and below the lag limit");
+	TestStart();
 	TestRing();
 	TestReader();
 	TestPhase();

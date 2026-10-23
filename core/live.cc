@@ -15,28 +15,21 @@ namespace live
 
 	void Ring::Push(const int16_t* samples, size_t count)
 	{
-		std::function<void()> listener;
-		{
-			std::lock_guard lock(mLock);
-			const auto* bytes = reinterpret_cast<const uint8_t*>(samples);
-			size_t size = count * sizeof(int16_t);
-			const size_t capacity = mData.size();
-			if (size > capacity) {
-				// Only the newest `capacity` bytes can stay.
-				bytes += size - capacity;
-				mWritten += size - capacity;
-				size = capacity;
-			}
-			const size_t at = static_cast<size_t>(mWritten % capacity);
-			const size_t first = (std::min)(size, capacity - at);
-			std::memcpy(mData.data() + at, bytes, first);
-			std::memcpy(mData.data(), bytes + first, size - first);
-			mWritten += size;
-			listener = mListener;
+		std::lock_guard lock(mLock);
+		const auto* bytes = reinterpret_cast<const uint8_t*>(samples);
+		size_t size = count * sizeof(int16_t);
+		const size_t capacity = mData.size();
+		if (size > capacity) {
+			// Only the newest `capacity` bytes can stay.
+			bytes += size - capacity;
+			mWritten += size - capacity;
+			size = capacity;
 		}
-		if (listener) {
-			listener();
-		}
+		const size_t at = static_cast<size_t>(mWritten % capacity);
+		const size_t first = (std::min)(size, capacity - at);
+		std::memcpy(mData.data() + at, bytes, first);
+		std::memcpy(mData.data(), bytes + first, size - first);
+		mWritten += size;
 	}
 
 	uint64_t Ring::Written() const
@@ -65,12 +58,6 @@ namespace live
 		mWritten = 0;
 	}
 
-	void Ring::SetListener(std::function<void()> listener)
-	{
-		std::lock_guard lock(mLock);
-		mListener = std::move(listener);
-	}
-
 	Reader::Reader(const Ring& ring, const uint8_t* header) : mRing(ring)
 	{
 		std::memcpy(mHeader, header, kHeaderSize);
@@ -79,13 +66,14 @@ namespace live
 	void Reader::Prepare(uint64_t position)
 	{
 		const uint64_t written = mRing.Written();
-		const uint64_t preroll = MsToBytes(kPrerollMs);
 		if (!mStarted || written - (std::min)(written, mCursor) > MsToBytes(kMaxLagMs)) {
 			if (mStarted) {
 				++mStats.mJumps;
 			}
+			const uint64_t preroll = MsToBytes(kPrerollMs);
 			mCursor = written > preroll ? (written - preroll) & ~uint64_t{ kBlockAlign - 1 } : 0;
 			mStarted = true;
+			mPlaying = true;
 		}
 		// Wwise counts frames from the data chunk; after a seek to a frame boundary the ring must be at one too.
 		if (position >= kHeaderSize) {
@@ -100,21 +88,6 @@ namespace live
 	{
 		const uint64_t written = mRing.Written();
 		return written > mCursor ? written - mCursor : 0;
-	}
-
-	bool Reader::Ready(uint64_t position, uint32_t size, DWORD waitedMs)
-	{
-		const uint64_t end = position + size;
-		if (end <= kHeaderSize) {
-			return true;
-		}
-		// The first audio waits for the preroll, so Wwise's opening burst fills its buffer with real audio.
-		if (!mStarted && mRing.Written() < MsToBytes(kPrerollMs) && waitedMs < kStartWaitMs) {
-			return false;
-		}
-		Prepare((std::max)(position, uint64_t{ kHeaderSize }));
-		const uint64_t need = end - (std::max)(position, uint64_t{ kHeaderSize });
-		return mRing.Written() >= mCursor + need || waitedMs >= kMaxWaitMs;
 	}
 
 	void Reader::Fill(uint64_t position, uint32_t size, uint8_t* out)
@@ -136,18 +109,32 @@ namespace live
 		if (at >= end) {
 			return;
 		}
-
-		Prepare(at);
 		const uint64_t need = end - at;
-		const uint64_t written = mRing.Written();
-		uint64_t have = written > mCursor ? (std::min)(need, written - mCursor) : 0;
-		if (have && !mRing.Copy(mCursor, out, static_cast<size_t>(have))) {
-			// Overwritten meanwhile (can't happen with a 10 s ring unless the reader stalled): start over.
-			++mStats.mJumps;
-			mStarted = false;
-			have = 0;
+		const uint64_t resume = MsToBytes(kResumeMs);
+
+		uint64_t have = 0;
+		if (mStarted || mRing.Written() >= resume) {
+			Prepare(at);
+			const uint64_t written = mRing.Written();
+			const uint64_t lead = written > mCursor ? written - mCursor : 0;
+			if (!mPlaying && lead >= resume) {
+				mPlaying = true;
+			}
+			if (mPlaying) {
+				have = (std::min)(need, lead);
+				if (have && !mRing.Copy(mCursor, out, static_cast<size_t>(have))) {
+					// Overwritten meanwhile (can't happen with a 10 s ring unless the reader stalled): start over.
+					++mStats.mJumps;
+					mStarted = false;
+					have = 0;
+				}
+				mCursor += have;
+				if (have < need) {
+					++mStats.mUnderruns;
+					mPlaying = false;
+				}
+			}
 		}
-		mCursor += have;
 		if (have < need) {
 			std::memset(out + have, 0, static_cast<size_t>(need - have));
 			mStats.mSilenceBytes += need - have;

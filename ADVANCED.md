@@ -30,14 +30,14 @@
 4. 一首结束后由游戏自己的逻辑随机挑下一首。
 5. **图标**：mod 启动时把图标做成游戏格式的 UI 贴图包，写成 `.asi` 旁边的 `SDRadio-logo.perm.bin` 和
    `.temp.bin`，电台列表里写上这个包的相对路径。游戏的归档里没有这个路径，就会从磁盘读取，和加载自带电台的图标完全一样，不需要任何 hook，也不占用别的电台的图标。见下面的[自定义图标](#自定义图标)。
-6. **直播电台（实验功能，`[Live]`）**：再加一个电台，播放实时音源。它的曲目是一首声明长 1 小时的 WAV，游戏来读时，mod 不管读的是哪个位置，都从一个 10 秒的环形缓冲里取最新的音频，开播时落后最新音频 3 秒，让 Wwise 有足够的缓冲余量。音源目前有测试信号和**网络电台**：用 WinHTTP 拉 MP3 或 Ogg Vorbis 的流（走系统代理，支持 .m3u / .pls），从 ICY 元数据或 Vorbis 注释读曲名，重采样到 48 kHz，按实时速度送进缓冲，断线自动重连。曲名目前只写进日志，HUD 上显示的是电台的域名。
+6. **直播电台（实验功能，`[Live]`）**：再加一个电台，播放实时音源。它的曲目是一首声明长 1 小时的 WAV，游戏来读时，mod 不管读的是哪个位置，都从一个 10 秒的环形缓冲里取最新的音频，开播时落后最新音频 5 秒作为缓冲余量。读取总是立即完成、从不等待音源（音源来不及时先补静音，攒够再接着播），因为挂起的读取会占住游戏音频引擎的 I/O 名额，让游戏卡顿、换不了台。音源目前有测试信号和**网络电台**：用 WinHTTP 拉 MP3 或 Ogg Vorbis 的流（走系统代理，支持 .m3u / .pls），从 ICY 元数据或 Vorbis 注释读曲名，重采样到 48 kHz，按实时速度送进缓冲，断线自动重连。曲名目前只写进日志，HUD 上显示的是电台的域名。
 
 实现细节和逆向笔记见 [CLAUDE.md](CLAUDE.md) 和 [docs/radio-internals.md](docs/radio-internals.md)（英文）。
 
 **格式**：MP3、FLAC、WAV、OGG Vorbis 由 mod 自带的解码器（dr_libs、stb_vorbis）处理，任何平台都一样；M4A/AAC、WMA 等借助 Windows 的 Media Foundation，在 Wine/Proton 下是否可用取决于其版本。歌名和歌手取自 ID3、Vorbis
 comment、RIFF INFO 标签，没有标签时用文件名；GBK 编码的老式中文标签也能识别。日志里每首歌都写明用的是哪个解码器。
 
-状态：Windows 上已在游戏内验证（FLAC）；MP3/OGG/M4A、HUD 上的中文歌名、Linux / macOS（Proton、Wine、CrossOver）上的游戏内表现待测（自动测试在 Wine 11 和 Wine 9 下都通过）。直播电台和网络电台在 Windows 游戏内能正常播放；修复偶尔卡顿的版本（开播前预留 3 秒缓冲）还待游戏内确认。AAC、Opus、FLAC 格式的网络电台暂不支持。
+状态：Windows 上已在游戏内验证（FLAC）；MP3/OGG/M4A、HUD 上的中文歌名、Linux / macOS（Proton、Wine、CrossOver）上的游戏内表现待测（自动测试在 Wine 11 和 Wine 9 下都通过）。直播电台和网络电台在 Windows 游戏内能正常播放；修复游戏偶尔卡顿、听久了换不了台的版本（读取从不等待音源）还待游戏内确认。AAC、Opus、FLAC 格式的网络电台暂不支持。
 
 ### 需求
 
@@ -161,7 +161,9 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
    stations' logos: no hooks, and no other station's logo is touched. See [Custom logo](#custom-logo) below.
 6. **Live station (experimental, `[Live]`)**: a second station playing a real-time source. Its tracks are
    WAVs that declare an hour; whatever position the game reads, the mod hands it the next audio from a 10 s
-   ring, starting 3 s behind the newest so Wwise has a cushion. Sources so far: a test signal and **internet
+   ring, starting 5 s behind the newest as a cushion. Reads complete at once and never wait for the source
+   (silence while it is late, then it rebuffers), since a pending read holds one of the game's audio I/O
+   slots: waiting reads made the game hitch and could keep the station from switching. Sources so far: a test signal and **internet
    radio**: an MP3 or Ogg Vorbis stream fetched with WinHTTP (system proxy, .m3u / .pls followed), titles
    from ICY metadata or Vorbis comments, resampled to 48 kHz, fed in real time, reconnecting on errors.
    Titles only go to the log for now; the HUD shows the station's host name.
@@ -176,8 +178,8 @@ Chinese tags are recognized. The log names the decoder used for each track.
 
 Status: verified in game on Windows (FLAC); MP3/OGG/M4A, Chinese titles on the HUD and the game on Linux /
 macOS (Proton, Wine, CrossOver) not yet tested (the automated tests pass under Wine 11 and Wine 9). The live
-station and internet radio play in game on Windows; the fix for occasional stutter (a 3 s cushion at the
-start) is yet to be confirmed in game. AAC, Opus and FLAC internet streams aren't supported yet.
+station and internet radio play in game on Windows; the fix for occasional hitches and a station that
+wouldn't switch after a while (reads that never wait for the source) is yet to be confirmed in game. AAC, Opus and FLAC internet streams aren't supported yet.
 
 ### Requirements
 

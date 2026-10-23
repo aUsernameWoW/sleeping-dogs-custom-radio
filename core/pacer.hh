@@ -1,7 +1,7 @@
 #pragma once
 
 // The FIFO between internet radio decoding and the live ring (netradio.hh): once kStartMs have collected
-// (kRebufferMs after an underrun) it hands over what it has, up to the live reader's preroll, at once, and the
+// (kRebufferMs after an underrun) it hands over all but kRebufferMs, up to the live reader's preroll, at once, and the
 // rest by the clock; titles wait for their audio. Pure, and not thread-safe: netradio guards it with a lock.
 // See pacer_test.
 
@@ -14,7 +14,7 @@
 
 namespace netradio
 {
-	// As much as the live reader's preroll (live::kPrerollMs), all of which then goes out at once.
+	// kStartMs - kRebufferMs go out at once: as much as a fresh live reader waits for (live::kResumeMs).
 	constexpr uint32_t kStartMs = 3'000;
 	constexpr uint32_t kRebufferMs = 1'000;
 	constexpr uint32_t kMaxBufferedMs = 15'000;

@@ -72,7 +72,7 @@ int main(int argc, char** argv)
 				inflight = true;
 				issued = now;
 			}
-			if (inflight && reader.Ready(position, 131072, now - issued)) {
+			if (inflight) {
 				reader.Fill(position, 131072, chunk.data());
 				position += 131072;
 				emulation.mLongestWait = (std::max)(emulation.mLongestWait, now - issued);
@@ -86,9 +86,9 @@ int main(int argc, char** argv)
 			}
 		}
 		const live::Reader::Stats& s = reader.GetStats();
-		std::printf("Wwise emulation: %u reads, first audio after %lu ms, longest wait %lu ms, %llu ms silence padded, %.0f ms starved, lowest buffer %.0f ms\n",
+		std::printf("Wwise emulation: %u reads, first read after %lu ms, longest wait %lu ms, %llu ms silence padded, %u underruns, %u jumps, %.0f ms starved, lowest buffer %.0f ms\n",
 			emulation.mReads, emulation.mFirstAudioAt, emulation.mLongestWait, s.mSilenceBytes * 1000 / (live::kRate * live::kBlockAlign),
-			emulation.mStarvedMs, emulation.mLowestBufferMs);
+			s.mUnderruns, s.mJumps, emulation.mStarvedMs, emulation.mLowestBufferMs);
 	});
 
 	const DWORD start = GetTickCount();

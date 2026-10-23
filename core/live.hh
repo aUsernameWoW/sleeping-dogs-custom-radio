@@ -6,13 +6,16 @@
 // served from the ring instead of the file position (Reader).
 //
 // How the game reads it (in game, 2026-10-23): 128 KB (682 ms) per read; at open the header, then a seek to the
-// game's track timer, then a burst of 4 reads (~2.7 s), then one read every ~0.69 s. Wwise's buffer is the
-// cushion against a late source, and it only fills if that first burst finds audio: so a stream starts
-// kPrerollMs (more than the burst) behind the newest audio, and its reads wait up to kStartWaitMs for that
-// much to be there. Without it (internet radio, 2026-10-23) the burst found an empty ring, the stream ran at
-// the live edge with every read waiting a whole chunk's 0.68 s, and playback stuttered. After the start, a read
-// the source can't satisfy within kMaxWaitMs completes with what there is plus silence rather than starving
-// the voice; a reader more than kMaxLagMs behind (after a stall) jumps back to the preroll distance.
+// game's track timer, then a burst of 4 reads (~2.7 s), then one read every ~0.69 s. Reads complete at once,
+// never waiting for the source: a pending transfer holds one of the Wwise device's concurrent I/O slots, which
+// every game stream and bank load on that device shares (CAkIOThread::IncrementIOCount closes the I/O gate at
+// uMaxConcurrentIO). Reads that waited for audio (up to 10 s at the start, ~0.4 s each in steady state at the
+// live edge, 1.5 s each while the network was down) made the game hitch and, once they piled up, kept the next
+// station's bank from loading, so the station couldn't be switched (2026-10-23). So the cushion is in the
+// ring instead: a stream starts kPrerollMs behind the newest audio (more than Wwise's burst plus a read), a
+// read the ring can't fill gets what there is plus silence and the reader rebuffers until kResumeMs are
+// there, then goes on where it stopped; a reader more than kMaxLagMs behind jumps back to the preroll distance.
+// A source still starting reads as silence until kResumeMs have arrived.
 
 #include <Windows.h>
 
@@ -35,12 +38,10 @@ namespace live
 	constexpr uint64_t kFrames = uint64_t{ kRate } * 3600;
 
 	constexpr uint32_t kRingMs = 10'000;
-	constexpr uint32_t kPrerollMs = 3'000;
-	// A source just started (internet radio: connecting, then its own buffer) gets this long to deliver the
-	// preroll before the stream starts with silence instead.
-	constexpr uint32_t kStartWaitMs = 10'000;
-	constexpr uint32_t kMaxWaitMs = 1'500;
-	constexpr uint32_t kMaxLagMs = 6'000;
+	// Wwise's opening burst takes ~3.4 s of it at once, which leaves ~1.6 s for the steady reads (one needs 0.68).
+	constexpr uint32_t kPrerollMs = 5'000;
+	constexpr uint32_t kResumeMs = 2'000;
+	constexpr uint32_t kMaxLagMs = 8'000;
 
 	constexpr uint64_t MsToBytes(uint64_t ms) { return ms * kRate / 1000 * kBlockAlign; }
 
@@ -56,14 +57,11 @@ namespace live
 		bool Copy(uint64_t from, uint8_t* out, size_t size) const;
 		// Back to empty, position 0 (a new source).
 		void Reset();
-		// Called after every push (the stream completion thread's wake-up).
-		void SetListener(std::function<void()> listener);
 
 	private:
 		mutable std::mutex mLock;
 		std::vector<uint8_t> mData;
 		uint64_t mWritten = 0;
-		std::function<void()> mListener;
 	};
 
 	// One open live track file: maps Wwise's reads to the ring. Used from one thread (stream completion).
@@ -72,10 +70,8 @@ namespace live
 	public:
 		Reader(const Ring& ring, const uint8_t* header);
 
-		// Whether a read of `size` bytes at file `position` can complete now: its audio is in the ring, or it
-		// waited `waitedMs` >= kMaxWaitMs. Reads must be asked and filled in the order Wwise issued them.
-		bool Ready(uint64_t position, uint32_t size, DWORD waitedMs);
-		// Fills `out` for a read that is Ready (header bytes, ring audio, silence for what isn't there).
+		// Fills `out` for a read of `size` bytes at file `position` (header bytes, ring audio, silence for what
+		// isn't there), never waiting. Reads must be filled in the order Wwise issued them.
 		void Fill(uint64_t position, uint32_t size, uint8_t* out);
 
 		struct Stats
@@ -84,6 +80,7 @@ namespace live
 			uint64_t mSilenceBytes = 0; // padded because the source was late
 			uint32_t mJumps = 0;        // fell behind (or out of the ring) and skipped ahead
 			uint32_t mSeeks = 0;        // reads not following the previous one (the game's resume seek)
+			uint32_t mUnderruns = 0;    // reads the ring couldn't fill: rebuffered
 		};
 		const Stats& GetStats() const { return mStats; }
 		// How far the reader is behind the newest audio, in bytes.
@@ -96,6 +93,7 @@ namespace live
 		const Ring& mRing;
 		uint8_t mHeader[kHeaderSize];
 		bool mStarted = false;
+		bool mPlaying = false; // false while rebuffering
 		uint64_t mCursor = 0;
 		uint64_t mExpected = 0; // file position the next read would have if Wwise reads straight on
 		Stats mStats;

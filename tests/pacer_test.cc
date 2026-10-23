@@ -49,7 +49,8 @@ namespace
 		pacer.Mark("Second");       // from 2900 ms of audio on
 		AddMs(pacer, 3000);         // 5900 ms buffered
 
-		Check(pacer.Take(2000, out) == live::kPrerollMs * perMs && pacer.Playing(), "hands over the live preroll at once");
+		Check(pacer.Take(2000, out) == (5900 - netradio::kRebufferMs) * perMs && pacer.Playing(), "hands over all but kRebufferMs at once");
+		static_assert(5900 - netradio::kRebufferMs <= live::kPrerollMs, "up to the live preroll");
 		Check(pacer.TakeTitle(title) && title == "Second", "the title comes with its audio (it was in the head start)");
 		Check(!pacer.TakeTitle(title), "a title is reported once");
 		out.clear();
@@ -65,7 +66,7 @@ namespace
 		out.clear();
 		Check(pacer.Take(11'000, out) == 0, "rebuffering waits for kRebufferMs");
 		AddMs(pacer, 20);
-		Check(pacer.Take(11'100, out) == (netradio::kRebufferMs + 10) * perMs && pacer.Playing(), "then hands over what it has");
+		Check(pacer.Take(11'100, out) == 10 * perMs && pacer.Playing(), "then hands over what it has beyond kRebufferMs");
 		Check(pacer.TakeTitle(title) && title == "Third", "and the title with it");
 		AddMs(pacer, 500);
 		out.clear();

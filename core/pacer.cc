@@ -50,8 +50,11 @@ namespace netradio
 			mStartMs = nowMs;
 			mSentFrames = 0;
 			// What's buffered goes out at once, up to the live reader's preroll: a stream opening now then finds
-			// its preroll right away instead of waiting for it in real time.
-			mHeadFrames = (std::min)(static_cast<uint64_t>(mFifo.size() / 2), uint64_t{ live::kPrerollMs } * live::kRate / 1000);
+			// its preroll right away instead of waiting for it in real time. kRebufferMs stay as this side's
+			// cushion against the network, or the first late packet would be an underrun.
+			const uint64_t keep = uint64_t{ kRebufferMs } * live::kRate / 1000;
+			const uint64_t frames = mFifo.size() / 2;
+			mHeadFrames = (std::min)(frames > keep ? frames - keep : 0, uint64_t{ live::kPrerollMs } * live::kRate / 1000);
 		}
 		const uint64_t dueFrames = mHeadFrames + (nowMs - mStartMs) * live::kRate / 1000;
 		if (dueFrames <= mSentFrames) {

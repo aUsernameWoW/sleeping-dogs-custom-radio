@@ -20,7 +20,8 @@ M4A in game, Chinese titles on the HUD, Linux (Proton) and macOS (CrossOver/Wine
 
 Since 2026-10-23 also a **live station** (`[Live]`, off by default) that plays a real-time source: a test
 signal or **internet radio** (MP3 / Ogg Vorbis over WinHTTP). Both play in game on Windows; the fix for the
-stutter internet radio showed (a 3 s cushion at the start) isn't confirmed in game yet. See "Live station" and
+game hitches and the station that wouldn't switch (reads that never wait, 2026-10-23) isn't confirmed in game
+yet. See "Live station" and
 "Internet radio" below. Experimental capture of another app's audio is on branch `gpl/external-audio` (GPL,
 not to be merged without the user's licensing decision; its CLAUDE.md has the details).
 
@@ -98,7 +99,7 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   5 game packs; opaque pictures, fitting; includes stb by relative path since tests get no include paths),
   `library_test` (the .asi with music already in its folder: a Chinese subfolder and file name, WAV INFO tags
   in GBK and UTF-8, mono, a broken `.m4a` that the Media Foundation fallback must reject, a `.txt` to ignore;
-  written for the Wine run below), `live_test` (the live ring and reader: preroll start, waits, padding,
+  written for the Wine run below), `live_test` (the live ring and reader: preroll start, padding, rebuffering,
   jumps, frame phase), `icy_test` and `pacer_test` (internet radio's pure parts, see there), and
   `netradio_manual` (compiled only: a real station with Wwise's reads emulated; needs the network).
 - `.github/workflows/build.yml` — CI like SDIMEFix's (documented in `mods\SDIMEFix\CLAUDE.md`), including
@@ -168,14 +169,16 @@ fed by a test signal (`Source = test`: a 0.15 s beep each second, 880 Hz on ever
   /`AddStation` in hooks.cc; `streamio::Register` now takes one call per station (banks by ID).
 - `core/live.*`: the source pushes 48 kHz 16-bit stereo into a 10 s `Ring` (absolute byte positions). A live
   track's WAV header declares an hour of data (`live::kFrames`, see why there). Wwise's reads
-  ignore the file position and take the next ring bytes (`Reader`), starting 3 s behind the newest audio
-  (`kPrerollMs`, more than Wwise's opening burst); the first audio read waits up to 10 s (`kStartWaitMs`) for
-  that much to be in the ring. Later, a read the ring can't satisfy waits up to 1.5 s (`kMaxWaitMs`), then
-  completes with silence for the missing part (the cursor moves only over real audio); a reader more than
-  6 s behind jumps back to the preroll distance; after a seek (the game's resume
-  `SeekMS`) the cursor takes the position's frame phase. Live reads complete in issue order per file (the
-  completer fills them under its lock). Each open logs its first 60 requests/reads, then every 100th; close
-  logs reads, padded silence, jumps and seeks.
+  ignore the file position and take the next ring bytes (`Reader`), starting 5 s behind the newest audio
+  (`kPrerollMs`: Wwise's opening burst takes ~3.4 s, leaving ~1.6 s for the steady reads). **Reads never wait**
+  (see "Hitches and a stuck station" below): one the ring can't fill gets what there is plus silence, and the
+  reader rebuffers (silence) until 2 s (`kResumeMs`) are there, then goes on where it stopped (the cursor
+  moves only over real audio); a fresh source reads as silence until 2 s have arrived, then starts at its
+  oldest audio; a reader more than 8 s behind jumps back to the preroll distance; after a seek (the game's
+  resume `SeekMS`) the cursor takes the position's frame phase. Live reads complete in issue order per file
+  (the completer fills them under its lock, logs after unlocking). Each open logs its first 20
+  requests/reads, every 100th, and every underrun or jump; close logs reads, padded silence, underruns,
+  jumps and seeks.
 - The source runs while a live file is open and stops 10 s after the last close (station switches and track
   starts reopen it); `Ring::Reset` on start. `live_test` covers ring and reader.
 - **In game (2026-10-23, Windows)**: the first build declared ~4 GB (~6.2 h) of data and played a looping,
@@ -189,12 +192,27 @@ fed by a test signal (`Source = test`: a 0.15 s beep each second, 880 Hz on ever
   had nothing for Wwise's burst anyway, so the stream ran at the live edge: every steady-state read waited a
   whole chunk (671-704 ms), Wwise had ~no cushion, and playback stuttered (no pacer underruns: the network was
   fine). The test signal had hidden it: its first reads padded ~2.7 s of silence, which became the cushion.
-  Fixed by the 3 s preroll the first read waits for, plus the pacer handing its first 3 s over at once.
+  First fixed by a 3 s preroll the first read waited for, plus the pacer handing its first 3 s over at once;
+  that didn't hold (next item).
+- **Hitches and a stuck station (2026-10-23)**: the user reported the game hitching now and then and, after
+  listening a while, the station not switching. The log showed the 3 s preroll eaten by the burst (reads 2-4
+  at once), then every steady read waiting ~0.4 s at the live edge again. Waiting itself was the bug: the game's
+  streaming device is a `CAkDeviceDeferredLinedUp` shared by every game stream and bank load (ours included),
+  and each pending transfer holds one of its `uMaxConcurrentIO` slots (`CAkIOThread::IncrementIOCount` resets
+  the max-IO gate event, which `IOSchedThread` waits on before scheduling anything). So a read waiting 0.4 s
+  (10 s at a start, 1.5 s each while the network is down, with Wwise queueing more) delays the game's own
+  streams, and enough of them keep the next station's bank from loading: `Radio::Update` waits for it.
+  (The cause of the stuck switch is inferred from this; the original log was overwritten.) Now reads complete
+  at once and the cushion lives in the ring. The pacer keeps 1 s (`kRebufferMs`) of its own when it starts, so
+  the first late packet isn't an underrun. A stopped source's feeder no longer pushes while it winds down
+  (it could mix into the next source's ring after a quick switch back). `netradio_manual` with Radio
+  Paradise, 40 s: no wait, no underrun, no jump, lowest Wwise buffer 2.7 s; ~4 s of silence at a cold start
+  (connecting + 2 s), none when the source is already running.
 
 ## Internet radio (2026-10-23, `[Live] Source = radio`, `Url = ...`; plays in game on Windows)
 
-In game (2026-10-23, Radio Paradise MP3): plays and switches fine, but stuttered now and then; the cause and the
-fix (not yet confirmed in game) are under "Live station". README's FAQ explains the ini for players.
+In game (2026-10-23, Radio Paradise MP3): plays and switches fine, but stuttered now and then, then made the
+game hitch and the station stick; the causes and the fix (not yet confirmed in game) are under "Live station". README's FAQ explains the ini for players.
 
 The live station's first real source. All own code (no GPL), works under Wine as far as WinHTTP does.
 
@@ -210,8 +228,8 @@ The live station's first real source. All own code (no GPL), works under Wine as
   Icecast puts the next song's comments: the title for Ogg). A decoder that hasn't produced a sample after
   256 KB refuses the stream. `Resampler`: linear, to 48 kHz. Its own `ToStereo` (no decoder.cc in tests).
 - `core/pacer.*` (pure, `pacer_test`, also the resampler and junk refusal): starts after 3 s buffered (1 s
-  after an underrun) and hands over what it has, up to the live preroll, at once (servers burst on connect, so
-  the reader's 3 s preroll is there ~1 s after connecting), then by the clock; titles are marked at the audio
+  after an underrun) and hands over all but 1 s, up to the live preroll, at once (servers burst on connect, so
+  a fresh reader's 2 s are there ~1 s after connecting), then by the clock; titles are marked at the audio
   position where they arrived and released when that audio goes out (up to 15 s queued, so ICY titles would
   otherwise be early).
 - The HUD's song line is fixed in Radios.xml at startup, so the live track's title is the URL's host; titles go
@@ -294,7 +312,7 @@ The live station's first real source. All own code (no GPL), works under Wine as
    Wine in CI), Chinese titles on the HUD (font
    glyphs), long-track seek behavior (`SeekMS` on resume reads far ahead: decode-to-position latency).
 4. Maybe: several stations (one per subfolder), shuffle/order option, M3U playlists.
-5. Live station / internet radio (2026-10-23, see their sections): confirm the stutter fix in game; then the
+5. Live station / internet radio (2026-10-23, see their sections): confirm the never-waiting reads in game; then the
    song on the HUD (hook the widget's current-song lookup: titles are fixed in Radios.xml today), AAC streams
    (many stations; needs a decoder: Media Foundation can't take a byte stream as simply, a bundled one would
    need a license check), several stations or a station list, SHOUTcast 1's `ICY 200 OK` (raw socket). A

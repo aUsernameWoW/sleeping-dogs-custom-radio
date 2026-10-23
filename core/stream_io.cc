@@ -75,42 +75,41 @@ namespace streamio
 		void Completer()
 		{
 			std::vector<Request> ready;
+			std::vector<std::string> lines;
 			for (;;) {
 				{
 					std::unique_lock lock(gLock);
 					gWake.wait(lock, [] { return !gPending.empty(); });
-					// A live file's reads take consecutive audio from the ring, so they complete in the order
-					// Wwise issued them: once one has to wait, the later ones of that file wait too.
-					std::vector<const File*> blocked;
 					for (auto it = gPending.begin(); it != gPending.end();) {
 						File& f = *it->mFile;
 						if (f.mLive) {
+							// Never waits for the source (see live.hh: a pending read holds one of the device's I/O
+							// slots). Consecutive audio from the ring, so filled in the order Wwise issued them.
 							const ak::AsyncIOTransferInfo& info = *it->mInfo;
 							const DWORD waited = GetTickCount() - it->mQueuedAt;
-							if (std::find(blocked.begin(), blocked.end(), &f) == blocked.end()
-								&& f.mLive->Ready(info.mFilePosition, info.mRequestedSize, waited)) {
-								const uint64_t silenceBefore = f.mLive->GetStats().mSilenceBytes;
-								f.mLive->Fill(info.mFilePosition, info.mRequestedSize, static_cast<uint8_t*>(info.mBuffer));
-								it->mFilled = true;
-								// How Wwise reads an endless stream (sizes, pacing) isn't known yet: log the first
-								// reads of each open, then every 100th.
-								const uint32_t n = f.mLive->GetStats().mReads;
-								if (n <= 60 || n % 100 == 0) {
-									const DWORD sinceOpen = GetTickCount() - f.mOpenedAt;
-									LOG("live: read %u at %lu ms: position %llu, %u bytes (%llu ms), waited %lu ms, %llu ms silence, now %llu ms behind live",
-										n, sinceOpen, info.mFilePosition, info.mRequestedSize,
-										static_cast<uint64_t>(info.mRequestedSize) * 1000 / (live::kRate * live::kBlockAlign), waited,
-										(f.mLive->GetStats().mSilenceBytes - silenceBefore) * 1000 / (live::kRate * live::kBlockAlign),
-										f.mLive->Lead() * 1000 / (live::kRate * live::kBlockAlign));
-								}
-								if (waited > f.mLongestWait) f.mLongestWait = waited;
-								ready.push_back(std::move(*it));
-								it = gPending.erase(it);
+							const live::Reader::Stats before = f.mLive->GetStats();
+							f.mLive->Fill(info.mFilePosition, info.mRequestedSize, static_cast<uint8_t*>(info.mBuffer));
+							it->mFilled = true;
+							// The first reads of each open, every 100th, underruns and jumps; logged after the lock
+							// is released, since Wwise's I/O thread takes it in Read.
+							const live::Reader::Stats& after = f.mLive->GetStats();
+							const uint32_t n = after.mReads;
+							const bool underrun = after.mUnderruns != before.mUnderruns;
+							const bool jump = after.mJumps != before.mJumps;
+							if (n <= 20 || n % 100 == 0 || underrun || jump) {
+								char line[320];
+								std::snprintf(line, sizeof(line),
+									"live: read %u at %lu ms: position %llu, %u bytes (%llu ms), waited %lu ms, %llu ms silence, now %llu ms behind live%s%s",
+									n, GetTickCount() - f.mOpenedAt, info.mFilePosition, info.mRequestedSize,
+									static_cast<uint64_t>(info.mRequestedSize) * 1000 / (live::kRate * live::kBlockAlign), waited,
+									(after.mSilenceBytes - before.mSilenceBytes) * 1000 / (live::kRate * live::kBlockAlign),
+									f.mLive->Lead() * 1000 / (live::kRate * live::kBlockAlign),
+									underrun ? " (source late: rebuffering)" : "", jump ? " (jumped ahead)" : "");
+								lines.emplace_back(line);
 							}
-							else {
-								blocked.push_back(&f);
-								++it;
-							}
+							if (waited > f.mLongestWait) f.mLongestWait = waited;
+							ready.push_back(std::move(*it));
+							it = gPending.erase(it);
 							continue;
 						}
 						const uint64_t end = it->mInfo->mFilePosition + it->mInfo->mRequestedSize;
@@ -134,6 +133,10 @@ namespace streamio
 					Complete(r, ak::kSuccess);
 				}
 				ready.clear();
+				for (const std::string& line : lines) {
+					LOG("%s", line.c_str());
+				}
+				lines.clear();
 			}
 		}
 
@@ -242,7 +245,6 @@ namespace streamio
 					uint8_t header[kWavHeaderSize];
 					WriteWavHeader(header, live::kRate, live::kFrames);
 					file->mLive = std::make_unique<live::Reader>(live::Stream(), header);
-					live::Stream().SetListener([] { gWake.notify_one(); });
 					live::Acquire();
 				}
 				else {
@@ -298,7 +300,7 @@ namespace streamio
 			info.mRequestedSize = info.mFilePosition < f.mSize ? static_cast<uint32_t>(f.mSize - info.mFilePosition) : 0;
 		}
 		++f.mReads;
-		if (f.mLive && (f.mReads <= 60 || f.mReads % 100 == 0)) {
+		if (f.mLive && (f.mReads <= 20 || f.mReads % 100 == 0)) {
 			LOG("live: request %u at %lu ms: position %llu, %u bytes", f.mReads, GetTickCount() - f.mOpenedAt, info.mFilePosition, info.mRequestedSize);
 		}
 		gPending.push_back({ it->second, &info, GetTickCount() });
@@ -336,8 +338,8 @@ namespace streamio
 		if (file->mLive) {
 			live::Release();
 			const live::Reader::Stats& s = file->mLive->GetStats();
-			LOG("stream: live track %08X: %u reads, %llu ms of silence padded, %u jumps ahead, %u seeks", file->mId, s.mReads,
-				s.mSilenceBytes * 1000 / (live::kRate * live::kBlockAlign), s.mJumps, s.mSeeks);
+			LOG("stream: live track %08X: %u reads, %llu ms of silence padded, %u underruns, %u jumps ahead, %u seeks", file->mId,
+				s.mReads, s.mSilenceBytes * 1000 / (live::kRate * live::kBlockAlign), s.mUnderruns, s.mJumps, s.mSeeks);
 		}
 		LOG("stream: close %08X after %lu ms, %u reads, longest wait %lu ms%s", file->mId, GetTickCount() - file->mOpenedAt, file->mReads,
 			file->mLongestWait, orphans.empty() ? "" : " (had pending reads)");
