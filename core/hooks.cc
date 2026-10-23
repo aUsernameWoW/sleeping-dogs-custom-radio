@@ -7,6 +7,7 @@
 #include <cstring>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "ak.hh"
@@ -61,7 +62,21 @@ namespace hooks
 		constexpr size_t kCurrentSongCallDisp = 64;
 		constexpr char kSigWidgetUpdate[] = "48 89 5C 24 08 57 48 83 EC 40 83 39 02 0F 29 74 24 30";
 		constexpr size_t kStationIdOffset = 0x24; // RadioStation::m_id
+		constexpr size_t kStationNameOffset = 0x60; // RadioStation::m_name, char[64]
 		constexpr size_t kWidgetChangedOffset = 4; // UIHKRadioStationWidget::mChanged
+
+		// Diagnostics for station switches (a report of the live station not switching away, 2026-10-23):
+		// UFG::Radio::NextStation / PrevStation(bool displayStationId) do nothing unless flag 0x01 (on) is set and
+		// 0x20 / 0x40 (a switch waiting for its HUD update) are clear; Radio::Update clears those only once the new
+		// station's bank reports loaded, the player is in a vehicle and 0.3 s have passed. UFG::Radio::SetStation
+		// (index) is the vehicle's or a script's choice. Flags are the byte at +0x158; m_curStation at +0x148.
+		constexpr char kSigNextStation[] =
+			"48 89 74 24 10 57 48 83 EC 20 80 3D ? ? ? ? 00 0F B6 F2 48 8B F9 0F 84 ? ? ? ? 0F B6 81 58 01 00 00 A8 01 0F 84 ? ? ? ? A8 20";
+		constexpr char kSigPrevStation[] =
+			"48 89 74 24 10 57 48 83 EC 20 80 3D ? ? ? ? 00 0F B6 F2 48 8B F9 0F 84 ? ? ? ? 0F B6 81 58 01 00 00 A8 01 0F 84 ? ? ? ? A8 40";
+		constexpr char kSigSetStation[] = "48 89 5C 24 08 57 48 83 EC 20 4C 8B 81 48 01 00 00";
+		constexpr size_t kRadioCurStationOffset = 0x148;
+		constexpr size_t kRadioFlagsOffset = 0x158;
 		constexpr size_t kWidgetVisibleOffset = 5; // UIHKRadioStationWidget::mVisible
 
 		using ExtractFromCacheFn = char*(__fastcall*)(const char* filename);
@@ -73,6 +88,8 @@ namespace hooks
 		using CreateAndPlayEventFn = bool(__fastcall*)(void* entity, uint32_t eventId, void* controller, const void* params, uint32_t fadeMs, void* externalSources);
 		using CurrentSongFn = const char*(__fastcall*)(void* radio);
 		using WidgetUpdateFn = void(__fastcall*)(void* widget, void* screen, float elapsed);
+		using StepStationFn = void(__fastcall*)(void* radio, bool displayStationId);
+		using SetStationFn = void(__fastcall*)(void* radio, uint32_t index);
 
 		ExtractFromCacheFn gExtractFromCache = nullptr;
 		QMallocFn gQMalloc = nullptr;
@@ -85,6 +102,10 @@ namespace hooks
 		WidgetUpdateFn gWidgetUpdate = nullptr;
 		size_t gCurStationOffset = 0; // RadioFullyControlled::m_curStation, from the getter's first instruction
 		std::atomic<uint32_t> gLiveStationId{ 0 }; // 0: no live station
+		StepStationFn gNextStation = nullptr;
+		StepStationFn gPrevStation = nullptr;
+		SetStationFn gSetStation = nullptr;
+		std::unordered_map<uint32_t, uint32_t> gStationBanks; // every station's bank ID -> station ID, for the log
 
 		// The streaming device every file of SFX.pck is opened on; learnt from the first successful open
 		// (Init.bnk loads long before any station), since our files must be read by the same device.
@@ -148,6 +169,10 @@ namespace hooks
 			gPatchedXml = original;
 			uint32_t next = radios::MaxStationId(original) + 1;
 			bool any = false;
+			// Before any bank can load; one past ours is harmless.
+			for (uint32_t id = 1; id <= next + 1; ++id) {
+				gStationBanks[bank::BankId(id)] = id;
+			}
 
 			// Radios.xml is read during the game's startup; the scan runs from DllMain, normally done by then.
 			const std::vector<library::Track>* tracks = library::Wait(30'000);
@@ -280,10 +305,62 @@ namespace hooks
 
 		void __fastcall BankLoadCallbackHook(uint32_t bankId, const void* inMemory, ak::AKRESULT result, int32_t poolId, void* cookie)
 		{
-			if (gStationReady && gBankIds.count(bankId)) {
-				LOG("bank: %08X loaded with result %d (1 = success) in pool %d", bankId, result, poolId);
+			// Every station's bank, the game's too (the switch diagnostics need to see them).
+			if (gStationReady) {
+				if (const auto it = gStationBanks.find(bankId); it != gStationBanks.end()) {
+					LOG("bank: %08X (station %u) callback with result %d (1 = success) in pool %d", bankId, it->second, result, poolId);
+				}
 			}
 			gBankLoadCallback(bankId, inMemory, result, poolId, cookie);
+		}
+
+		std::string DescribeStation(const void* radio)
+		{
+			const auto* station = *reinterpret_cast<const uint8_t* const*>(static_cast<const uint8_t*>(radio) + kRadioCurStationOffset);
+			if (!station) {
+				return "(none)";
+			}
+			char name[64];
+			std::memcpy(name, station + kStationNameOffset, sizeof(name));
+			name[63] = '\0';
+			return std::to_string(*reinterpret_cast<const uint32_t*>(station + kStationIdOffset)) + " \"" + name + "\"";
+		}
+
+		uint8_t RadioFlags(const void* radio)
+		{
+			return static_cast<const uint8_t*>(radio)[kRadioFlagsOffset];
+		}
+
+		void LogStep(const char* what, void* radio, StepStationFn original, bool displayStationId)
+		{
+			const std::string from = DescribeStation(radio);
+			const uint8_t flags = RadioFlags(radio);
+			original(radio, displayStationId);
+			const std::string to = DescribeStation(radio);
+			if (to == from) {
+				LOG("radio: %s station ignored on %s (flags 0x%02X: on %d, waiting for the HUD %d)", what, from.c_str(), flags, flags & 1,
+					(flags & 0x60) != 0);
+			}
+			else {
+				LOG("radio: %s station %s -> %s (flags 0x%02X -> 0x%02X)", what, from.c_str(), to.c_str(), flags, RadioFlags(radio));
+			}
+		}
+
+		void __fastcall NextStationHook(void* radio, bool displayStationId)
+		{
+			LogStep("next", radio, gNextStation, displayStationId);
+		}
+
+		void __fastcall PrevStationHook(void* radio, bool displayStationId)
+		{
+			LogStep("previous", radio, gPrevStation, displayStationId);
+		}
+
+		void __fastcall SetStationHook(void* radio, uint32_t index)
+		{
+			const std::string from = DescribeStation(radio);
+			gSetStation(radio, index);
+			LOG("radio: set station %u: %s -> %s (flags 0x%02X)", index, from.c_str(), DescribeStation(radio).c_str(), RadioFlags(radio));
 		}
 
 		bool __fastcall CreateAndPlayEventHook(void* entity, uint32_t eventId, void* controller, const void* params, uint32_t fadeMs, void* externalSources)
@@ -411,8 +488,13 @@ namespace hooks
 
 		uint8_t* bankLoaded = scan::FindUnique("UFG::SoundBankManager::BankLoadCallback", kSigBankLoadCallback);
 		uint8_t* playEvent = scan::FindUnique("UFG::AudioEntity::CreateAndPlayEvent", kSigCreateAndPlayEvent);
+		uint8_t* nextStation = scan::FindUnique("UFG::Radio::NextStation", kSigNextStation);
+		uint8_t* prevStation = scan::FindUnique("UFG::Radio::PrevStation", kSigPrevStation);
+		uint8_t* setStation = scan::FindUnique("UFG::Radio::SetStation", kSigSetStation);
 		const bool diagnostics = Hook("BankLoadCallback", bankLoaded, &BankLoadCallbackHook, gBankLoadCallback) &
-			Hook("CreateAndPlayEvent", playEvent, &CreateAndPlayEventHook, gCreateAndPlayEvent);
+			Hook("CreateAndPlayEvent", playEvent, &CreateAndPlayEventHook, gCreateAndPlayEvent) &
+			Hook("NextStation", nextStation, &NextStationHook, gNextStation) & Hook("PrevStation", prevStation, &PrevStationHook, gPrevStation) &
+			Hook("SetStation", setStation, &SetStationHook, gSetStation);
 		LOG("hook: station hooks ready%s", diagnostics ? "" : " (diagnostic hooks missing)");
 		if (gConfig.mLive && !InstallSongTitle()) {
 			LOG("hook: the live station's song title can't be shown on the HUD (it shows the fixed title)");
