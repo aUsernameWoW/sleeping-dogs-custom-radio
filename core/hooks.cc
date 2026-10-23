@@ -75,6 +75,17 @@ namespace hooks
 		constexpr char kSigPrevStation[] =
 			"48 89 74 24 10 57 48 83 EC 20 80 3D ? ? ? ? 00 0F B6 F2 48 8B F9 0F 84 ? ? ? ? 0F B6 81 58 01 00 00 A8 01 0F 84 ? ? ? ? A8 40";
 		constexpr char kSigSetStation[] = "48 89 5C 24 08 57 48 83 EC 20 4C 8B 81 48 01 00 00";
+		// UFG::UIHKRadioStationWidget::LoadTextures(oldIndex, newIndex), from ChangeStation(id) (index = id - 1).
+		// When the new station's texture pack is the one already loaded it only activates the widget if newIndex
+		// is already mCurrentStation, and otherwise does nothing, leaving mCurrentStation behind. The game's
+		// stations each have their own pack, so it never mattered; ours share one (both stations, our logo or a
+		// borrowed one). After a switch between them the widget never activated again, and a press on a hidden
+		// widget only clicks and calls ChangeStation to show it: the radio couldn't switch until the player
+		// re-entered the car (2026-10-23). The hook sets mCurrentStation first unless a pack load is in flight
+		// (its callback matches its index against mCurrentStation); with a different pack the game sets it anyway.
+		constexpr char kSigLoadTextures[] = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 30 49 63 F0";
+		constexpr size_t kWidgetWaitingForTextureOffset = 7; // UIHKRadioStationWidget::mWaitingForTexture
+		constexpr size_t kWidgetCurrentStationOffset = 8;    // UIHKRadioStationWidget::mCurrentStation
 		constexpr size_t kRadioCurStationOffset = 0x148;
 		constexpr size_t kRadioFlagsOffset = 0x158;
 		constexpr size_t kWidgetVisibleOffset = 5; // UIHKRadioStationWidget::mVisible
@@ -90,6 +101,7 @@ namespace hooks
 		using WidgetUpdateFn = void(__fastcall*)(void* widget, void* screen, float elapsed);
 		using StepStationFn = void(__fastcall*)(void* radio, bool displayStationId);
 		using SetStationFn = void(__fastcall*)(void* radio, uint32_t index);
+		using LoadTexturesFn = void(__fastcall*)(void* widget, int oldIndex, int newIndex);
 
 		ExtractFromCacheFn gExtractFromCache = nullptr;
 		QMallocFn gQMalloc = nullptr;
@@ -105,6 +117,7 @@ namespace hooks
 		StepStationFn gNextStation = nullptr;
 		StepStationFn gPrevStation = nullptr;
 		SetStationFn gSetStation = nullptr;
+		LoadTexturesFn gLoadTextures = nullptr;
 		std::unordered_map<uint32_t, uint32_t> gStationBanks; // every station's bank ID -> station ID, for the log
 
 		// The streaming device every file of SFX.pck is opened on; learnt from the first successful open
@@ -356,6 +369,18 @@ namespace hooks
 			LogStep("previous", radio, gPrevStation, displayStationId);
 		}
 
+		void __fastcall LoadTexturesHook(void* widget, int oldIndex, int newIndex)
+		{
+			auto* bytes = static_cast<uint8_t*>(widget);
+			uint32_t current;
+			std::memcpy(&current, bytes + kWidgetCurrentStationOffset, sizeof(current));
+			if (!bytes[kWidgetWaitingForTextureOffset] && current != static_cast<uint32_t>(newIndex)) {
+				const uint32_t index = static_cast<uint32_t>(newIndex);
+				std::memcpy(bytes + kWidgetCurrentStationOffset, &index, sizeof(index));
+			}
+			gLoadTextures(widget, oldIndex, newIndex);
+		}
+
 		void __fastcall SetStationHook(void* radio, uint32_t index)
 		{
 			const std::string from = DescribeStation(radio);
@@ -484,6 +509,12 @@ namespace hooks
 			// that did install only pass through while no station exists.
 			LOG("hook: install failed, no station");
 			return;
+		}
+
+		// Needed as soon as two of our stations share a texture pack (the music and the live one).
+		uint8_t* loadTextures = scan::FindUnique("UFG::UIHKRadioStationWidget::LoadTextures", kSigLoadTextures);
+		if (!Hook("UIHKRadioStationWidget::LoadTextures", loadTextures, &LoadTexturesHook, gLoadTextures)) {
+			LOG("hook: switching between SDRadio's stations may leave the radio stuck until the car is re-entered");
 		}
 
 		uint8_t* bankLoaded = scan::FindUnique("UFG::SoundBankManager::BankLoadCallback", kSigBankLoadCallback);
