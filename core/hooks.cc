@@ -51,6 +51,19 @@ namespace hooks
 		constexpr char kSigCreateAndPlayEvent[] =
 			"40 53 48 83 EC 30 80 B9 28 01 00 00 00 49 8B D8 74 24 48 8B 44 24 68 48 89 44 24 20 E8 ? ? ? ? 84 C0 74 11 8B 54 24 60 48 8B CB";
 
+		// The live station's song title on the HUD. UFG::UIHKRadioStationWidget::Flash_SetSongTitle(UIScreen*)
+		// shows LocalizeText(RadioFullyControlled::GetCurrentlyPlayingSong(sm_playerRadio)), the current track's
+		// name from Radios.xml; its first call to it (rel32 at kCurrentSongCallDisp) leads to the getter, which
+		// starts `mov rax, [rcx+m_curStation]` (the offset is read from there). UIHKRadioStationWidget::Update
+		// (widget, UIScreen*, elapsed) runs every frame and refreshes the texts while `mChanged` is set.
+		constexpr char kSigSetSongTitle[] =
+			"48 8B C4 57 48 81 EC 90 00 00 00 48 C7 40 98 FE FF FF FF 48 89 58 08 48 89 70 10 48 8B 42 60 48 8B 98 40 01 00 00 48 85 DB 0F 84 ? ? ? ? 48 8B 0D ? ? ? ? 48 85 C9 0F 84 ? ? ? ? E8";
+		constexpr size_t kCurrentSongCallDisp = 64;
+		constexpr char kSigWidgetUpdate[] = "48 89 5C 24 08 57 48 83 EC 40 83 39 02 0F 29 74 24 30";
+		constexpr size_t kStationIdOffset = 0x24; // RadioStation::m_id
+		constexpr size_t kWidgetChangedOffset = 4; // UIHKRadioStationWidget::mChanged
+		constexpr size_t kWidgetVisibleOffset = 5; // UIHKRadioStationWidget::mVisible
+
 		using ExtractFromCacheFn = char*(__fastcall*)(const char* filename);
 		using QMallocFn = void*(__fastcall*)(uint64_t size, const char* name, uint64_t allocationParams);
 		using OpenFn = ak::AKRESULT(__fastcall*)(void* self, uint32_t fileId, uint32_t openMode, ak::FileSystemFlags* flags, bool* syncOpen, ak::FileDesc* desc);
@@ -58,6 +71,8 @@ namespace hooks
 		using CloseFn = ak::AKRESULT(__fastcall*)(void* self, ak::FileDesc* desc);
 		using BankLoadCallbackFn = void(__fastcall*)(uint32_t bankId, const void* inMemory, ak::AKRESULT result, int32_t poolId, void* cookie);
 		using CreateAndPlayEventFn = bool(__fastcall*)(void* entity, uint32_t eventId, void* controller, const void* params, uint32_t fadeMs, void* externalSources);
+		using CurrentSongFn = const char*(__fastcall*)(void* radio);
+		using WidgetUpdateFn = void(__fastcall*)(void* widget, void* screen, float elapsed);
 
 		ExtractFromCacheFn gExtractFromCache = nullptr;
 		QMallocFn gQMalloc = nullptr;
@@ -66,6 +81,10 @@ namespace hooks
 		CloseFn gClose = nullptr;
 		BankLoadCallbackFn gBankLoadCallback = nullptr;
 		CreateAndPlayEventFn gCreateAndPlayEvent = nullptr;
+		CurrentSongFn gCurrentSong = nullptr;
+		WidgetUpdateFn gWidgetUpdate = nullptr;
+		size_t gCurStationOffset = 0; // RadioFullyControlled::m_curStation, from the getter's first instruction
+		std::atomic<uint32_t> gLiveStationId{ 0 }; // 0: no live station
 
 		// The streaming device every file of SFX.pck is opened on; learnt from the first successful open
 		// (Init.bnk loads long before any station), since our files must be read by the same device.
@@ -183,6 +202,7 @@ namespace hooks
 						sources.push_back({ bank::TrackFileId(next, k), L"", live::kRate, live::kFrames, true });
 					}
 					if (AddStation(std::move(station), next, std::move(sources))) {
+						gLiveStationId = next;
 						any = true;
 					}
 				}
@@ -275,6 +295,43 @@ namespace hooks
 			return played;
 		}
 
+		// The HUD's song line: on the live station, what the source plays now (the track's fixed title, the
+		// radio's host, until the source names one). Called twice per refresh by Flash_SetSongTitle, which
+		// copies the text before anything else runs, so one buffer per thread is enough.
+		const char* __fastcall CurrentSongHook(void* radio)
+		{
+			const uint32_t live = gLiveStationId.load();
+			const auto* station = radio ? *reinterpret_cast<const uint8_t* const*>(static_cast<const uint8_t*>(radio) + gCurStationOffset) : nullptr;
+			if (live && station && *reinterpret_cast<const uint32_t*>(station + kStationIdOffset) == live) {
+				thread_local std::string title;
+				title = live::NowPlaying();
+				if (!title.empty()) {
+					static std::string logged;
+					if (title != logged) {
+						logged = title;
+						LOG("hud: song title \"%s\"", title.c_str());
+					}
+					return title.c_str();
+				}
+			}
+			return gCurrentSong(radio);
+		}
+
+		// A new title while the widget shows: have it refresh its texts, as the game does when a track starts
+		// (Radio::DoStartTrack -> HandleNewSong). It only refreshes while visible, so the title waits otherwise
+		// and shows when the widget next opens (which reads it anew anyway).
+		void __fastcall WidgetUpdateHook(void* widget, void* screen, float elapsed)
+		{
+			static uint32_t shown = 0;
+			auto* bytes = static_cast<uint8_t*>(widget);
+			const uint32_t generation = live::NowPlayingGeneration();
+			if (generation != shown && bytes[kWidgetVisibleOffset]) {
+				shown = generation;
+				bytes[kWidgetChangedOffset] = 1;
+			}
+			gWidgetUpdate(widget, screen, elapsed);
+		}
+
 		template <typename T>
 		bool Hook(const char* name, void* target, void* detour, T& original)
 		{
@@ -294,6 +351,31 @@ namespace hooks
 				return false;
 			}
 			return true;
+		}
+		// Finds and hooks the two functions behind the HUD's song line. Optional: without them the live station
+		// shows its fixed title.
+		bool InstallSongTitle()
+		{
+			uint8_t* setTitle = scan::FindUnique("UFG::UIHKRadioStationWidget::Flash_SetSongTitle", kSigSetSongTitle);
+			uint8_t* update = scan::FindUnique("UFG::UIHKRadioStationWidget::Update", kSigWidgetUpdate);
+			if (!setTitle || !update) {
+				return false;
+			}
+			auto* getter = static_cast<uint8_t*>(scan::RipTarget(setTitle + kCurrentSongCallDisp));
+			// mov rax, [rcx+disp32]; cmp qword ptr [rax+120h], 0 (RadioStation::m_currentlyPlaying)
+			static constexpr uint8_t kStart[] = { 0x48, 0x8B, 0x81 };
+			static constexpr uint8_t kCompare[] = { 0x48, 0x83, 0xB8, 0x20, 0x01, 0x00, 0x00, 0x00 };
+			if (std::memcmp(getter, kStart, sizeof(kStart)) != 0 || std::memcmp(getter + 7, kCompare, sizeof(kCompare)) != 0) {
+				LOG("hook: GetCurrentlyPlayingSong at +0x%llX doesn't look as expected", static_cast<unsigned long long>(getter - reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr))));
+				return false;
+			}
+			int32_t offset;
+			std::memcpy(&offset, getter + 3, sizeof(offset));
+			gCurStationOffset = static_cast<size_t>(offset);
+			LOG("scan: RadioFullyControlled::GetCurrentlyPlayingSong at +0x%llX (m_curStation +0x%X)",
+				static_cast<unsigned long long>(getter - reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr))), offset);
+			return Hook("GetCurrentlyPlayingSong", getter, &CurrentSongHook, gCurrentSong) &&
+				Hook("UIHKRadioStationWidget::Update", update, &WidgetUpdateHook, gWidgetUpdate);
 		}
 	}
 
@@ -332,5 +414,8 @@ namespace hooks
 		const bool diagnostics = Hook("BankLoadCallback", bankLoaded, &BankLoadCallbackHook, gBankLoadCallback) &
 			Hook("CreateAndPlayEvent", playEvent, &CreateAndPlayEventHook, gCreateAndPlayEvent);
 		LOG("hook: station hooks ready%s", diagnostics ? "" : " (diagnostic hooks missing)");
+		if (gConfig.mLive && !InstallSongTitle()) {
+			LOG("hook: the live station's song title can't be shown on the HUD (it shows the fixed title)");
+		}
 	}
 }
