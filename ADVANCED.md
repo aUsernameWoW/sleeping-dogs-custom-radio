@@ -30,7 +30,7 @@
 4. 一首结束后由游戏自己的逻辑随机挑下一首。
 5. **图标**：mod 启动时把图标做成游戏格式的 UI 贴图包，写成 `.asi` 旁边的 `SDRadio-logo.perm.bin` 和
    `.temp.bin`，电台列表里写上这个包的相对路径。游戏的归档里没有这个路径，就会从磁盘读取，和加载自带电台的图标完全一样，不需要任何 hook，也不占用别的电台的图标。见下面的[自定义图标](#自定义图标)。
-6. **直播电台（实验功能，`[Live]`）**：再加一个电台，播放实时音源。它的曲目是一首声明长 1 小时的 WAV，游戏来读时，mod 不管读的是哪个位置，都从一个 10 秒的环形缓冲里取最新的音频，开播时落后最新音频 5 秒作为缓冲余量。读取总是立即完成、从不等待音源（音源来不及时先补静音，攒够再接着播），因为挂起的读取会占住游戏音频引擎的 I/O 名额，让游戏卡顿、换不了台。音源目前有测试信号和**网络电台**：用 WinHTTP 拉 MP3 或 Ogg Vorbis 的流（走系统代理，支持 .m3u / .pls），从 ICY 元数据或 Vorbis 注释读曲名，重采样到 48 kHz，按实时速度送进缓冲，断线自动重连。曲名目前只写进日志，HUD 上显示的是电台的域名。
+6. **直播电台（实验功能，`[Live]`）**：再加一个电台，播放实时音源。它的曲目是一首声明长 1 小时的 WAV，游戏来读时，mod 不管读的是哪个位置，都从一个 10 秒的环形缓冲里取最新的音频，开播时落后最新音频 5 秒作为缓冲余量。读取总是立即完成、从不等待音源（音源来不及时先补静音，攒够再接着播），因为挂起的读取会占住游戏音频引擎的 I/O 名额，让游戏卡顿、换不了台。音源目前有测试信号和**网络电台**：用 WinHTTP 拉 MP3 或 Ogg Vorbis 的流（走系统代理，支持 .m3u / .pls），从 ICY 元数据或 Vorbis 注释读曲名，重采样到 48 kHz，按实时速度送进缓冲，断线自动重连。HUD 上显示当前歌名（电台还没报歌名时显示它的域名），也写进日志。
 
 实现细节和逆向笔记见 [CLAUDE.md](CLAUDE.md) 和 [docs/radio-internals.md](docs/radio-internals.md)（英文）。
 
@@ -72,7 +72,7 @@ comment、RIFF INFO 标签，没有标签时用文件名；GBK 编码的老式�
 | `[Station]` | `MusicFolder` | 空 | 音乐文件夹；空 = `.asi` 旁边的 `SDRadio`，相对路径相对于 `plugins` |
 | `[Station]` | `CustomLogo` | 1 | HUD 图标：1 = 音乐文件夹里的 `logo.png`，没有就用自带的「私家台」；0 = 借用下面的游戏图标 |
 | `[Station]` | `TextureName`, `TexturePack` | `Logo_Softly`, `Radio_Softly_TexturePack` | `CustomLogo = 0` 时借用的游戏电台图标（可选值见 ini 注释） |
-| `[Live]` | `Enabled`, `Name`, `Source`, `Url` | 0, `SDRADIO LIVE`, `test`, 空 | 实验功能：再加一个播放实时音源的「直播」电台。`Source = test` 是测试信号（每秒一声提示音）；`Source = radio` 播放 `Url` 指向的网络电台：MP3 或 Ogg Vorbis 的流，或指向它的 .m3u / .pls（可以在 [radio-browser.info](https://www.radio-browser.info) 找台）。AAC、Opus、FLAC 的台暂不支持，日志里会写明。曲名写进日志，HUD 上暂时只显示电台的域名 |
+| `[Live]` | `Enabled`, `Name`, `Source`, `Url` | 0, `SDRADIO LIVE`, `test`, 空 | 实验功能：再加一个播放实时音源的「直播」电台。`Source = test` 是测试信号（每秒一声提示音）；`Source = radio` 播放 `Url` 指向的网络电台：MP3 或 Ogg Vorbis 的流，或指向它的 .m3u / .pls（可以在 [radio-browser.info](https://www.radio-browser.info) 找台）。AAC、Opus、FLAC 的台暂不支持，日志里会写明。HUD 上显示当前歌名（还没有歌名时显示电台的域名），也写进日志 |
 | `[Debug]` | `Logging` | 1 | 写 `SDRadio.log`，出错时记录调用栈并写 `SDRadio-crash-<n>.dmp` |
 
 ### 自定义图标
@@ -166,7 +166,7 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
    slots: waiting reads made the game hitch and could keep the station from switching. Sources so far: a test signal and **internet
    radio**: an MP3 or Ogg Vorbis stream fetched with WinHTTP (system proxy, .m3u / .pls followed), titles
    from ICY metadata or Vorbis comments, resampled to 48 kHz, fed in real time, reconnecting on errors.
-   Titles only go to the log for now; the HUD shows the station's host name.
+   The HUD shows the current title (the station's host name until it names one); titles also go to the log.
 
 Details and reverse-engineering notes: [CLAUDE.md](CLAUDE.md) and
 [docs/radio-internals.md](docs/radio-internals.md).
@@ -223,7 +223,7 @@ If you already have an ASI loader, just put `SDRadio.asi` where it loads plugins
 | `[Station]` | `MusicFolder` | empty | Music folder; empty = `SDRadio` next to the `.asi`, relative paths are relative to `plugins` |
 | `[Station]` | `CustomLogo` | 1 | HUD logo: 1 = `logo.png` from the music folder, else SDRadio's own (私家台); 0 = the game logo below |
 | `[Station]` | `TextureName`, `TexturePack` | `Logo_Softly`, `Radio_Softly_TexturePack` | With `CustomLogo = 0`, the game station logo to borrow (choices in the ini's comments) |
-| `[Live]` | `Enabled`, `Name`, `Source`, `Url` | 0, `SDRADIO LIVE`, `test`, empty | Experimental: a second station playing a real-time source. `Source = test` is a test signal (a beep every second); `Source = radio` plays the internet radio at `Url`: an MP3 or Ogg Vorbis stream, or an .m3u / .pls pointing at one (find stations at [radio-browser.info](https://www.radio-browser.info)). AAC, Opus and FLAC stations aren't supported yet (the log says so). Song titles go to the log; the HUD shows the station's host name for now |
+| `[Live]` | `Enabled`, `Name`, `Source`, `Url` | 0, `SDRADIO LIVE`, `test`, empty | Experimental: a second station playing a real-time source. `Source = test` is a test signal (a beep every second); `Source = radio` plays the internet radio at `Url`: an MP3 or Ogg Vorbis stream, or an .m3u / .pls pointing at one (find stations at [radio-browser.info](https://www.radio-browser.info)). AAC, Opus and FLAC stations aren't supported yet (the log says so). The HUD shows the current song title (the host name until the station names one); titles also go to the log |
 | `[Debug]` | `Logging` | 1 | Write `SDRadio.log`; on a crash, log the stack and write `SDRadio-crash-<n>.dmp` |
 
 ### Custom logo

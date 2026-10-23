@@ -232,8 +232,17 @@ The live station's first real source. All own code (no GPL), works under Wine as
   a fresh reader's 2 s are there ~1 s after connecting), then by the clock; titles are marked at the audio
   position where they arrived and released when that audio goes out (up to 15 s queued, so ICY titles would
   otherwise be early).
-- The HUD's song line is fixed in Radios.xml at startup, so the live track's title is the URL's host; titles go
-  to the log only. A dynamic HUD title needs `UIHKRadioStationWidget`'s current-song lookup hooked (open).
+- **HUD song title** (2026-10-23, not yet seen in game): Radios.xml fixes each track's title at startup (the live
+  tracks': the URL's host). `UIHKRadioStationWidget::Flash_SetSongTitle` shows
+  `LocalizeText(RadioFullyControlled::GetCurrentlyPlayingSong(sm_playerRadio))` (the current asset's name,
+  `RadioStation::m_currentlyPlayingAssetName`) and invokes `mc_RadioStations.SetSongTitle`; hooks.cc hooks the
+  getter (reached through Flash_SetSongTitle's first call; `m_curStation` +0x148 read from its first
+  instruction, which is checked) and returns `live::NowPlaying()` on the live station (`RadioStation::m_id`
+  +0x24), else the original. The widget refreshes its texts in `Update` only while `mChanged` (+4) is set and
+  `mVisible` (+5); the game sets it from `Radio::DoStartTrack` via `HandleNewSong`. A hook on `Update` sets it
+  when the title's generation changed while visible. So, as for game stations, a new song shows if the widget is
+  up (it fades 4 s after the last input) or the next time it opens; it doesn't pop up by itself. The title is
+  UTF-8 from ICY/Vorbis; Chinese glyphs on the HUD are as untested as for music files. Log: `hud: song title`.
 - `tests/netradio_manual.cc <url> [s]` (compiled, not run; needs the network): plays a station into the ring and
   prints the log and the fill rate, with Wwise emulated as the game reads (128 KB, one at a time, ~2.7 s kept):
   reads, waits, padded silence, starvation, the lowest buffer. After the stutter fix, Radio Paradise for 40 s:
@@ -312,8 +321,8 @@ The live station's first real source. All own code (no GPL), works under Wine as
    Wine in CI), Chinese titles on the HUD (font
    glyphs), long-track seek behavior (`SeekMS` on resume reads far ahead: decode-to-position latency).
 4. Maybe: several stations (one per subfolder), shuffle/order option, M3U playlists.
-5. Live station / internet radio (2026-10-23, see their sections): confirm the never-waiting reads in game; then the
-   song on the HUD (hook the widget's current-song lookup: titles are fixed in Radios.xml today), AAC streams
+5. Live station / internet radio (2026-10-23, see their sections): confirm the never-waiting reads and the HUD song
+   title in game; then AAC streams
    (many stations; needs a decoder: Media Foundation can't take a byte stream as simply, a bundled one would
    need a license check), several stations or a station list, SHOUTcast 1's `ICY 200 OK` (raw socket). A
    browser dashboard was discussed (2026-10-22, like FH6 Universal Radio's): own code, localhost by default

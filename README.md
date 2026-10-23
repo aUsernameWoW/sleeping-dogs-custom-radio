@@ -103,7 +103,7 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 
 **想在车里听网络电台（实验功能）**
 
-用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `radio`，`Url` 填上电台的流地址（例如 `https://stream.radioparadise.com/mp3-128`），保存后重启游戏。旧版本生成的 ini 里没有 `[Live]` 这一段，在文件末尾自己加上 `[Live]` 和这三行就行。切台时会多出一个「SDRADIO LIVE」，连上后两三秒出声。目前只支持 MP3 和 Ogg Vorbis 格式的电台，可以在 [radio-browser.info](https://www.radio-browser.info) 按格式（codec）找台；HUD 上暂时显示电台的网址，不显示歌名。
+用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `radio`，`Url` 填上电台的流地址（例如 `https://stream.radioparadise.com/mp3-128`），保存后重启游戏。旧版本生成的 ini 里没有 `[Live]` 这一段，在文件末尾自己加上 `[Live]` 和这三行就行。切台时会多出一个「SDRADIO LIVE」，连上后几秒内出声。目前只支持 MP3 和 Ogg Vorbis 格式的电台，可以在 [radio-browser.info](https://www.radio-browser.info) 按格式（codec）找台。HUD 上显示电台正在放的歌名（电台还没报歌名时显示它的网址）。
 
 **更新**
 
@@ -272,9 +272,9 @@ The game shows every station logo in white, so what you see is your picture's sh
 Open `plugins\SDRadio.ini` in Notepad; in the `[Live]` section set `Enabled` to `1`, `Source` to `radio` and
 `Url` to the station's stream address (e.g. `https://stream.radioparadise.com/mp3-128`), save and restart the
 game (an ini written by an older version has no `[Live]` section: add `[Live]` and those three lines at the
-end). A station "SDRADIO LIVE" joins the cycle and starts two or three seconds after you tune in. Only MP3 and
-Ogg Vorbis stations work so far (search [radio-browser.info](https://www.radio-browser.info) by codec); the HUD
-shows the station's address rather than the song for now.
+end). A station "SDRADIO LIVE" joins the cycle and starts a few seconds after you tune in. Only MP3 and
+Ogg Vorbis stations work so far (search [radio-browser.info](https://www.radio-browser.info) by codec). The HUD
+shows the song the station is playing (its address until the station names one).
 
 **Updating**
 
