@@ -3,14 +3,14 @@
 [![Build](https://github.com/aUsernameWoW/sleeping-dogs-custom-radio/actions/workflows/build.yml/badge.svg)](https://github.com/aUsernameWoW/sleeping-dogs-custom-radio/actions/workflows/build.yml)
 
 > [!IMPORTANT]
-> **关于这个 mod**：它完全是用 Claude Code 里的 Claude Fable 和 Opus vibe coding 写出来的，几乎没有经过审查，请当作实验性质的 mod 使用，发现异常请反馈。作为一个长期缺少 mod 而自己下场做 mod 的普通玩家，我在 vibe 的过程中收获了许多快乐；如果你也有想实现的灵感，不妨也试着 vibe 一下。由于这些代码都是 vibe 出来的，所以我不会以我的 mod 盈利，也不接受捐助。如果你喜欢我的作品，请给[致谢](#致谢)中提到的开源项目点个 star，也可以考虑向这些项目和作者捐赠（如果他们接受捐赠的话），祝你游玩愉快！
+> **关于这个 mod**：它完全是用 Claude Code 里的 Claude Fable 和 Opus vibe coding 写出来的。我不是专家，但会尽我所能保证它的质量，遇到问题欢迎反馈。作为一个长期缺少 mod 而自己下场做 mod 的普通玩家，我在 vibe 的过程中收获了许多快乐；如果你也有想实现的灵感，不妨也试着 vibe 一下。我不会以我的 mod 盈利，也不接受捐助。如果你喜欢我的作品，请给[致谢](#致谢)中提到的开源项目点个 star，也可以考虑向这些项目和作者捐赠（如果他们接受捐赠的话），祝你游玩愉快！
 >
-> **About this mod**: it was fully vibe-coded with Claude Fable and Opus in Claude Code, with little review, so treat
-> it as experimental and please report anything unusual. I'm just an ordinary player who went a long time without
-> mods for this game and finally started making them myself. Vibe coding them has been a lot of fun; if you have an
-> idea of your own, it might be for you too. Since all this code is vibe-coded, I won't make money from my mods and
-> don't accept donations. If you like my work, please star the open-source projects listed in the
-> [Credits](#credits) instead, and consider donating to them and their authors if they accept donations. Have fun!
+> **About this mod**: it was fully vibe-coded with Claude Fable and Opus in Claude Code. I'm not an expert, but I do
+> my best to ensure its quality; if you run into a problem, please report it. I'm an ordinary player who went a long
+> time without mods for this game and finally started making them myself. Vibe coding them has been a lot of fun; if
+> you have an idea of your own, it might be for you too. I won't make money from my mods and don't accept donations.
+> If you like my work, please star the open-source projects listed in the [Credits](#credits) instead, and consider
+> donating to them and their authors if they accept donations. Have fun!
 
 [中文](#中文) | [English](#english)
 
@@ -127,7 +127,7 @@ SHA-256 固定在 `.github/asi-loader.env`。推送到 `main` 且测试（包括
 - [Wine](https://www.winehq.org)：自动测试也在 Linux 上的 Wine 里运行。
 - [IDA Pro](https://hex-rays.com/ida-pro)（Hex-Rays）和 [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp)（mrexodia）：分析游戏程序。
 - [Pillow](https://python-pillow.org)：绘制「私家台」图标的脚本。
-- [Claude Code](https://claude.com/claude-code)（Anthropic）：这个 mod 完全是用 Claude Fable 和 Opus vibe coding 写出来的，代码、文档和逆向分析都出自 Claude，几乎没有经过人工审查。
+- [Claude Code](https://claude.com/claude-code)（Anthropic）：这个 mod 完全是用 Claude Fable 和 Opus vibe coding 写出来的，代码、文档和逆向分析都出自 Claude。
 - 字体：「私家台」的灯管照 [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) Bold 的字形描出；横幅图和图标用了 [Noto Sans SC/TC](https://fonts.google.com/noto)、[Teko](https://fonts.google.com/specimen/Teko)、[Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) 和 Microsoft 的 Bahnschrift。
 
 **游戏与商标**
@@ -284,7 +284,7 @@ This mod uses or builds on the work of these people and projects. Thank you.
 - [IDA Pro](https://hex-rays.com/ida-pro) (Hex-Rays) and [ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp) (mrexodia): analyzing the game's code.
 - [Pillow](https://python-pillow.org): the script that draws the 私家台 logo.
 - [Claude Code](https://claude.com/claude-code) (Anthropic): this mod was fully vibe-coded with Claude Fable and Opus; its code,
-  documentation and reverse engineering are all Claude's, with little human review.
+  documentation and reverse engineering are all Claude's.
 - Fonts: the 私家台 tubes are traced over [Noto Sans SC](https://fonts.google.com/noto/specimen/Noto+Sans+SC) Bold;
   the banner and the icon use [Noto Sans SC/TC](https://fonts.google.com/noto), [Teko](https://fonts.google.com/specimen/Teko), [Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) and Microsoft's Bahnschrift.
 
