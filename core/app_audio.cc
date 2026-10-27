@@ -539,6 +539,11 @@ namespace appaudio
 					if (warned && !warnings) {
 						LOG("app: %s's volume mixer settings look right now", name.c_str());
 					}
+					// Only the mute on the HUD: the player hears that one as silence and may never open the log; a
+					// doubled sound they notice themselves.
+					if ((warnings ^ warned) & kWarnMuted) {
+						live::SetWarning(warnings & kWarnMuted ? name + " is muted in the volume mixer" : std::string());
+					}
 					warned = warnings;
 				}
 				if (WaitForSingleObject(process, 0) == WAIT_OBJECT_0) {
@@ -567,6 +572,7 @@ namespace appaudio
 				}
 			}
 			CloseHandle(process);
+			live::SetWarning({});
 		}
 		titles.join();
 		if (SUCCEEDED(com)) {
