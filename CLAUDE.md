@@ -341,7 +341,15 @@ unofficial client, against Spotify's terms: weigh that then).
   the player restarted meanwhile isn't paused again until the station is left again. The session's playback
   status is logged on change (4 playing, 5 paused). `app_audio_manual control <exe>`: 5 s not listening, 5 s
   listening (offline, NetEase was paused, so nothing to do: verify with it playing).
-- Next: a warning when the app is muted or plays on the default device; maybe next/previous track from the
+- **Volume mixer warnings** (2026-10-27): every 5 s while capturing, `appaudio::Sessions(pid)` reads the sessions of
+  the process tree on every active render device (`IAudioSessionManager2`, `IAudioSessionControl2::GetProcessId`,
+  `ISimpleAudioVolume`; default device = `eConsole`) and logs them when they change; `Warnings` flags an *active*
+  session that is muted or at 0 (`kWarnMuted`) or on the default device (`kWarnDefaultDevice`), logged once as
+  `app: WARNING: ...` until cleared. Idle sessions are ignored (Windows keeps one per device the app ever used).
+  `app_audio_manual <index> sessions` (2026-10-27, Steam Streaming Speakers): the child's session active without
+  a warning and captured at -20.0 dBFS; muted through `ISimpleAudioVolume` it warns and captures -90.3 dBFS, the
+  level of the in-game log of the first try. Not yet seen in game; log only, nothing on the HUD.
+- Next: maybe the mute warning on the HUD; maybe next/previous track from the
   radio (SMTC `TrySkipNextAsync`...); maybe set the app's output device from the mod (only through undocumented policy-config interfaces,
   as EarTrumpet does: risky).
 
@@ -459,6 +467,6 @@ while they slept, so only tested with a stand-in.
    allows any origin and sets executable paths); `ShellExecute` to open it (Wine hands that to the Linux
    browser). WebView2: not needed, and it doesn't run under Wine.
 6. Another app's audio: own code on `main` since 2026-10-23, works in game (see "App audio"); the HUD title
-   from its media session too; next a warning when the app is muted in the mixer. The GPL branch `gpl/external-audio` (code from FH6 Universal Radio) is parked;
+   from its media session too; a log warning when the app is muted or on the default device (2026-10-27). The GPL branch `gpl/external-audio` (code from FH6 Universal Radio) is parked;
    keep rebasing it. Spotify through librespot since 2026-10-23 (see "Spotify"): try it with an account; decide
    whether to build and bundle librespot in CI (notices for its crates).
