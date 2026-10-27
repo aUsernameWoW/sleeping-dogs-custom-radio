@@ -4,6 +4,7 @@
 // afterwards). Compiled, not run by build.ps1 / CI (it plays sound and mutes a device).
 //   app_audio_manual list                 output devices
 //   app_audio_manual <index> [mute]       the experiment on that device (mute: also with the device muted)
+//   app_audio_manual <index> sessions     the volume mixer warnings: the child's session as it is, then muted
 //   app_audio_manual titles <exe>         the HUD title for that program, from its media session
 //   app_audio_manual control <exe>        pausing and resuming that program as the station is left and played
 //   app_audio_manual play <index> <s>     (the child) play the sine
@@ -134,6 +135,38 @@ namespace
 		return 0;
 	}
 
+	// Mutes (or unmutes) `pid`'s sessions on the device, as the volume mixer would. Returns how many it set.
+	int MuteSessions(const std::wstring& id, DWORD pid, BOOL mute)
+	{
+		IMMDevice* device = OpenDevice(id);
+		IAudioSessionManager2* manager = nullptr;
+		IAudioSessionEnumerator* sessions = nullptr;
+		int count = 0, set = 0;
+		if (device && SUCCEEDED(device->Activate(__uuidof(IAudioSessionManager2), CLSCTX_ALL, nullptr, reinterpret_cast<void**>(&manager))) &&
+			SUCCEEDED(manager->GetSessionEnumerator(&sessions)) && SUCCEEDED(sessions->GetCount(&count))) {
+			for (int i = 0; i < count; ++i) {
+				IAudioSessionControl* control = nullptr;
+				IAudioSessionControl2* control2 = nullptr;
+				ISimpleAudioVolume* volume = nullptr;
+				DWORD owner = 0;
+				if (SUCCEEDED(sessions->GetSession(i, &control)) &&
+					SUCCEEDED(control->QueryInterface(__uuidof(IAudioSessionControl2), reinterpret_cast<void**>(&control2))) &&
+					SUCCEEDED(control2->GetProcessId(&owner)) && owner == pid &&
+					SUCCEEDED(control->QueryInterface(__uuidof(ISimpleAudioVolume), reinterpret_cast<void**>(&volume))) &&
+					SUCCEEDED(volume->SetMute(mute, nullptr))) {
+					++set;
+				}
+				if (volume) volume->Release();
+				if (control2) control2->Release();
+				if (control) control->Release();
+			}
+		}
+		if (sessions) sessions->Release();
+		if (manager) manager->Release();
+		if (device) device->Release();
+		return set;
+	}
+
 	// Captures `pid` for `ms` and returns the peak in dBFS (-96 if nothing).
 	double CapturePeak(DWORD pid, DWORD ms)
 	{
@@ -206,11 +239,12 @@ int wmain(int argc, wchar_t** argv)
 		return index < devices.size() ? Play(devices[index].mId, _wtoi(argv[3])) : 2;
 	}
 	if (argc < 2) {
-		std::printf("usage: app_audio_manual list | <index> [mute]\n");
+		std::printf("usage: app_audio_manual list | <index> [mute | sessions]\n");
 		return 2;
 	}
 	const size_t index = static_cast<size_t>(_wtoi(argv[1]));
 	const bool mute = argc >= 3 && std::wstring(argv[2]) == L"mute";
+	const bool sessions = argc >= 3 && std::wstring(argv[2]) == L"sessions";
 	if (index >= devices.size()) {
 		std::printf("no device %zu\n", index);
 		return 2;
@@ -230,6 +264,30 @@ int wmain(int argc, wchar_t** argv)
 	std::printf("as it is:\n");
 	const double plain = CapturePeak(pi.dwProcessId, 4000);
 	std::printf("  peak %.1f dBFS (played at -20)\n", plain);
+
+	bool sessionsOk = true;
+	if (sessions) {
+		// The child plays on that device, so its session is there and active; muted (the child's own session,
+		// nothing of the player's) the capture is silent and the warning comes. A non-default device warns of
+		// nothing else; the default one warns that it doubles the sound.
+		const auto report = [&](const char* when) {
+			const std::vector<appaudio::Session> found = appaudio::Sessions(pi.dwProcessId);
+			const unsigned warnings = appaudio::Warnings(found);
+			std::printf("%s: sessions %s; warnings%s%s%s\n", when, appaudio::Describe(found).c_str(), warnings ? "" : " none",
+				warnings & appaudio::kWarnMuted ? " muted" : "", warnings & appaudio::kWarnDefaultDevice ? " default-device" : "");
+			return warnings;
+		};
+		const unsigned onDevice = devices[index].mDefault ? unsigned{ appaudio::kWarnDefaultDevice } : 0u;
+		sessionsOk = report("as it is") == onDevice;
+		const int set = MuteSessions(devices[index].mId, pi.dwProcessId, TRUE);
+		std::printf("muted %d session(s) of the child\n", set);
+		Sleep(300);
+		sessionsOk = report("session muted") == (onDevice | appaudio::kWarnMuted) && set > 0 && sessionsOk;
+		const double silent = CapturePeak(pi.dwProcessId, 2000);
+		std::printf("  peak %.1f dBFS while its session is muted\n", silent);
+		sessionsOk = silent < -60.0 && sessionsOk;
+		MuteSessions(devices[index].mId, pi.dwProcessId, FALSE);
+	}
 
 	double muted = 0.0;
 	if (mute) {
@@ -251,5 +309,5 @@ int wmain(int argc, wchar_t** argv)
 	TerminateProcess(pi.hProcess, 0);
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
-	return plain > -30.0 && (!mute || muted > -30.0) ? 0 : 1;
+	return plain > -30.0 && (!mute || muted > -30.0) && sessionsOk ? 0 : 1;
 }
