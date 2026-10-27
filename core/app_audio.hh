@@ -47,6 +47,34 @@ namespace appaudio
 		HANDLE mEvent = nullptr;
 	};
 
+	// One of the app's audio sessions, as the volume mixer shows it.
+	struct Session
+	{
+		std::string mDevice;          // the output device's name (UTF-8)
+		bool mDefaultDevice = false;  // the default output device, where the game plays too
+		bool mActive = false;         // rendering now
+		bool mMuted = false;
+		float mVolume = 1.0f;         // the mixer's slider, 0..1
+	};
+
+	// The sessions of `pid` and its children on every active output device. Use with COM initialized.
+	std::vector<Session> Sessions(DWORD pid);
+
+	// What the player probably didn't mean, from the app's sessions that render now (an idle session says nothing
+	// about what the player hears).
+	enum Warning : unsigned
+	{
+		// Muted or at 0 in the mixer: process loopback taps after the session volume, so the station gets silence
+		// (the first in-game try, 2026-10-23).
+		kWarnMuted = 1,
+		// On the default output device: the player hears it twice, and also while not on the station.
+		kWarnDefaultDevice = 2,
+	};
+	unsigned Warnings(const std::vector<Session>& sessions);
+
+	// The sessions for the log, e.g. "Speakers (default): active, 100%; Steam Streaming Speakers: active, muted".
+	std::string Describe(const std::vector<Session>& sessions);
+
 	// The live source: waits for the app, captures it, starts over when it exits; meanwhile now_playing.hh puts
 	// the app's song on the HUD and, with `controlApp`, pauses the app while the station isn't played. Returns
 	// once `stop` is set.

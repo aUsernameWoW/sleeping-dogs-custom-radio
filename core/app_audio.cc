@@ -1,13 +1,16 @@
 #include "app_audio.hh"
 
 #include <audioclientactivationparams.h>
+#include <audiopolicy.h>
 #include <mmdeviceapi.h>
+#include <functiondiscoverykeys_devpkey.h>
 #include <tlhelp32.h>
 
 #include <algorithm>
 #include <cmath>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "live.hh"
 #include "log.hh"
@@ -163,6 +166,172 @@ namespace appaudio
 		{
 			return peak > 0 ? 20.0 * std::log10(peak / 32768.0) : -96.0;
 		}
+
+		// `root` and every process below it: the sessions belong to whichever child renders.
+		std::unordered_set<DWORD> ProcessTree(DWORD root)
+		{
+			std::unordered_set<DWORD> tree;
+			HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+			if (snapshot == INVALID_HANDLE_VALUE) {
+				return tree;
+			}
+			std::unordered_multimap<DWORD, DWORD> children; // parent pid -> pid
+			PROCESSENTRY32W entry = { sizeof(entry) };
+			for (BOOL ok = Process32FirstW(snapshot, &entry); ok; ok = Process32NextW(snapshot, &entry)) {
+				children.emplace(entry.th32ParentProcessID, entry.th32ProcessID);
+			}
+			CloseHandle(snapshot);
+			std::vector<DWORD> pending{ root };
+			while (!pending.empty()) {
+				const DWORD pid = pending.back();
+				pending.pop_back();
+				// The System Idle Process (0) is its own parent; a recycled pid could make a loop too.
+				if (!tree.insert(pid).second) {
+					continue;
+				}
+				const auto [first, last] = children.equal_range(pid);
+				for (auto it = first; it != last; ++it) {
+					pending.push_back(it->second);
+				}
+			}
+			return tree;
+		}
+
+		std::wstring DeviceId(IMMDevice* device)
+		{
+			LPWSTR id = nullptr;
+			std::wstring result;
+			if (SUCCEEDED(device->GetId(&id)) && id) {
+				result = id;
+			}
+			CoTaskMemFree(id);
+			return result;
+		}
+
+		std::string DeviceName(IMMDevice* device)
+		{
+			std::string name;
+			IPropertyStore* props = nullptr;
+			if (SUCCEEDED(device->OpenPropertyStore(STGM_READ, &props))) {
+				PROPVARIANT value;
+				PropVariantInit(&value);
+				if (SUCCEEDED(props->GetValue(PKEY_Device_FriendlyName, &value)) && value.vt == VT_LPWSTR) {
+					name = logger::ToUtf8(value.pwszVal);
+				}
+				PropVariantClear(&value);
+				props->Release();
+			}
+			return name.empty() ? "(unnamed device)" : name;
+		}
+
+		// The sessions on one device that belong to `tree`.
+		void DeviceSessions(IMMDevice* device, const std::unordered_set<DWORD>& tree, Session base, std::vector<Session>& out)
+		{
+			IAudioSessionManager2* manager = nullptr;
+			if (FAILED(device->Activate(__uuidof(IAudioSessionManager2), CLSCTX_ALL, nullptr, reinterpret_cast<void**>(&manager)))) {
+				return;
+			}
+			IAudioSessionEnumerator* sessions = nullptr;
+			int count = 0;
+			if (SUCCEEDED(manager->GetSessionEnumerator(&sessions)) && SUCCEEDED(sessions->GetCount(&count))) {
+				for (int i = 0; i < count; ++i) {
+					IAudioSessionControl* control = nullptr;
+					IAudioSessionControl2* control2 = nullptr;
+					ISimpleAudioVolume* volume = nullptr;
+					DWORD pid = 0;
+					AudioSessionState state = AudioSessionStateInactive;
+					// GetProcessId fails (AUDCLNT_S_NO_SINGLE_PROCESS is a success code, with pid 0) for
+					// cross-process sessions; those aren't the app's.
+					if (SUCCEEDED(sessions->GetSession(i, &control)) &&
+						SUCCEEDED(control->QueryInterface(__uuidof(IAudioSessionControl2), reinterpret_cast<void**>(&control2))) &&
+						SUCCEEDED(control2->GetProcessId(&pid)) && pid && tree.count(pid) &&
+						SUCCEEDED(control->GetState(&state)) &&
+						SUCCEEDED(control->QueryInterface(__uuidof(ISimpleAudioVolume), reinterpret_cast<void**>(&volume)))) {
+						Session session = base;
+						BOOL muted = FALSE;
+						volume->GetMute(&muted);
+						volume->GetMasterVolume(&session.mVolume);
+						session.mMuted = muted != FALSE;
+						session.mActive = state == AudioSessionStateActive;
+						out.push_back(std::move(session));
+					}
+					if (volume) volume->Release();
+					if (control2) control2->Release();
+					if (control) control->Release();
+				}
+			}
+			if (sessions) sessions->Release();
+			manager->Release();
+		}
+	}
+
+	std::vector<Session> Sessions(DWORD pid)
+	{
+		std::vector<Session> result;
+		const std::unordered_set<DWORD> tree = ProcessTree(pid);
+		IMMDeviceEnumerator* enumerator = nullptr;
+		if (!pid || FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator),
+			reinterpret_cast<void**>(&enumerator)))) {
+			return result;
+		}
+		// eConsole: the "Default Device" in Sound settings, which the game (and a session left at "Default") plays on.
+		std::wstring defaultId;
+		IMMDevice* defaultDevice = nullptr;
+		if (SUCCEEDED(enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &defaultDevice))) {
+			defaultId = DeviceId(defaultDevice);
+			defaultDevice->Release();
+		}
+		IMMDeviceCollection* devices = nullptr;
+		UINT count = 0;
+		if (SUCCEEDED(enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &devices)) && SUCCEEDED(devices->GetCount(&count))) {
+			for (UINT i = 0; i < count; ++i) {
+				IMMDevice* device = nullptr;
+				if (FAILED(devices->Item(i, &device))) {
+					continue;
+				}
+				Session base;
+				base.mDevice = DeviceName(device);
+				base.mDefaultDevice = !defaultId.empty() && DeviceId(device) == defaultId;
+				DeviceSessions(device, tree, base, result);
+				device->Release();
+			}
+		}
+		if (devices) devices->Release();
+		enumerator->Release();
+		return result;
+	}
+
+	unsigned Warnings(const std::vector<Session>& sessions)
+	{
+		unsigned warnings = 0;
+		for (const Session& s : sessions) {
+			if (!s.mActive) {
+				continue;
+			}
+			if (s.mMuted || s.mVolume <= 0.0f) {
+				warnings |= kWarnMuted;
+			}
+			if (s.mDefaultDevice) {
+				warnings |= kWarnDefaultDevice;
+			}
+		}
+		return warnings;
+	}
+
+	std::string Describe(const std::vector<Session>& sessions)
+	{
+		if (sessions.empty()) {
+			return "none";
+		}
+		std::string text;
+		for (const Session& s : sessions) {
+			char line[64];
+			std::snprintf(line, sizeof(line), "%s, %s%d%%", s.mActive ? "active" : "idle", s.mMuted ? "muted, " : "",
+				static_cast<int>(std::lround(s.mVolume * 100.0f)));
+			if (!text.empty()) text += "; ";
+			text += s.mDevice + (s.mDefaultDevice ? " (default): " : ": ") + line;
+		}
+		return text;
 	}
 
 	DWORD FindProcess(const std::wstring& exeName)
@@ -343,7 +512,35 @@ namespace appaudio
 			DWORD reportAt = GetTickCount() + 10'000;
 			uint64_t captured = 0, padded = 0;
 			int peak = 0;
+			// Every 5 s: the app's sessions in the volume mixer, logged when they change, with a warning for a
+			// setting that silences the station or doubles the sound.
+			DWORD sessionsAt = GetTickCount();
+			std::string sessionsLogged;
+			unsigned warned = 0;
 			while (!stop.load()) {
+				if (static_cast<int32_t>(GetTickCount() - sessionsAt) >= 0) {
+					sessionsAt = GetTickCount() + 5'000;
+					const std::vector<Session> sessions = Sessions(pid);
+					const std::string described = Describe(sessions);
+					if (described != sessionsLogged) {
+						sessionsLogged = described;
+						LOG("app: %s's audio sessions: %s", name.c_str(), described.c_str());
+					}
+					const unsigned warnings = Warnings(sessions);
+					if ((warnings & kWarnMuted) && !(warned & kWarnMuted)) {
+						LOG("app: WARNING: %s is muted (or at 0) in the volume mixer, so the station hears silence. Unmute it "
+							"and mute or turn down its output device instead", name.c_str());
+					}
+					if ((warnings & kWarnDefaultDevice) && !(warned & kWarnDefaultDevice)) {
+						LOG("app: WARNING: %s plays on the default output device, where the game plays too: you hear it twice, "
+							"also off the radio. Send it to an unused output device (Settings > System > Sound > Volume mixer; "
+							"NetEase Cloud Music: in its own settings)", name.c_str());
+					}
+					if (warned && !warnings) {
+						LOG("app: %s's volume mixer settings look right now", name.c_str());
+					}
+					warned = warnings;
+				}
 				if (WaitForSingleObject(process, 0) == WAIT_OBJECT_0) {
 					LOG("app: %s exited", name.c_str());
 					break;

@@ -55,7 +55,32 @@ int main()
 	Check(nowplaying::Format("", "Title") == "Title", "title alone");
 	Check(nowplaying::Format("Artist", "").empty(), "no title, no text");
 
+	using appaudio::Session;
+	const auto session = [](bool defaultDevice, bool active, bool muted, float volume) {
+		Session s;
+		s.mDevice = defaultDevice ? "Speakers" : "Steam Streaming Speakers";
+		s.mDefaultDevice = defaultDevice;
+		s.mActive = active;
+		s.mMuted = muted;
+		s.mVolume = volume;
+		return s;
+	};
+	Check(appaudio::Warnings({}) == 0, "no sessions, no warnings");
+	Check(appaudio::Warnings({ session(false, true, false, 1.0f) }) == 0, "playing unmuted on another device is right");
+	Check(appaudio::Warnings({ session(false, true, true, 1.0f) }) == appaudio::kWarnMuted, "a muted session");
+	Check(appaudio::Warnings({ session(false, true, false, 0.0f) }) == appaudio::kWarnMuted, "a session at 0 is muted too");
+	Check(appaudio::Warnings({ session(true, true, false, 0.5f) }) == appaudio::kWarnDefaultDevice, "playing on the default device");
+	Check(appaudio::Warnings({ session(true, false, true, 0.0f), session(false, true, false, 1.0f) }) == 0,
+		"an idle session (left over on the default device) says nothing");
+	Check(appaudio::Warnings({ session(true, true, true, 1.0f) }) == (appaudio::kWarnMuted | appaudio::kWarnDefaultDevice), "both");
+	Check(appaudio::Describe({}) == "none", "no sessions described");
+	Check(appaudio::Describe({ session(true, true, false, 1.0f), session(false, false, true, 0.25f) }) ==
+		"Speakers (default): active, 100%; Steam Streaming Speakers: idle, muted, 25%", "sessions described");
+
 	CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+	const std::vector<Session> own = appaudio::Sessions(GetCurrentProcessId());
+	std::printf("this process's audio sessions: %s\n", appaudio::Describe(own).c_str());
+	Check(appaudio::Sessions(0).empty(), "no process, no sessions");
 	appaudio::Capture capture;
 	std::string error;
 	if (capture.Open(GetCurrentProcessId(), error)) {
