@@ -348,8 +348,11 @@ unofficial client, against Spotify's terms: weigh that then).
   `app: WARNING: ...` until cleared. Idle sessions are ignored (Windows keeps one per device the app ever used).
   `app_audio_manual <index> sessions` (2026-10-27, Steam Streaming Speakers): the child's session active without
   a warning and captured at -20.0 dBFS; muted through `ISimpleAudioVolume` it warns and captures -90.3 dBFS, the
-  level of the in-game log of the first try. Not yet seen in game; log only, nothing on the HUD.
-- Next: maybe the mute warning on the HUD; maybe next/previous track from the
+  level of the in-game log of the first try. The mute warning also goes on the HUD: `live::SetWarning` replaces
+  the song line (`live::HudText`, which `CurrentSongHook` shows) and bumps the title generation so the widget
+  refreshes; cleared when unmuted, when the capture ends and when a source starts. The default-device warning
+  stays in the log. Neither seen in game yet.
+- Next: maybe next/previous track from the
   radio (SMTC `TrySkipNextAsync`...); maybe set the app's output device from the mod (only through undocumented policy-config interfaces,
   as EarTrumpet does: risky).
 
