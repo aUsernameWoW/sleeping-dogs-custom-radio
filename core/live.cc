@@ -159,6 +159,7 @@ namespace live
 
 		std::mutex gTitleLock;
 		std::string gTitle;
+		std::string gWarning;
 		std::atomic<uint32_t> gTitleGeneration{ 0 };
 
 		std::atomic<int> gOpenCount{ 0 };         // gOpen, readable without gLock
@@ -172,6 +173,7 @@ namespace live
 			}
 			gStream.Reset();
 			SetNowPlaying({});
+			SetWarning({});
 			gStop = std::make_shared<std::atomic<bool>>(false);
 			gThread = std::thread([source = gSource, stop = gStop] { source(*stop); });
 			LOG("live: source \"%s\" started", gSourceName.c_str());
@@ -271,6 +273,21 @@ namespace live
 	uint32_t NowPlayingGeneration()
 	{
 		return gTitleGeneration.load();
+	}
+
+	void SetWarning(std::string text)
+	{
+		std::lock_guard lock(gTitleLock);
+		if (text != gWarning) {
+			gWarning = std::move(text);
+			++gTitleGeneration;
+		}
+	}
+
+	std::string HudText()
+	{
+		std::lock_guard lock(gTitleLock);
+		return gWarning.empty() ? gTitle : gWarning;
 	}
 
 	void Acquire()

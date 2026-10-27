@@ -48,6 +48,22 @@ namespace
 		return true;
 	}
 
+	void TestHudText()
+	{
+		live::SetNowPlaying("Artist - Title");
+		const uint32_t before = live::NowPlayingGeneration();
+		live::SetWarning("cloudmusic.exe is muted in the volume mixer");
+		Check(live::HudText() == "cloudmusic.exe is muted in the volume mixer", "a warning takes the title's place");
+		Check(live::NowPlayingGeneration() != before, "and has the HUD refresh");
+		Check(live::NowPlaying() == "Artist - Title", "the title stays as it was");
+		const uint32_t warned = live::NowPlayingGeneration();
+		live::SetWarning("cloudmusic.exe is muted in the volume mixer");
+		Check(live::NowPlayingGeneration() == warned, "the same warning again changes nothing");
+		live::SetWarning({});
+		Check(live::HudText() == "Artist - Title" && live::NowPlayingGeneration() != warned, "cleared, the title is back");
+		live::SetNowPlaying({});
+	}
+
 	void TestRing()
 	{
 		live::Ring ring(1000);
@@ -219,6 +235,7 @@ int main()
 	static_assert(live::kHeaderSize - 8 + live::kFrames * live::kBlockAlign <= 0xFFFFFFFFull, "RIFF size fits");
 	static_assert(live::kMaxLagMs > live::kPrerollMs && live::kMaxLagMs < live::kRingMs, "a jump lands inside the ring and below the lag limit");
 	TestStart();
+	TestHudText();
 	TestRing();
 	TestReader();
 	TestPhase();

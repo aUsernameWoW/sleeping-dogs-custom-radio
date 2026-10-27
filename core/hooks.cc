@@ -419,7 +419,7 @@ namespace hooks
 			const auto* station = radio ? *reinterpret_cast<const uint8_t* const*>(static_cast<const uint8_t*>(radio) + gCurStationOffset) : nullptr;
 			if (live && station && *reinterpret_cast<const uint32_t*>(station + kStationIdOffset) == live) {
 				thread_local std::string title;
-				title = live::NowPlaying();
+				title = live::HudText();
 				if (!title.empty()) {
 					static std::string logged;
 					if (title != logged) {

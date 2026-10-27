@@ -119,6 +119,11 @@ namespace live
 	void SetNowPlaying(std::string title);
 	std::string NowPlaying();
 	uint32_t NowPlayingGeneration();
+	// A problem the player should fix (e.g. the captured app muted in the mixer), shown on the HUD in place of the
+	// title until cleared with an empty text; it changes NowPlayingGeneration too. Cleared when a source starts.
+	void SetWarning(std::string text);
+	// What the HUD's song line shows: the warning if there is one, else the title.
+	std::string HudText();
 
 	// A live file was opened / closed. The source runs while any is open, and stops 10 s after the last
 	// closes (the game reopens the stream on every track start and station switch).
