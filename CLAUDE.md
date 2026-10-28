@@ -359,12 +359,16 @@ unofficial client, against Spotify's terms: weigh that then).
   same-family process that has one (active first); rechecked every 5 s while the tree stays sessionless.
   Restarted (2026-10-28), `AppleMusic.exe` had an idle session of its own on the default device while the agent
   played, which kept the capture on it (-90 dBFS): now only an *active* session keeps the named tree, and every
-  5 s a capture whose process renders nothing moves to the package's process that does (-7.8 dBFS).
+  5 s a capture whose process renders nothing moves to the package's process that does (-7.8 dBFS); only to one
+  that renders: paused ~8 s, the agent's session goes idle too, and the capture fell back to the silent UI process
+  (in game, 2026-10-28).
   `App = AppleMusic.exe` then captured `AMPLibraryAgent.exe` at -19.5 dBFS. Its media session
   (`AppleInc.AppleMusicWin_nzyj5cx40ttqa!App`) matches `applemusic` as before; it sends "Artist — Album" as the
   artist with an empty AlbumTitle, so for it `AppleMusicArtist` cuts at the first " — " (HUD "Olivia Rodrigo -
-  the cure"). Pause/resume (`control AppleMusic.exe`) works: paused 1.8 s after the start, resumed. Not yet tried
-  in game, nor whether the volume mixer's per-app output device moves it (the session is the agent's). The user
+  the cure"). Pause/resume (`control AppleMusic.exe`) works: paused 1.8 s after the start, resumed. **Works in game**
+  (2026-10-28, user: "working as expected"): the volume mixer's output device (Steam Streaming Speakers, set for
+  both "Apple Music" entries, then Apple Music restarted: it only moves on a new stream, see below), capture
+  -8.5..-9 dBFS without padded silence, HUD title, three pauses/resumes on leaving and returning. The user
   uses Apple Music, not NetEase (2026-10-27): the docs lead with it. `app_audio_manual probe <exe>` shows all of
   this for a program.
 - **Setting the app's output device from the mod: tried, not adopted** (2026-10-28, the user asked why it has to be
