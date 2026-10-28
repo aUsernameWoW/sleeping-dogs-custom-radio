@@ -606,9 +606,14 @@ namespace appaudio
 					sessionsAt = GetTickCount() + 5'000;
 					const std::vector<Session> sessions = Sessions(pid);
 					// Started before it played anything, or the app restarted: another process of its package may be
-					// the one that renders now.
-					const bool rendering = std::any_of(sessions.begin(), sessions.end(), [](const Session& s) { return s.mActive; });
-					if (!rendering && AudioProcess(root) != pid) {
+					// the one that renders now. Only one that does: paused for ~8 s, Apple Music's agent goes idle
+					// too, and the capture would fall back to the silent UI process just before the player resumes
+					// (2026-10-28, in game).
+					const auto renders = [](const std::vector<Session>& list) {
+						return std::any_of(list.begin(), list.end(), [](const Session& s) { return s.mActive; });
+					};
+					const DWORD other = renders(sessions) ? pid : AudioProcess(root);
+					if (other != pid && (sessions.empty() || renders(Sessions(other)))) {
 						LOG("app: %s's sound plays from another of its processes now; capturing that instead", name.c_str());
 						break;
 					}
