@@ -7,11 +7,14 @@
 //   app_audio_manual <index> sessions     the volume mixer warnings: the child's session as it is, then muted
 //   app_audio_manual titles <exe>         the HUD title for that program, from its media session
 //   app_audio_manual control <exe>        pausing and resuming that program as the station is left and played
-//   app_audio_manual play <index> <s>     (the child) play the sine
+//   app_audio_manual move <exe> <index>   sending that program to that output device and back
+//   app_audio_manual follow <index>       whether a child playing on the default device follows such a move
+//   app_audio_manual play <index>|default <s>  (the child) play the sine
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include "../core/app_audio.cc"
+#include "../core/app_device.cc"
 #include "../core/live.cc"
 #include "../core/now_playing.cc"
 #include "../core/log.cc"
@@ -85,7 +88,9 @@ namespace
 		IMMDeviceEnumerator* enumerator = nullptr;
 		IMMDevice* device = nullptr;
 		if (SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator), reinterpret_cast<void**>(&enumerator)))) {
-			enumerator->GetDevice(id.c_str(), &device);
+			// No ID: the default device, as an app that lets Windows choose opens it.
+			if (id.empty()) enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
+			else enumerator->GetDevice(id.c_str(), &device);
 			enumerator->Release();
 		}
 		return device;
@@ -219,6 +224,97 @@ int wmain(int argc, wchar_t** argv)
 		std::printf("capture peak %.1f dBFS\n", CapturePeak(pid, 3000));
 		return 0;
 	}
+	if (argc >= 4 && std::wstring(argv[1]) == L"media") {
+		// "media <exe> play|pause|stop|next|previous": that through the program's media session, then its sessions.
+		using namespace winrt::Windows::Media::Control;
+		const std::wstring what = argv[3];
+		const auto manager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get();
+		for (const auto& session : manager.GetSessions()) {
+			if (nowplaying::Matches(winrt::to_string(session.SourceAppUserModelId()), nowplaying::MatchKey(argv[2]))) {
+				(what == L"play" ? session.TryPlayAsync() : what == L"pause" ? session.TryPauseAsync() :
+					what == L"next" ? session.TrySkipNextAsync() : what == L"stop" ? session.TryStopAsync() : session.TrySkipPreviousAsync()).get();
+			}
+		}
+		Sleep(2000);
+		std::printf("sessions: %s\n", appaudio::Describe(appaudio::Sessions(appaudio::AudioProcess(appaudio::FindProcess(argv[2])))).c_str());
+		return 0;
+	}
+	if (argc >= 4 && std::wstring(argv[1]) == L"move") {
+		// Moving that program to another output device as the live source does, then back: its chosen device and
+		// its sessions before, after the move (with 3 s of capture) and after the restore.
+		const DWORD pid = appaudio::AudioProcess(appaudio::FindProcess(argv[2]));
+		const size_t index = static_cast<size_t>(_wtoi(argv[3]));
+		if (!pid || index >= devices.size()) return 2;
+		std::string error;
+		std::wstring chosen;
+		// "move <exe> <index> play": start the program through its media session first, pause it at the end.
+		// "... reopen": also, once moved, pause and resume it, then skip a track (new streams: do they move?).
+		const std::wstring mode = argc >= 5 ? argv[4] : L"";
+		const bool play = mode == L"play" || mode == L"reopen" || mode == L"seek";
+		const auto media = [&](int what) {
+			using namespace winrt::Windows::Media::Control;
+			const auto manager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get();
+			for (const auto& session : manager.GetSessions()) {
+				if (nowplaying::Matches(winrt::to_string(session.SourceAppUserModelId()), nowplaying::MatchKey(argv[2]))) {
+					if (what == 3) {
+						// A seek to where it is: does that reopen its stream?
+						session.TryChangePlaybackPositionAsync(session.GetTimelineProperties().Position().count()).get();
+					}
+					else {
+						(what == 1 ? session.TryPlayAsync() : what == 0 ? session.TryPauseAsync() : session.TrySkipNextAsync()).get();
+					}
+				}
+			}
+		};
+		if (play) {
+			media(1);
+			Sleep(1500);
+		}
+		if (!appdevice::Get(pid, chosen, error)) {
+			std::printf("can't read its device: %s\n", error.c_str());
+			return 1;
+		}
+		std::printf("process %lu chose \"%s\"\nsessions: %s\n", pid, chosen.empty() ? "(default)" : logger::ToUtf8(chosen.c_str()).c_str(),
+			appaudio::Describe(appaudio::Sessions(pid)).c_str());
+		if (!appdevice::Set(pid, devices[index].mId, error)) {
+			std::printf("can't move it: %s\n", error.c_str());
+			return 1;
+		}
+		Sleep(1000);
+		std::wstring now;
+		appdevice::Get(pid, now, error);
+		std::printf("moved to %s: chose \"%s\"\nsessions: %s\n", logger::ToUtf8(devices[index].mName.c_str()).c_str(),
+			logger::ToUtf8(now.c_str()).c_str(), appaudio::Describe(appaudio::Sessions(pid)).c_str());
+		std::printf("capture peak %.1f dBFS\n", CapturePeak(pid, 3000));
+		if (mode == L"seek") {
+			media(3);
+			Sleep(2000);
+			std::printf("seeked: %s\n", appaudio::Describe(appaudio::Sessions(pid)).c_str());
+		}
+		if (mode == L"reopen") {
+			media(0);
+			Sleep(1000);
+			media(1);
+			Sleep(2000);
+			std::printf("paused and resumed: %s\n", appaudio::Describe(appaudio::Sessions(pid)).c_str());
+			media(2);
+			Sleep(3000);
+			std::printf("next track: %s\n", appaudio::Describe(appaudio::Sessions(pid)).c_str());
+		}
+		const bool restored = appdevice::Set(pid, chosen, error);
+		Sleep(1000);
+		if (mode == L"seek") {
+			media(3);
+			Sleep(2000);
+		}
+		appdevice::Get(pid, now, error);
+		std::printf("restored%s: chose \"%s\"\nsessions: %s\n", restored ? "" : (" FAILED: " + error).c_str(),
+			now.empty() ? "(default)" : logger::ToUtf8(now.c_str()).c_str(), appaudio::Describe(appaudio::Sessions(pid)).c_str());
+		if (play) {
+			media(0);
+		}
+		return restored ? 0 : 1;
+	}
 	if (argc >= 3 && std::wstring(argv[1]) == L"titles") {
 		// What the HUD would show for that program: its media session's title, for 5 s (log in app_audio_manual.log).
 		DeleteFileW(L"app_audio_manual.log");
@@ -250,8 +346,37 @@ int wmain(int argc, wchar_t** argv)
 		return 0;
 	}
 	if (argc >= 4 && std::wstring(argv[1]) == L"play") {
+		if (std::wstring(argv[2]) == L"default") {
+			return Play({}, _wtoi(argv[3]));
+		}
 		const size_t index = static_cast<size_t>(_wtoi(argv[2]));
 		return index < devices.size() ? Play(devices[index].mId, _wtoi(argv[3])) : 2;
+	}
+	if (argc >= 3 && std::wstring(argv[1]) == L"follow") {
+		// Whether a program playing on the default device follows a move: a child plays the sine there, is moved to
+		// that device (its sessions show where it plays), then back.
+		const size_t index = static_cast<size_t>(_wtoi(argv[2]));
+		if (index >= devices.size()) return 2;
+		wchar_t self[MAX_PATH];
+		GetModuleFileNameW(nullptr, self, MAX_PATH);
+		std::wstring command = L"\"" + std::wstring(self) + L"\" play default 10";
+		STARTUPINFOW si = { sizeof(si) };
+		PROCESS_INFORMATION pi = {};
+		if (!CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) return 1;
+		Sleep(1500);
+		std::string error;
+		std::printf("playing: %s\n", appaudio::Describe(appaudio::Sessions(pi.dwProcessId)).c_str());
+		const bool moved = appdevice::Set(pi.dwProcessId, devices[index].mId, error);
+		Sleep(1500);
+		std::printf("moved%s: %s\n", moved ? "" : (" FAILED: " + error).c_str(), appaudio::Describe(appaudio::Sessions(pi.dwProcessId)).c_str());
+		std::printf("capture peak %.1f dBFS (played at -20)\n", CapturePeak(pi.dwProcessId, 2000));
+		const bool restored = appdevice::Set(pi.dwProcessId, {}, error);
+		Sleep(1500);
+		std::printf("restored%s: %s\n", restored ? "" : (" FAILED: " + error).c_str(), appaudio::Describe(appaudio::Sessions(pi.dwProcessId)).c_str());
+		WaitForSingleObject(pi.hProcess, INFINITE);
+		CloseHandle(pi.hThread);
+		CloseHandle(pi.hProcess);
+		return moved && restored ? 0 : 1;
 	}
 	if (argc < 2) {
 		std::printf("usage: app_audio_manual list | <index> [mute | sessions]\n");
