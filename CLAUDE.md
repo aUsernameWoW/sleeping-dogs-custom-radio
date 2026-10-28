@@ -352,6 +352,18 @@ unofficial client, against Spotify's terms: weigh that then).
   the song line (`live::HudText`, which `CurrentSongHook` shows) and bumps the title generation so the widget
   refreshes; cleared when unmuted, when the capture ends and when a source starts. The default-device warning
   stays in the log. Neither seen in game yet.
+- **Apple Music for Windows** (Microsoft Store, `AppleInc.AppleMusicWin_nzyj5cx40ttqa` 1.1540; 2026-10-27, offline
+  with it playing): the UI is `AppleMusic.exe`, but the sound comes from `AMPLibraryAgent.exe`, which COM
+  starts outside its tree (parent: a svchost), so capturing `AppleMusic.exe` gave -90 dBFS. `AudioProcess`:
+  when the named tree has no audio session and the process is packaged (`GetPackageFamilyName`), capture the
+  same-family process that has one (active first); rechecked every 5 s while the tree stays sessionless.
+  `App = AppleMusic.exe` then captured `AMPLibraryAgent.exe` at -19.5 dBFS. Its media session
+  (`AppleInc.AppleMusicWin_nzyj5cx40ttqa!App`) matches `applemusic` as before; it sends "Artist — Album" as the
+  artist with an empty AlbumTitle, so for it `AppleMusicArtist` cuts at the first " — " (HUD "Olivia Rodrigo -
+  the cure"). Pause/resume (`control AppleMusic.exe`) works: paused 1.8 s after the start, resumed. Not yet tried
+  in game, nor whether the volume mixer's per-app output device moves it (the session is the agent's). The user
+  uses Apple Music, not NetEase (2026-10-27): the docs lead with it. `app_audio_manual probe <exe>` shows all of
+  this for a program.
 - Next: maybe next/previous track from the
   radio (SMTC `TrySkipNextAsync`...); maybe set the app's output device from the mod (only through undocumented policy-config interfaces,
   as EarTrumpet does: risky).
