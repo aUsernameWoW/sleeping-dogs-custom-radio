@@ -92,6 +92,9 @@ int main()
 	const std::vector<Session> own = appaudio::Sessions(GetCurrentProcessId());
 	std::printf("this process's audio sessions: %s\n", appaudio::Describe(own).c_str());
 	Check(appaudio::Sessions(0).empty(), "no process, no sessions");
+	Check(appaudio::PackageFamily(GetCurrentProcessId()).empty(), "an ordinary program has no package");
+	Check(appaudio::AudioProcess(GetCurrentProcessId()) == GetCurrentProcessId(), "an ordinary program is captured itself");
+	Check(appaudio::AudioProcess(0) == 0, "no process, nothing to capture");
 	appaudio::Capture capture;
 	std::string error;
 	if (capture.Open(GetCurrentProcessId(), error)) {

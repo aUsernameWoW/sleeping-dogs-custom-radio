@@ -55,10 +55,19 @@ namespace appaudio
 		bool mActive = false;         // rendering now
 		bool mMuted = false;
 		float mVolume = 1.0f;         // the mixer's slider, 0..1
+		DWORD mProcess = 0;
 	};
 
 	// The sessions of `pid` and its children on every active output device. Use with COM initialized.
 	std::vector<Session> Sessions(DWORD pid);
+
+	// The package family of a packaged (Store) app's process ("AppleInc.AppleMusicWin_nzyj5cx40ttqa"); empty
+	// for an ordinary program.
+	std::wstring PackageFamily(DWORD pid);
+	// The process to capture for the app whose tree starts at `root`: `root`, unless its tree has no audio session
+	// and another process of the same package has one. Apple Music for Windows (1.1540) plays from
+	// AMPLibraryAgent.exe, which COM starts outside AppleMusic.exe's tree. Use with COM initialized.
+	DWORD AudioProcess(DWORD root);
 
 	// What the player probably didn't mean, from the app's sessions that render now (an idle session says nothing
 	// about what the player hears).

@@ -6,8 +6,11 @@
 #include <functiondiscoverykeys_devpkey.h>
 #include <tlhelp32.h>
 
+#include <appmodel.h>
+
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
@@ -224,8 +227,8 @@ namespace appaudio
 			return name.empty() ? "(unnamed device)" : name;
 		}
 
-		// The sessions on one device that belong to `tree`.
-		void DeviceSessions(IMMDevice* device, const std::unordered_set<DWORD>& tree, Session base, std::vector<Session>& out)
+		// The sessions on one device whose process `wanted` accepts.
+		void DeviceSessions(IMMDevice* device, const std::function<bool(DWORD)>& wanted, Session base, std::vector<Session>& out)
 		{
 			IAudioSessionManager2* manager = nullptr;
 			if (FAILED(device->Activate(__uuidof(IAudioSessionManager2), CLSCTX_ALL, nullptr, reinterpret_cast<void**>(&manager)))) {
@@ -244,10 +247,11 @@ namespace appaudio
 					// cross-process sessions; those aren't the app's.
 					if (SUCCEEDED(sessions->GetSession(i, &control)) &&
 						SUCCEEDED(control->QueryInterface(__uuidof(IAudioSessionControl2), reinterpret_cast<void**>(&control2))) &&
-						SUCCEEDED(control2->GetProcessId(&pid)) && pid && tree.count(pid) &&
+						SUCCEEDED(control2->GetProcessId(&pid)) && pid && wanted(pid) &&
 						SUCCEEDED(control->GetState(&state)) &&
 						SUCCEEDED(control->QueryInterface(__uuidof(ISimpleAudioVolume), reinterpret_cast<void**>(&volume)))) {
 						Session session = base;
+						session.mProcess = pid;
 						BOOL muted = FALSE;
 						volume->GetMute(&muted);
 						volume->GetMasterVolume(&session.mVolume);
@@ -265,40 +269,105 @@ namespace appaudio
 		}
 	}
 
-	std::vector<Session> Sessions(DWORD pid)
+	namespace
 	{
-		std::vector<Session> result;
-		const std::unordered_set<DWORD> tree = ProcessTree(pid);
-		IMMDeviceEnumerator* enumerator = nullptr;
-		if (!pid || FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator),
-			reinterpret_cast<void**>(&enumerator)))) {
+		std::vector<Session> AllSessions(const std::function<bool(DWORD)>& wanted)
+		{
+			std::vector<Session> result;
+			IMMDeviceEnumerator* enumerator = nullptr;
+			if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator),
+				reinterpret_cast<void**>(&enumerator)))) {
+				return result;
+			}
+			// eConsole: the "Default Device" in Sound settings, which the game (and a session left at "Default") plays on.
+			std::wstring defaultId;
+			IMMDevice* defaultDevice = nullptr;
+			if (SUCCEEDED(enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &defaultDevice))) {
+				defaultId = DeviceId(defaultDevice);
+				defaultDevice->Release();
+			}
+			IMMDeviceCollection* devices = nullptr;
+			UINT count = 0;
+			if (SUCCEEDED(enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &devices)) && SUCCEEDED(devices->GetCount(&count))) {
+				for (UINT i = 0; i < count; ++i) {
+					IMMDevice* device = nullptr;
+					if (FAILED(devices->Item(i, &device))) {
+						continue;
+					}
+					Session base;
+					base.mDevice = DeviceName(device);
+					base.mDefaultDevice = !defaultId.empty() && DeviceId(device) == defaultId;
+					DeviceSessions(device, wanted, base, result);
+					device->Release();
+				}
+			}
+			if (devices) devices->Release();
+			enumerator->Release();
 			return result;
 		}
-		// eConsole: the "Default Device" in Sound settings, which the game (and a session left at "Default") plays on.
-		std::wstring defaultId;
-		IMMDevice* defaultDevice = nullptr;
-		if (SUCCEEDED(enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &defaultDevice))) {
-			defaultId = DeviceId(defaultDevice);
-			defaultDevice->Release();
+
+		std::string ProcessName(DWORD pid)
+		{
+			HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+			wchar_t path[MAX_PATH];
+			DWORD size = MAX_PATH;
+			const bool ok = process && QueryFullProcessImageNameW(process, 0, path, &size);
+			if (process) CloseHandle(process);
+			if (!ok) return "process " + std::to_string(pid);
+			const std::wstring full(path, size);
+			return logger::ToUtf8(full.substr(full.find_last_of(L'\\') + 1).c_str());
 		}
-		IMMDeviceCollection* devices = nullptr;
-		UINT count = 0;
-		if (SUCCEEDED(enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &devices)) && SUCCEEDED(devices->GetCount(&count))) {
-			for (UINT i = 0; i < count; ++i) {
-				IMMDevice* device = nullptr;
-				if (FAILED(devices->Item(i, &device))) {
-					continue;
-				}
-				Session base;
-				base.mDevice = DeviceName(device);
-				base.mDefaultDevice = !defaultId.empty() && DeviceId(device) == defaultId;
-				DeviceSessions(device, tree, base, result);
-				device->Release();
+	}
+
+	std::vector<Session> Sessions(DWORD pid)
+	{
+		if (!pid) {
+			return {};
+		}
+		const std::unordered_set<DWORD> tree = ProcessTree(pid);
+		return AllSessions([&](DWORD session) { return tree.count(session) != 0; });
+	}
+
+	std::wstring PackageFamily(DWORD pid)
+	{
+		HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+		if (!process) {
+			return {};
+		}
+		wchar_t name[PACKAGE_FAMILY_NAME_MAX_LENGTH + 1];
+		UINT32 length = ARRAYSIZE(name);
+		const LONG result = GetPackageFamilyName(process, &length, name);
+		CloseHandle(process);
+		return result == ERROR_SUCCESS ? std::wstring(name) : std::wstring();
+	}
+
+	DWORD AudioProcess(DWORD root)
+	{
+		if (!root || !Sessions(root).empty()) {
+			return root;
+		}
+		const std::wstring family = PackageFamily(root);
+		if (family.empty()) {
+			return root;
+		}
+		const std::unordered_set<DWORD> tree = ProcessTree(root);
+		std::unordered_map<DWORD, bool> sameFamily;
+		const std::vector<Session> found = AllSessions([&](DWORD pid) {
+			if (tree.count(pid)) return false;
+			const auto [it, added] = sameFamily.try_emplace(pid, false);
+			if (added) it->second = PackageFamily(pid) == family;
+			return it->second;
+		});
+		// One that renders now, else any (an idle session is where it will play next).
+		DWORD best = root;
+		bool bestActive = false;
+		for (const Session& s : found) {
+			if (best == root || (s.mActive && !bestActive)) {
+				best = s.mProcess;
+				bestActive = s.mActive;
 			}
 		}
-		if (devices) devices->Release();
-		enumerator->Release();
-		return result;
+		return best;
 	}
 
 	unsigned Warnings(const std::vector<Session>& sessions)
@@ -484,7 +553,9 @@ namespace appaudio
 		bool waitingLogged = false;
 		std::vector<int16_t> samples;
 		while (!stop.load()) {
-			const DWORD pid = exeName.empty() ? 0 : FindProcess(exeName);
+			const DWORD root = exeName.empty() ? 0 : FindProcess(exeName);
+			// Apple Music plays from AMPLibraryAgent.exe, a process of its package outside its own tree.
+			const DWORD pid = AudioProcess(root);
 			HANDLE process = pid ? OpenProcess(SYNCHRONIZE, FALSE, pid) : nullptr;
 			Capture capture;
 			std::string error;
@@ -505,7 +576,13 @@ namespace appaudio
 				continue;
 			}
 			waitingLogged = false;
-			LOG("app: capturing %s (process %lu and its children)", name.c_str(), pid);
+			if (pid == root) {
+				LOG("app: capturing %s (process %lu and its children)", name.c_str(), pid);
+			}
+			else {
+				LOG("app: capturing %s through %s (process %lu, same app package, where its sound plays)", name.c_str(),
+					ProcessName(pid).c_str(), pid);
+			}
 
 			// Every 10 s: how loud the capture was and how much of it was silence, so a log tells whether the
 			// app was heard (the mute question: see CLAUDE.md).
@@ -521,6 +598,11 @@ namespace appaudio
 				if (static_cast<int32_t>(GetTickCount() - sessionsAt) >= 0) {
 					sessionsAt = GetTickCount() + 5'000;
 					const std::vector<Session> sessions = Sessions(pid);
+					// Started before it played anything: its package's player process may have a session by now.
+					if (sessions.empty() && pid == root && AudioProcess(root) != root) {
+						LOG("app: %s's sound plays from another process of its package now; capturing that instead", name.c_str());
+						break;
+					}
 					const std::string described = Describe(sessions);
 					if (described != sessionsLogged) {
 						sessionsLogged = described;
