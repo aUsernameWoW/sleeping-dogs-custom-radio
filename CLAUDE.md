@@ -313,7 +313,7 @@ unofficial client, against Spotify's terms: weigh that then).
 - **NetEase Cloud Music ignores Windows' per-app output device** (2026-10-23, user): it plays to the device
   chosen in its own settings, so it had to be set there to "WASAPI: Steam Streaming Speakers"; the volume
   mixer's choice alone didn't move it. Other apps (Spotify, browsers) follow the mixer's choice as far as
-  known. So setting the device from the mod (policy config, see Next) wouldn't help NetEase either.
+  known. So setting the device from the mod (policy config, tried below) wouldn't help NetEase either.
 - **Requirement: Windows 10 build 20348+** (`AUDIOCLIENT_ACTIVATION_PARAMS`), so in practice Windows 11 (or
   Server 2022+). Wine: activation fails (the GPL branch's CI saw `0x80070002`); logged, the station stays silent.
 - **The mute question, answered 2026-10-23 on Windows 11 (`tests/app_audio_manual.cc`, no game)**: a child
@@ -364,9 +364,21 @@ unofficial client, against Spotify's terms: weigh that then).
   in game, nor whether the volume mixer's per-app output device moves it (the session is the agent's). The user
   uses Apple Music, not NetEase (2026-10-27): the docs lead with it. `app_audio_manual probe <exe>` shows all of
   this for a program.
-- Next: maybe next/previous track from the
-  radio (SMTC `TrySkipNextAsync`...); maybe set the app's output device from the mod (only through undocumented policy-config interfaces,
-  as EarTrumpet does: risky).
+- **Setting the app's output device from the mod: tried, not adopted** (2026-10-28, the user asked why it has to be
+  done by hand). `core/app_device.*` (not in the .asi) calls the undocumented WinRT class
+  `Windows.Media.Internal.AudioPolicyConfig` (`IAudioPolicyConfigFactory`, IID `ab3d4648-...` since 21H2, else
+  `2a59116d-...`; `Set/GetPersistedDefaultAudioEndpoint` with the device ID wrapped as
+  `\\?\SWD#MMDEVAPI#<id>#{e6327cad-...}`, both roles), as EarTrumpet does. Get and Set work on Windows 11 and the
+  setting is the volume mixer's. But it only decides where a program's *next* stream opens:
+  `app_audio_manual follow` (a child on the default device via `GetDefaultAudioEndpoint`) stayed where it was;
+  `move AppleMusic.exe 0 reopen|seek` (AMPLibraryAgent.exe playing): no move on the setting, on pause + resume, on
+  a seek or on skipping back; one skip forward moved it (a new stream, probably a track of another format), the
+  next skip didn't. Apple Music keeps its stream open (and the session active) while paused; SMTC
+  `TryStopAsync` closes it, but then its media session empties and `TryPlayAsync` doesn't start it again. So the
+  mod could only take effect once Apple Music restarts, and moving it back after the game the same way (a wrong
+  restore leaves the player's music playing into an unheard device): not worth it. `app_audio_manual media <exe>
+  play|pause|stop|next|previous` prints the sessions after each.
+- Next: maybe next/previous track from the radio (SMTC `TrySkipNextAsync`...).
 
 ## Spotify (2026-10-23, `[Live] Source = spotify`; not yet tried with an account)
 
