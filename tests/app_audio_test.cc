@@ -54,6 +54,17 @@ int main()
 	Check(nowplaying::Format("Artist", "Title") == "Artist - Title", "artist and title");
 	Check(nowplaying::Format("", "Title") == "Title", "title alone");
 	Check(nowplaying::Format("Artist", "").empty(), "no title, no text");
+	Check(nowplaying::Format("Olivia Rodrigo \xE2\x80\x94 GUTS", "vampire", "GUTS") == "Olivia Rodrigo - vampire",
+		"an \"Artist \xE2\x80\x94 Album\" artist loses the album");
+	Check(nowplaying::AppleMusicArtist("Olivia Rodrigo \xE2\x80\x94 you seem pretty sad for a girl so in love") == "Olivia Rodrigo",
+		"Apple Music's artist without its album (seen 2026-10-27)");
+	Check(nowplaying::AppleMusicArtist("Olivia Rodrigo") == "Olivia Rodrigo", "an Apple Music artist without an album");
+	Check(nowplaying::Matches("AppleInc.AppleMusicWin_nzyj5cx40ttqa!App", nowplaying::kAppleMusic), "Apple Music's session");
+	Check(nowplaying::Matches("AppleInc.AppleMusicWin_nzyj5cx40ttqa!App", nowplaying::MatchKey(L"AppleMusic.exe")),
+		"App = AppleMusic.exe finds its session");
+	Check(nowplaying::Format("Olivia Rodrigo", "vampire", "GUTS") == "Olivia Rodrigo - vampire", "a plain artist stays");
+	Check(nowplaying::Format("GUTS", "vampire", "GUTS") == "GUTS - vampire", "an artist that is only the album name stays");
+	Check(nowplaying::Format("Band \xE2\x80\x94 Live", "Song", "Other") == "Band \xE2\x80\x94 Live - Song", "a dash in the artist itself stays");
 
 	using appaudio::Session;
 	const auto session = [](bool defaultDevice, bool active, bool muted, float volume) {

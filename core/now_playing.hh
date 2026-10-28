@@ -17,8 +17,11 @@ namespace nowplaying
 	// Whether a session's SourceAppUserModelId (e.g. "cloudmusic.exe", "Spotify.exe", "Chrome", a packaged
 	// app's "SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify") belongs to the app with that key.
 	bool Matches(const std::string& appId, const std::string& key);
-	// "Artist - Title", or the title alone; empty without a title.
-	std::string Format(const std::string& artist, const std::string& title);
+	// "Artist - Title", or the title alone; empty without a title. An artist ending in " — <album>" loses that part.
+	std::string Format(const std::string& artist, const std::string& title, const std::string& album = {});
+	// Apple Music's session (its package name, as Matches takes it) and its artist without the " — Album" it adds.
+	constexpr const char* kAppleMusic = "appleinc.applemusicwin";
+	std::string AppleMusicArtist(const std::string& artist);
 
 	// Polls every 2 s and sets live::SetNowPlaying to the matching session's title. With `control`, also pauses
 	// the app while the game doesn't play the live station (live::Listening) and resumes it when it does again.

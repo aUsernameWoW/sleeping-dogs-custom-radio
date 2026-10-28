@@ -92,12 +92,28 @@ namespace nowplaying
 		return !key.empty() && Lower(appId).find(key) != std::string::npos;
 	}
 
-	std::string Format(const std::string& artist, const std::string& title)
+	std::string AppleMusicArtist(const std::string& artist)
+	{
+		// Apple Music for Windows (1.1540, 2026-10-27) reports "Artist — Album" as the artist and no AlbumTitle.
+		const size_t dash = artist.find(" \xE2\x80\x94 ");
+		return dash == std::string::npos || dash == 0 ? artist : artist.substr(0, dash);
+	}
+
+	std::string Format(const std::string& artist, const std::string& title, const std::string& album)
 	{
 		if (title.empty()) {
 			return {};
 		}
-		return artist.empty() ? title : artist + " - " + title;
+		// An app that appends the album to the artist would crowd the HUD's one line.
+		std::string who = artist;
+		for (const char* dash : { " \xE2\x80\x94 ", " \xE2\x80\x93 ", " - " }) {
+			const std::string suffix = dash + album;
+			if (!album.empty() && who.size() > suffix.size() && who.compare(who.size() - suffix.size(), suffix.size(), suffix) == 0) {
+				who.resize(who.size() - suffix.size());
+				break;
+			}
+		}
+		return who.empty() ? title : who + " - " + title;
 	}
 
 	void Run(const std::wstring& exeName, bool control, const std::atomic<bool>& stop)
@@ -178,7 +194,13 @@ namespace nowplaying
 						auto properties = found.TryGetMediaPropertiesAsync();
 						if (Finish(properties)) {
 							const auto media = properties.GetResults();
-							title = Format(winrt::to_string(media.Artist()), winrt::to_string(media.Title()));
+							const std::string artist = winrt::to_string(media.Artist()), album = winrt::to_string(media.AlbumTitle());
+							const std::string app = winrt::to_string(found.SourceAppUserModelId());
+							title = Format(Matches(app, kAppleMusic) ? AppleMusicArtist(artist) : artist, winrt::to_string(media.Title()), album);
+							if (title != shown) {
+								// What the app put where: Apple Music sends "Artist — Album" as the artist.
+								LOG("media: artist \"%s\", album \"%s\"", artist.c_str(), album.c_str());
+							}
 						}
 					}
 					else if (!missingLogged) {
