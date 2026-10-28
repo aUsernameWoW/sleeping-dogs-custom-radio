@@ -281,6 +281,8 @@ jobs:
           unzip -j loader.zip '*dinput8.dll' -d package
           cp dist/SDRadio.asi package/plugins/
           cp THIRD-PARTY-NOTICES.md package/plugins/SDRadio-THIRD-PARTY-NOTICES.md
+          # A branch with GPL code (gpl/external-audio) has its license next to the .asi.
+          if [ -f LICENSE ]; then cp LICENSE package/plugins/SDRadio-LICENSE.txt; fi
           cp .github/PUT-YOUR-MUSIC-HERE.txt package/plugins/SDRadio/
           (cd package && zip -r -X ../SDRadio.zip dinput8.dll plugins)
           unzip -l SDRadio.zip

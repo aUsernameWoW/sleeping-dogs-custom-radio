@@ -161,6 +161,7 @@ Bugs 标签里说明情况，并附上 `plugins\SDRadio.log`。
   和 Jorge L Rodriguez）：stb_vorbis 解码 OGG，stb_image、stb_image_resize2、stb_dxt 处理 PNG 图标。
 - [C++/WinRT](https://github.com/microsoft/cppwinrt)（Microsoft）：读取系统媒体会话（SMTC），在 HUD 上显示其他程序正在放的歌名。
 - Windows 的 Media Foundation（Microsoft，系统自带，不在 mod 里）：解码 M4A、WMA 等其他格式。
+- [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio)（g0ldyy，GPL-3.0）：仅限 `gpl/external-audio` 分支：分支上的实验功能（读取系统媒体会话、抓取其他程序的声音）的代码改编自它，所以这个分支的构建按 GPL-3.0 发布（见 [LICENSE](LICENSE)）。
 
 **工具**
 
@@ -383,6 +384,9 @@ This mod uses or builds on the work of these people and projects. Thank you.
 - [C++/WinRT](https://github.com/microsoft/cppwinrt) (Microsoft): reads the system media sessions (SMTC) for the
   song another program plays, shown on the HUD.
 - Windows Media Foundation (Microsoft; part of Windows, not of the mod): decoding M4A, WMA and other formats.
+- [FH6 Universal Radio](https://github.com/g0ldyy/fh6-universal-radio) (g0ldyy, GPL-3.0): only on the
+  `gpl/external-audio` branch, whose experimental code (reading the system's media sessions, capturing another
+  program's audio) is adapted from it; that branch's builds are therefore under the GPL-3.0 ([LICENSE](LICENSE)).
 
 **Tools**
 
