@@ -204,6 +204,21 @@ int wmain(int argc, wchar_t** argv)
 		}
 		return 0;
 	}
+	if (argc >= 3 && std::wstring(argv[1]) == L"probe") {
+		// What the live source would find for that program, without the game: its process, its sessions in the
+		// volume mixer with the warnings, and 3 s of capture.
+		const DWORD root = appaudio::FindProcess(argv[2]);
+		const DWORD pid = appaudio::AudioProcess(root);
+		std::printf("process: %lu, package \"%s\", plays from %lu\n", root,
+			logger::ToUtf8(appaudio::PackageFamily(root).c_str()).c_str(), pid);
+		if (!pid) return 1;
+		const std::vector<appaudio::Session> found = appaudio::Sessions(pid);
+		const unsigned warnings = appaudio::Warnings(found);
+		std::printf("sessions: %s\nwarnings:%s%s%s\n", appaudio::Describe(found).c_str(), warnings ? "" : " none",
+			warnings & appaudio::kWarnMuted ? " muted" : "", warnings & appaudio::kWarnDefaultDevice ? " default-device" : "");
+		std::printf("capture peak %.1f dBFS\n", CapturePeak(pid, 3000));
+		return 0;
+	}
 	if (argc >= 3 && std::wstring(argv[1]) == L"titles") {
 		// What the HUD would show for that program: its media session's title, for 5 s (log in app_audio_manual.log).
 		DeleteFileW(L"app_audio_manual.log");
