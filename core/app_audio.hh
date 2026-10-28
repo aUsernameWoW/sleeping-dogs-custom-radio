@@ -64,8 +64,8 @@ namespace appaudio
 	// The package family of a packaged (Store) app's process ("AppleInc.AppleMusicWin_nzyj5cx40ttqa"); empty
 	// for an ordinary program.
 	std::wstring PackageFamily(DWORD pid);
-	// The process to capture for the app whose tree starts at `root`: `root`, unless its tree has no audio session
-	// and another process of the same package has one. Apple Music for Windows (1.1540) plays from
+	// The process to capture for the app whose tree starts at `root`: `root`, unless no session of its tree renders
+	// and another process of the same package has one that does (or its tree has none and that one is idle). Apple Music for Windows (1.1540) plays from
 	// AMPLibraryAgent.exe, which COM starts outside AppleMusic.exe's tree. Use with COM initialized.
 	DWORD AudioProcess(DWORD root);
 

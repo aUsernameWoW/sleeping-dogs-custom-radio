@@ -357,6 +357,9 @@ unofficial client, against Spotify's terms: weigh that then).
   starts outside its tree (parent: a svchost), so capturing `AppleMusic.exe` gave -90 dBFS. `AudioProcess`:
   when the named tree has no audio session and the process is packaged (`GetPackageFamilyName`), capture the
   same-family process that has one (active first); rechecked every 5 s while the tree stays sessionless.
+  Restarted (2026-10-28), `AppleMusic.exe` had an idle session of its own on the default device while the agent
+  played, which kept the capture on it (-90 dBFS): now only an *active* session keeps the named tree, and every
+  5 s a capture whose process renders nothing moves to the package's process that does (-7.8 dBFS).
   `App = AppleMusic.exe` then captured `AMPLibraryAgent.exe` at -19.5 dBFS. Its media session
   (`AppleInc.AppleMusicWin_nzyj5cx40ttqa!App`) matches `applemusic` as before; it sends "Artist — Album" as the
   artist with an empty AlbumTitle, so for it `AppleMusicArtist` cuts at the first " — " (HUD "Olivia Rodrigo -

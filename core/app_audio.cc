@@ -343,7 +343,13 @@ namespace appaudio
 
 	DWORD AudioProcess(DWORD root)
 	{
-		if (!root || !Sessions(root).empty()) {
+		if (!root) {
+			return root;
+		}
+		// Restarted, Apple Music's own process has an idle session too (2026-10-28) while its agent plays: only one
+		// that renders keeps the choice in the named tree.
+		const std::vector<Session> own = Sessions(root);
+		if (std::any_of(own.begin(), own.end(), [](const Session& s) { return s.mActive; })) {
 			return root;
 		}
 		const std::wstring family = PackageFamily(root);
@@ -358,11 +364,12 @@ namespace appaudio
 			if (added) it->second = PackageFamily(pid) == family;
 			return it->second;
 		});
-		// One that renders now, else any (an idle session is where it will play next).
+		// One that renders now; else the named tree's idle session, else any (an idle session is where it will
+		// play next).
 		DWORD best = root;
 		bool bestActive = false;
 		for (const Session& s : found) {
-			if (best == root || (s.mActive && !bestActive)) {
+			if ((best == root && own.empty()) || (s.mActive && !bestActive)) {
 				best = s.mProcess;
 				bestActive = s.mActive;
 			}
@@ -598,9 +605,11 @@ namespace appaudio
 				if (static_cast<int32_t>(GetTickCount() - sessionsAt) >= 0) {
 					sessionsAt = GetTickCount() + 5'000;
 					const std::vector<Session> sessions = Sessions(pid);
-					// Started before it played anything: its package's player process may have a session by now.
-					if (sessions.empty() && pid == root && AudioProcess(root) != root) {
-						LOG("app: %s's sound plays from another process of its package now; capturing that instead", name.c_str());
+					// Started before it played anything, or the app restarted: another process of its package may be
+					// the one that renders now.
+					const bool rendering = std::any_of(sessions.begin(), sessions.end(), [](const Session& s) { return s.mActive; });
+					if (!rendering && AudioProcess(root) != pid) {
+						LOG("app: %s's sound plays from another of its processes now; capturing that instead", name.c_str());
 						break;
 					}
 					const std::string described = Describe(sessions);
