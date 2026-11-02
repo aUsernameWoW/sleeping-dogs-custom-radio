@@ -411,11 +411,18 @@ unofficial client, against Spotify's terms: weigh that then).
   one renders elsewhere (the player set up routing), the last choice while nothing renders. Zero setup by default,
   the radio effect for those who route; the default-device warning only applies to radio.
   `app_audio_manual auto` with the sine child on Steam Streaming Speakers: radio. Not yet in game.
-- **Direct mode follows the game's radio volume** (2026-11-02; the user asked for "the fade when getting out of the
-  car"). What the game really does is in docs/radio-internals.md, "The radio's volume outside the car": no fade on
-  getting out at all (`on_foot` changes nothing on radio_car), full volume up to 85 m from the car, an S-curve to
-  ≈ -48 dB at 100 m (RTPC `distance`), times the radio volume option (`master_radio_volume`); also a `health` LPF
-  and maybe occlusion, which a volume can't or doesn't follow. hooks.cc hooks `UFG::WwiseInterface::SetWwiseRtpcValue`
+- **Direct mode follows the game's radio volume** (2026-11-02; the user asked for "the crossfade when getting out
+  and in, like the game's stations"; the scope is the car radio, not a Walkman). What the game does is in
+  docs/radio-internals.md, "The radio's volume outside the car": the engine stopping turns the radio off
+  (`ms_player_radio` = `radio_off`: 1.5 s to -96 dB, plus the track's 0.5 s stop fade), starting it turns it on
+  (2.5 s fade in); `distance` (0 dB up to 85 m, S-curve to ≈ -48 dB at 100 m) and the radio volume option
+  (`master_radio_volume`) also apply; a `health` LPF and maybe occlusion a volume can't or doesn't follow. A first
+  version followed only distance and the option, read `on_foot` (nothing on radio_car) as "no fade on getting
+  out", and missed the crossfades: the user corrected it. `AK::SoundEngine::SetState` is hooked for
+  `ms_player_radio` (`live::SetRadioOn`, `RadioStateGain`: in dB, from where a fade had got to); `radio: turned
+  on/off` and `radio: player in a vehicle / on foot` in the log. The follower applies every 30 ms while the gain
+  moves. In auto mode the capture also attaches to the followed app while it's paused (an idle session), so the
+  volume is down before tuning in resumes it: getting in, it fades in with the radio instead of starting loud. hooks.cc hooks `UFG::WwiseInterface::SetWwiseRtpcValue`
   (every RTPC passes it) and keeps those two for the radio's game object (the `AudioEntity*` our events play on,
   from `CreateAndPlayEvent`; the option also comes as a global value at startup) in `live::SetRadio*`;
   `live::GameRadioGain` is the curves. `appaudio::VolumeFollower` sets the app's sessions' mixer volume to the

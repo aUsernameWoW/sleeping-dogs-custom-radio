@@ -103,6 +103,16 @@ namespace hooks
 		constexpr uint32_t kRtpcDistance = 1240670792;          // "distance"
 		constexpr uint32_t kRtpcRadioVolume = 1290242000;       // "master_radio_volume" (Radio::sm_radioVolumeRtpcId)
 		constexpr uint64_t kGlobalObject = ~uint64_t{ 0 };
+		// The radio's crossfades getting out and in (live::RadioStateGain): Radio::TurnOffRadio / TurnOnRadio set the
+		// global Wwise state ms_player_radio through AK::SoundEngine::SetState(group, state), the overload every
+		// game wrapper (AudioEntity / WwiseInterface / TidoGame::SetWwiseState) calls. ms_vehicle only for the log.
+		constexpr char kSigSetState[] = "48 83 EC 68 B8 07 00 00 00 89 4C 24 28 66 89 44 24 22";
+		constexpr uint32_t kStatePlayerRadio = 2661365015; // "ms_player_radio"
+		constexpr uint32_t kStateRadioOn = 3530733710;     // "radio_on"
+		constexpr uint32_t kStateRadioOff = 3499653780;    // "radio_off"
+		constexpr uint32_t kStateVehicle = 3424178224;     // "ms_vehicle"
+		constexpr uint32_t kStateInVehicle = 1065084817;   // "in_vehicle"
+		constexpr uint32_t kStateOnFoot = 103063709;       // "on_foot"
 
 		using ExtractFromCacheFn = char*(__fastcall*)(const char* filename);
 		using QMallocFn = void*(__fastcall*)(uint64_t size, const char* name, uint64_t allocationParams);
@@ -118,6 +128,8 @@ namespace hooks
 		using LoadTexturesFn = void(__fastcall*)(void* widget, int oldIndex, int newIndex);
 		using SetRtpcFn = bool(__fastcall*)(uint32_t rtpcId, float value, uint64_t objectId);
 		using SetObstructionFn = int(__fastcall*)(uint64_t objectId, uint32_t listener, float obstruction, float occlusion);
+		using SetStateFn = int(__fastcall*)(uint32_t group, uint32_t state);
+		SetStateFn gSetState = nullptr;
 		SetRtpcFn gSetRtpc = nullptr;
 		SetObstructionFn gSetObstruction = nullptr;
 		std::atomic<uint64_t> gRadioEntity{ 0 }; // the game object our stations' events play on: the player's radio
@@ -453,6 +465,19 @@ namespace hooks
 			return gSetRtpc(rtpcId, value, objectId);
 		}
 
+		int __fastcall SetStateHook(uint32_t group, uint32_t state)
+		{
+			if (group == kStatePlayerRadio && (state == kStateRadioOn || state == kStateRadioOff)) {
+				LOG("radio: turned %s (the game's %s)", state == kStateRadioOn ? "on" : "off",
+					state == kStateRadioOn ? "2.5 s fade in" : "0.5 s track fade, 1.5 s state fade");
+				live::SetRadioOn(state == kStateRadioOn);
+			}
+			else if (group == kStateVehicle && (state == kStateInVehicle || state == kStateOnFoot)) {
+				LOG("radio: player %s", state == kStateInVehicle ? "in a vehicle" : "on foot");
+			}
+			return gSetState(group, state);
+		}
+
 		int __fastcall SetObstructionHook(uint64_t objectId, uint32_t listener, float obstruction, float occlusion)
 		{
 			const uint64_t radio = gRadioEntity.load();
@@ -603,8 +628,12 @@ namespace hooks
 		if (gConfig.mLive && gConfig.mLiveSource == "app") {
 			uint8_t* setRtpc = scan::FindUnique("UFG::WwiseInterface::SetWwiseRtpcValue", kSigSetRtpc);
 			uint8_t* setObstruction = scan::FindUnique("AK::SoundEngine::SetObjectObstructionAndOcclusion", kSigSetObstruction);
+			uint8_t* setState = scan::FindUnique("AK::SoundEngine::SetState", kSigSetState);
 			if (!Hook("SetWwiseRtpcValue", setRtpc, &SetRtpcHook, gSetRtpc)) {
 				LOG("hook: a directly heard app won't follow the game's radio volume");
+			}
+			if (!Hook("SetState", setState, &SetStateHook, gSetState)) {
+				LOG("hook: a directly heard app won't fade with the radio getting out of and into the car");
 			}
 			Hook("SetObjectObstructionAndOcclusion", setObstruction, &SetObstructionHook, gSetObstruction);
 		}

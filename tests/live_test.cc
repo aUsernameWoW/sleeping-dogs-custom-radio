@@ -255,6 +255,24 @@ int main()
 	Check(close(live::RadioGain(), 0.002f), "the hooks' values combine");
 	live::SetRadioDistance(0.0f);
 	live::SetRadioVolume(10.0f);
+
+	// Getting out: the track's 0.5 s fade × 1.5 s to -96 dB; getting in: 2.5 s up from -96 dB, in dB.
+	Check(close(live::RadioStateGain(false, 1.0f, 0), 1.0f), "off: starts where the radio was");
+	Check(close(live::RadioStateGain(false, 1.0f, 250), 0.5f * std::pow(10.0f, -96.0f / 6.0f / 20.0f)), "off: a quarter second in");
+	Check(live::RadioStateGain(false, 1.0f, 500) == 0.0f && live::RadioStateGain(false, 1.0f, 5'000) == 0.0f, "off: silent after the track's fade");
+	Check(live::RadioStateGain(true, 0.0f, 0) == 0.0f, "on: starts silent");
+	Check(close(live::RadioStateGain(true, 0.0f, 1'250), std::pow(10.0f, -48.0f / 20.0f)), "on: -48 dB half way");
+	Check(close(live::RadioStateGain(true, 0.0f, 2'500), 1.0f) && close(live::RadioStateGain(true, 0.0f, 9'000), 1.0f), "on: full after 2.5 s");
+	Check(close(live::RadioStateGain(true, 0.5f, 0), 0.5f) && live::RadioStateGain(true, 0.5f, 1'000) > 0.5f,
+		"on: back in during a fade out, from where it had got to");
+	Check(close(live::RadioGain(), 1.0f), "on until the game says otherwise");
+	live::SetRadioOn(false);
+	Sleep(600);
+	Check(live::RadioGain() == 0.0f, "turned off: silent after 0.5 s");
+	live::SetRadioOn(true);
+	Check(live::RadioGain() < 0.01f, "turned on: starts silent");
+	Sleep(2'600);
+	Check(close(live::RadioGain(), 1.0f), "turned on: full after 2.5 s");
 	if (gFailures) {
 		return 1;
 	}

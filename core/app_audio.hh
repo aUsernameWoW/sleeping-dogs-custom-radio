@@ -94,8 +94,9 @@ namespace appaudio
 		std::wstring mExe;    // "AMPLibraryAgent.exe"
 		std::wstring mFamily; // package family of a Store app, else empty
 	};
-	// Every process but the game with a session that renders now, on any output device. Use with COM initialized.
-	std::vector<Renderer> Renderers();
+	// Every process but the game with a session that renders now (or, with `idle`, any session), on any output
+	// device. Use with COM initialized.
+	std::vector<Renderer> Renderers(bool idle = false);
 	// The renderer of the media session `appId` follows (now_playing.hh's ChosenApp: a package family before '!',
 	// or a name containing the exe's, as nowplaying::Matches takes it); without one and with `allowSole`, the only
 	// renderer if there's exactly one (a player without a media session, such as NetEase Cloud Music by default).

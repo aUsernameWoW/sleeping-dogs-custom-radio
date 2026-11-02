@@ -571,12 +571,12 @@ namespace appaudio
 		return app.empty() || Lower(app) == L"auto";
 	}
 
-	std::vector<Renderer> Renderers()
+	std::vector<Renderer> Renderers(bool idle)
 	{
 		const DWORD self = GetCurrentProcessId();
 		std::vector<Renderer> result;
 		for (const Session& s : AllSessions([self](DWORD pid) { return pid != self; })) {
-			if (!s.mActive || std::any_of(result.begin(), result.end(), [&](const Renderer& r) { return r.mProcess == s.mProcess; })) {
+			if ((!s.mActive && !idle) || std::any_of(result.begin(), result.end(), [&](const Renderer& r) { return r.mProcess == s.mProcess; })) {
 				continue;
 			}
 			Renderer renderer;
@@ -826,8 +826,16 @@ namespace appaudio
 			std::wstring exeName = app;
 			DWORD renderer = 0;
 			if (autoPick) {
-				const std::vector<Renderer> renderers = Renderers();
-				const int match = MatchRenderer(renderers, nowplaying::ChosenApp(), true);
+				std::vector<Renderer> renderers = Renderers();
+				const std::string chosen = nowplaying::ChosenApp();
+				int match = MatchRenderer(renderers, chosen, true);
+				// The followed app paused (by us, as the player left the car): its session is idle. Captured all the
+				// same, so the volume follower holds it down before it plays again: getting in, the radio fades in
+				// over 2.5 s, and an app resumed before the capture attached would start at full volume.
+				if (match < 0 && !chosen.empty()) {
+					renderers = Renderers(true);
+					match = MatchRenderer(renderers, chosen, false);
+				}
 				exeName = match >= 0 ? renderers[match].mExe : std::wstring();
 				renderer = match >= 0 ? renderers[match].mProcess : 0;
 			}
@@ -958,11 +966,12 @@ namespace appaudio
 					break;
 				}
 				if (direct) {
-					// The gain changes by small steps (distance comes every frame near the car, at most every 0.5 s
-					// beyond 50 m), so following it at the read pace (~100 ms) is smooth enough. Unchanged, every 2 s
-					// (a session that appeared, a slider the player moved): enumerating every device's sessions isn't free.
+					// While it changes (the radio's 0.5-2.5 s fades), every 30 ms at most: the loop runs per capture
+					// packet (~10 ms) and enumerating every device's sessions isn't free. Unchanged, every 2 s (a
+					// session that appeared, a slider the player moved).
 					const float gain = live::RadioGain();
-					if (std::fabs(gain - appliedGain) > 0.002f || static_cast<int32_t>(GetTickCount() - appliedAt) >= 2'000) {
+					const int32_t since = static_cast<int32_t>(GetTickCount() - appliedAt);
+					if ((std::fabs(gain - appliedGain) > 0.002f && since >= 30) || since >= 2'000) {
 						follower.Apply(pid, gain);
 						appliedGain = gain;
 						appliedAt = GetTickCount();

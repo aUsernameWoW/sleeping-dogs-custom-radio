@@ -143,8 +143,15 @@ namespace live
 	// (the options' 0-10, linear). Curve values for volume are stored as gain - 1 (-1 = silence), which is how
 	// they are read here: an assumption, not checked against Wwise's code. Linear amplitude, 0..1. Pure.
 	float GameRadioGain(float distance, float radioVolume);
-	// The latest RTPC values the hooks saw for the radio (hooks.cc), and the gain from them. 1 until known.
+	// The radio turning on and off: Radio::TurnOffRadio (the engine stopping as the player gets out) sets the Wwise
+	// state ms_player_radio to radio_off, whose transition is 1.5 s to -96 dB (Init.bnk's STMG and radio_car), and
+	// stops the track with a 0.5 s fade; Radio::TurnOnRadio (the engine starting) sets radio_on, 2.5 s back from
+	// -96 dB. The gain `elapsedMs` into that change, from `startGain` (where the previous one had got to). Wwise
+	// interpolates the state's volume in dB, which is how it's done here (assumed). Linear amplitude. Pure.
+	float RadioStateGain(bool on, float startGain, uint32_t elapsedMs);
+	// The latest values the hooks saw for the radio (hooks.cc), and the gain from them. 1 until known.
 	void SetRadioDistance(float distance);
 	void SetRadioVolume(float radioVolume);
+	void SetRadioOn(bool on);
 	float RadioGain();
 }

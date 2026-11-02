@@ -322,6 +322,42 @@ namespace live
 	{
 		std::atomic<float> gRadioDistance{ 0.0f };
 		std::atomic<float> gRadioVolume{ 10.0f };
+		// The last ms_player_radio change: on or off, since when, from which gain.
+		std::mutex gRadioStateLock;
+		bool gRadioOn = true;
+		ULONGLONG gRadioStateAt = 0;
+		float gRadioStateFrom = 1.0f;
+
+		float StateGainNow()
+		{
+			const ULONGLONG elapsed = gRadioStateAt ? GetTickCount64() - gRadioStateAt : 1'000'000;
+			return RadioStateGain(gRadioOn, gRadioStateFrom, static_cast<uint32_t>((std::min)(elapsed, ULONGLONG{ 1'000'000 })));
+		}
+	}
+
+	float RadioStateGain(bool on, float startGain, uint32_t elapsedMs)
+	{
+		constexpr float kSilentDb = -96.0f;
+		const float startDb = startGain > 0.0f ? (std::max)(20.0f * std::log10(startGain), kSilentDb) : kSilentDb;
+		const float t = static_cast<float>(elapsedMs) / (on ? 2'500.0f : 1'500.0f);
+		const float db = startDb + ((on ? 0.0f : kSilentDb) - startDb) * (std::min)(t, 1.0f);
+		float gain = db <= kSilentDb ? 0.0f : std::pow(10.0f, db / 20.0f);
+		if (!on) {
+			// StopTrack(500): the track itself fades out over 0.5 s, linear.
+			gain *= (std::max)(0.0f, 1.0f - static_cast<float>(elapsedMs) / 500.0f);
+		}
+		return gain;
+	}
+
+	void SetRadioOn(bool on)
+	{
+		std::lock_guard lock(gRadioStateLock);
+		if (on == gRadioOn && gRadioStateAt) {
+			return;
+		}
+		gRadioStateFrom = StateGainNow();
+		gRadioOn = on;
+		gRadioStateAt = GetTickCount64();
 	}
 
 	float GameRadioGain(float distance, float radioVolume)
@@ -352,7 +388,12 @@ namespace live
 
 	float RadioGain()
 	{
-		return GameRadioGain(gRadioDistance.load(), gRadioVolume.load());
+		float state;
+		{
+			std::lock_guard lock(gRadioStateLock);
+			state = StateGainNow();
+		}
+		return GameRadioGain(gRadioDistance.load(), gRadioVolume.load()) * state;
 	}
 
 	bool Listening(DWORD quietMs)

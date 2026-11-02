@@ -96,13 +96,22 @@ radio effect is bypassed at normal speed and only applies in slow motion, below 
 
 ## The radio's volume outside the car (installed build, 2026-11-02)
 
-What a player hears getting out and walking away; `AppSound = direct` follows the first two (CLAUDE.md).
+What a player hears getting out and in; `AppSound = direct` follows the first three (CLAUDE.md).
 
+- **The crossfades getting out and in** (what the user meant, 2026-11-02; first missed by looking at `ms_vehicle`
+  only): `VehicleAudioComponent::Update` stops the engine (`eEVENT_STOP`) and calls `TurnOffRadio` once the vehicle
+  isn't driven (flag 0x02 of +636 clear while 0x01 set); `Radio::TurnOffRadio` sets the global state
+  `ms_player_radio` = `radio_off` (radio_car: -96 dB, transition 1.5 s) and `StopTrack(500)` (the event's own 0.5 s
+  stop fade). `HumanDriverComponent::Update` (also `RemoteDriverComponent`, Skookum `start_radio`) calls
+  `VehicleAudioComponent::TurnOnRadio` -> `Radio::TurnOnRadio`: `radio_on` (2.5 s back from -96 dB), the volume
+  option re-applied, `StartTrack`. Every game wrapper ends in `AK::SoundEngine::SetState(group, state)` (the
+  2-argument overload; it maps state 748895195, "none", to 0). Wwise interpolating the state's volume in dB is assumed.
 - **`distance`**: `AudioEntity::AudioEntityUpdate` sets it on every audio entity (`WwiseInterface::SetWwiseRtpcValue
   (s_uDistanceUID, d, this)`): the listener-to-entity distance in meters, every frame below 25 m, then every
   0..0.5 s (25-50 m) or 0.5 s. `RadioFullyControlled::AudioEntityUpdate` moves the radio entity to the car
-  (`m_pVehAudComponent`'s matrix), and turns the radio off only once the car component is gone. The top node's curve:
-  0 dB up to 85 m, S-curve to ≈ -48 dB at 100 m. The radio keeps playing at full volume next to the car.
+  (`m_pVehAudComponent`'s matrix), and turns the radio off itself only once the car component is gone. The top
+  node's curve: 0 dB up to 85 m, S-curve to ≈ -48 dB at 100 m; it matters only while the radio plays with nobody
+  driving (the car is off the player otherwise).
 - **`master_radio_volume`** (1290242000, `Radio::sm_radioVolumeRtpcId`): `Radio::SetRadioVolume` clamps the option
   to 0..10 and sets it on the radio entity and globally (object ~0); radio_car's curve: (0, -1) to (10, 0) linear.
 - **radio_car** (Init.bnk, bus 3551958221, parent master_music): RTPC `health` (3677180323) on the LPF, 75 at 0 to
@@ -110,7 +119,8 @@ What a player hears getting out and walking away; `AppSound = direct` follows th
   `in_vehicle_ramming` LPF 25 / -3 dB; **`on_foot` changes nothing**), 3538277082 (unnamed state 1875627670: +3 dB),
   3813406269 (no states), `ms_player_radio` (`radio_off` -96 dB; `Radio::TurnOffRadio`/`TurnOnRadio`). STMG
   transition times: `ms_vehicle` in_vehicle <-> on_foot 2 s, `ms_player_radio` on -> off 1.5 s, off -> on 2.5 s.
-  `ms_vehicle` is set by `VehicleAudioComponent::SetDriverType` (`on_foot` when the last player driver leaves).
+  `ms_vehicle` is set by `VehicleAudioComponent::SetDriverType` (`on_foot` when the last player driver leaves);
+  for the radio, `ms_player_radio` is the one that fades.
 - **Obstruction / occlusion**: `AudioEntityUpdate` calls `AK::SoundEngine::SetObjectObstructionAndOcclusion` for each
   entity from `SetObsOccValues` (raycasts), easing at `TiDo::sm_occlusionRate`. Whether the radio gets any is not
   known yet: SDRadio logs it for the radio's object (`radio: obstruction`).
