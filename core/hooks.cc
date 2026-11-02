@@ -92,6 +92,18 @@ namespace hooks
 		constexpr size_t kRadioFlagsOffset = 0x158;
 		constexpr size_t kWidgetVisibleOffset = 5; // UIHKRadioStationWidget::mVisible
 
+		// What the game does to the radio's volume, for AppSound = direct, where the app is heard outside Wwise and
+		// has to follow it itself (live::GameRadioGain). Every RTPC goes through UFG::WwiseInterface::
+		// SetWwiseRtpcValue(rtpcId, value, objectId); the object is the AudioEntity, the same pointer
+		// CreateAndPlayEvent gets for our events, or ~0 for a global value. Diagnostics: Wwise's
+		// AK::SoundEngine::SetObjectObstructionAndOcclusion(object, listener, obstruction, occlusion), which
+		// AudioEntityUpdate calls from raycasts and which the gain doesn't follow (yet): is the radio occluded?
+		constexpr char kSigSetRtpc[] = "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 40 0F 29 74 24 30 49 8B F0";
+		constexpr char kSigSetObstruction[] = "48 83 EC 68 B8 14 00 00 00 F3 0F 11 54 24 34 F3 0F 11 5C 24 38";
+		constexpr uint32_t kRtpcDistance = 1240670792;          // "distance"
+		constexpr uint32_t kRtpcRadioVolume = 1290242000;       // "master_radio_volume" (Radio::sm_radioVolumeRtpcId)
+		constexpr uint64_t kGlobalObject = ~uint64_t{ 0 };
+
 		using ExtractFromCacheFn = char*(__fastcall*)(const char* filename);
 		using QMallocFn = void*(__fastcall*)(uint64_t size, const char* name, uint64_t allocationParams);
 		using OpenFn = ak::AKRESULT(__fastcall*)(void* self, uint32_t fileId, uint32_t openMode, ak::FileSystemFlags* flags, bool* syncOpen, ak::FileDesc* desc);
@@ -104,6 +116,11 @@ namespace hooks
 		using StepStationFn = void(__fastcall*)(void* radio, bool displayStationId);
 		using SetStationFn = void(__fastcall*)(void* radio, uint32_t index);
 		using LoadTexturesFn = void(__fastcall*)(void* widget, int oldIndex, int newIndex);
+		using SetRtpcFn = bool(__fastcall*)(uint32_t rtpcId, float value, uint64_t objectId);
+		using SetObstructionFn = int(__fastcall*)(uint64_t objectId, uint32_t listener, float obstruction, float occlusion);
+		SetRtpcFn gSetRtpc = nullptr;
+		SetObstructionFn gSetObstruction = nullptr;
+		std::atomic<uint64_t> gRadioEntity{ 0 }; // the game object our stations' events play on: the player's radio
 
 		ExtractFromCacheFn gExtractFromCache = nullptr;
 		QMallocFn gQMalloc = nullptr;
@@ -408,8 +425,46 @@ namespace hooks
 			const bool played = gCreateAndPlayEvent(entity, eventId, controller, params, fadeMs, externalSources);
 			if (gStationReady && gEventIds.count(eventId)) {
 				LOG("radio: post event %08X on entity %p: %s", eventId, entity, played ? "playing" : "FAILED");
+				gRadioEntity = reinterpret_cast<uint64_t>(entity);
 			}
 			return played;
+		}
+
+		bool __fastcall SetRtpcHook(uint32_t rtpcId, float value, uint64_t objectId)
+		{
+			const uint64_t radio = gRadioEntity.load();
+			if (rtpcId == kRtpcDistance && radio && objectId == radio) {
+				// Every frame below 25 m, then at most every 0.5 s: log only steps of 5 m.
+				static float logged = -100.0f;
+				if (std::fabs(value - logged) >= 5.0f) {
+					logged = value;
+					LOG("radio: distance %.0f m, gain %.2f", value, live::GameRadioGain(value, 10.0f));
+				}
+				live::SetRadioDistance(value);
+			}
+			else if (rtpcId == kRtpcRadioVolume && (objectId == kGlobalObject || (radio && objectId == radio))) {
+				static float logged = -1.0f;
+				if (value != logged) {
+					logged = value;
+					LOG("radio: radio volume option %.1f", value);
+				}
+				live::SetRadioVolume(value);
+			}
+			return gSetRtpc(rtpcId, value, objectId);
+		}
+
+		int __fastcall SetObstructionHook(uint64_t objectId, uint32_t listener, float obstruction, float occlusion)
+		{
+			const uint64_t radio = gRadioEntity.load();
+			if (radio && objectId == radio) {
+				static float loggedObstruction = -1.0f, loggedOcclusion = -1.0f;
+				if (std::fabs(obstruction - loggedObstruction) >= 0.1f || std::fabs(occlusion - loggedOcclusion) >= 0.1f) {
+					loggedObstruction = obstruction;
+					loggedOcclusion = occlusion;
+					LOG("radio: obstruction %.2f, occlusion %.2f", obstruction, occlusion);
+				}
+			}
+			return gSetObstruction(objectId, listener, obstruction, occlusion);
 		}
 
 		// The HUD's song line: on the live station, what the source plays now (the track's fixed title, the
@@ -544,6 +599,14 @@ namespace hooks
 		LOG("hook: station hooks ready%s", diagnostics ? "" : " (diagnostic hooks missing)");
 		if (gConfig.mLive && !InstallSongTitle()) {
 			LOG("hook: the live station's song title can't be shown on the HUD (it shows the fixed title)");
+		}
+		if (gConfig.mLive && gConfig.mLiveSource == "app") {
+			uint8_t* setRtpc = scan::FindUnique("UFG::WwiseInterface::SetWwiseRtpcValue", kSigSetRtpc);
+			uint8_t* setObstruction = scan::FindUnique("AK::SoundEngine::SetObjectObstructionAndOcclusion", kSigSetObstruction);
+			if (!Hook("SetWwiseRtpcValue", setRtpc, &SetRtpcHook, gSetRtpc)) {
+				LOG("hook: a directly heard app won't follow the game's radio volume");
+			}
+			Hook("SetObjectObstructionAndOcclusion", setObstruction, &SetObstructionHook, gSetObstruction);
 		}
 	}
 }

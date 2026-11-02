@@ -318,6 +318,43 @@ namespace live
 		gLastActivity = GetTickCount();
 	}
 
+	namespace
+	{
+		std::atomic<float> gRadioDistance{ 0.0f };
+		std::atomic<float> gRadioVolume{ 10.0f };
+	}
+
+	float GameRadioGain(float distance, float radioVolume)
+	{
+		// RTPC `distance` on the station top node: (0, 0) linear to (85, 0), S-curve to (100, -0.996).
+		float distanceCurve = 0.0f;
+		if (distance >= 100.0f) {
+			distanceCurve = -0.996f;
+		}
+		else if (distance > 85.0f) {
+			const float t = (distance - 85.0f) / 15.0f;
+			distanceCurve = -0.996f * t * t * (3.0f - 2.0f * t);
+		}
+		// RTPC `master_radio_volume` on radio_car: (0, -1) linear to (10, 0).
+		const float volumeCurve = (std::clamp)(radioVolume, 0.0f, 10.0f) / 10.0f - 1.0f;
+		return (1.0f + distanceCurve) * (1.0f + volumeCurve);
+	}
+
+	void SetRadioDistance(float distance)
+	{
+		gRadioDistance = distance;
+	}
+
+	void SetRadioVolume(float radioVolume)
+	{
+		gRadioVolume = radioVolume;
+	}
+
+	float RadioGain()
+	{
+		return GameRadioGain(gRadioDistance.load(), gRadioVolume.load());
+	}
+
 	bool Listening(DWORD quietMs)
 	{
 		return gOpenCount.load() > 0 && GetTickCount() - gLastActivity.load() < quietMs;

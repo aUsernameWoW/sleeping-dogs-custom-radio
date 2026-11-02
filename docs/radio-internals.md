@@ -89,6 +89,33 @@ ten station banks, byte-identical), props priority 100 / distance offset 0, 2D p
 | 2420253395 | 0 (volume, dB) | -96.3→-1, 0→0 (linear) |
 | 1240670792 | 0 (volume, dB) | 0→0, 85→0 (S-curve), 100→-0.996 |
 
+The names, recovered 2026-11-02 by hashing the exe's strings: 3026679070 is **`game_sim_time_scale`** (so the
+radio effect is bypassed at normal speed and only applies in slow motion, below 0.95), 1240670792 is **`distance`**,
+2420253395 unknown. Volume curves with scaling 2 store gain - 1: -1 is silence (-0.996 ≈ -48 dB), which fits
+`master_radio_volume` 0 muting; read that way, not checked in Wwise's code.
+
+## The radio's volume outside the car (installed build, 2026-11-02)
+
+What a player hears getting out and walking away; `AppSound = direct` follows the first two (CLAUDE.md).
+
+- **`distance`**: `AudioEntity::AudioEntityUpdate` sets it on every audio entity (`WwiseInterface::SetWwiseRtpcValue
+  (s_uDistanceUID, d, this)`): the listener-to-entity distance in meters, every frame below 25 m, then every
+  0..0.5 s (25-50 m) or 0.5 s. `RadioFullyControlled::AudioEntityUpdate` moves the radio entity to the car
+  (`m_pVehAudComponent`'s matrix), and turns the radio off only once the car component is gone. The top node's curve:
+  0 dB up to 85 m, S-curve to ≈ -48 dB at 100 m. The radio keeps playing at full volume next to the car.
+- **`master_radio_volume`** (1290242000, `Radio::sm_radioVolumeRtpcId`): `Radio::SetRadioVolume` clamps the option
+  to 0..10 and sets it on the radio entity and globally (object ~0); radio_car's curve: (0, -1) to (10, 0) linear.
+- **radio_car** (Init.bnk, bus 3551958221, parent master_music): RTPC `health` (3677180323) on the LPF, 75 at 0 to
+  0 from 60 on (low health muffles the radio); state groups `ms_vehicle` (an unnamed state 770684599 -3 dB,
+  `in_vehicle_ramming` LPF 25 / -3 dB; **`on_foot` changes nothing**), 3538277082 (unnamed state 1875627670: +3 dB),
+  3813406269 (no states), `ms_player_radio` (`radio_off` -96 dB; `Radio::TurnOffRadio`/`TurnOnRadio`). STMG
+  transition times: `ms_vehicle` in_vehicle <-> on_foot 2 s, `ms_player_radio` on -> off 1.5 s, off -> on 2.5 s.
+  `ms_vehicle` is set by `VehicleAudioComponent::SetDriverType` (`on_foot` when the last player driver leaves).
+- **Obstruction / occlusion**: `AudioEntityUpdate` calls `AK::SoundEngine::SetObjectObstructionAndOcclusion` for each
+  entity from `SetObsOccValues` (raycasts), easing at `TiDo::sm_occlusionRate`. Whether the radio gets any is not
+  known yet: SDRadio logs it for the radio's object (`radio: obstruction`).
+- Not looked at: HDR / ducking of master_music under dialogue.
+
 ## Wwise 2012.2 bank objects used (v88)
 
 - Sound (2): `LoadSource` = plugin u32 (0x00010001 PCM, 0x00040001 Vorbis, 0x00080001 external), stream type

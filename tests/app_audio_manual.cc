@@ -8,6 +8,7 @@
 //   app_audio_manual titles <exe>         the HUD title for that program, from its media session
 //   app_audio_manual control <exe>        pausing and resuming that program as the station is left and played
 //   app_audio_manual auto [s]             App = auto: which program it follows and captures
+//   app_audio_manual gain <index>         AppSound = direct's volume following on a child there, and its restores
 //   app_audio_manual move <exe> <index>   sending that program to that output device and back
 //   app_audio_manual follow <index>       whether a child playing on the default device follows such a move
 //   app_audio_manual play <index>|default <s>  (the child) play the sine
@@ -344,6 +345,45 @@ int wmain(int argc, wchar_t** argv)
 		live::Release();
 		stop = true;
 		control.join();
+		return 0;
+	}
+	if (argc >= 3 && std::wstring(argv[1]) == L"gain") {
+		// AppSound = direct's volume following, on a child playing the sine on that device: gain 0.5, a crash
+		// (the state file left behind), the leftover put back, then gain 0.25 and a clean restore.
+		const size_t index = static_cast<size_t>(_wtoi(argv[2]));
+		if (index >= devices.size()) return 2;
+		wchar_t self[MAX_PATH];
+		GetModuleFileNameW(nullptr, self, MAX_PATH);
+		std::wstring command = L"\"" + std::wstring(self) + L"\" play " + std::to_wstring(index) + L" 8";
+		STARTUPINFOW startup = { sizeof(startup) };
+		PROCESS_INFORMATION child = {};
+		if (!CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &child)) return 3;
+		CloseHandle(child.hThread);
+		Sleep(1500);
+		CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+		const auto show = [&](const char* when) {
+			const std::vector<appaudio::Session> sessions = appaudio::Sessions(child.dwProcessId);
+			std::printf("%-28s %s\n", when, appaudio::Describe(sessions).c_str());
+		};
+		const std::wstring state = L"app_audio_manual-volume.txt";
+		show("before:");
+		{
+			auto* crashed = new appaudio::VolumeFollower(state); // never destroyed: a crash
+			crashed->Apply(child.dwProcessId, 0.5f);
+			show("gain 0.5:");
+		}
+		std::printf("state file left: %s\n", GetFileAttributesW(state.c_str()) != INVALID_FILE_ATTRIBUTES ? "yes" : "no");
+		appaudio::VolumeFollower::RestoreLeftover(state);
+		show("leftover put back:");
+		std::printf("state file left: %s\n", GetFileAttributesW(state.c_str()) != INVALID_FILE_ATTRIBUTES ? "yes" : "no");
+		{
+			appaudio::VolumeFollower follower(state);
+			follower.Apply(child.dwProcessId, 0.25f);
+			show("gain 0.25:");
+		}
+		show("restored:");
+		TerminateProcess(child.hProcess, 0);
+		CloseHandle(child.hProcess);
 		return 0;
 	}
 	if (argc >= 2 && std::wstring(argv[1]) == L"auto") {

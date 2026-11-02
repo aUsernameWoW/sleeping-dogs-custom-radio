@@ -314,6 +314,52 @@ namespace appaudio
 			return result;
 		}
 
+		// Every session on every active output device, with what it takes to change its volume.
+		void ForEachSession(const std::function<void(DWORD pid, const std::wstring& session, ISimpleAudioVolume* volume)>& visit)
+		{
+			IMMDeviceEnumerator* enumerator = nullptr;
+			if (FAILED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, __uuidof(IMMDeviceEnumerator),
+				reinterpret_cast<void**>(&enumerator)))) {
+				return;
+			}
+			IMMDeviceCollection* devices = nullptr;
+			UINT count = 0;
+			if (SUCCEEDED(enumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &devices)) && SUCCEEDED(devices->GetCount(&count))) {
+				for (UINT d = 0; d < count; ++d) {
+					IMMDevice* device = nullptr;
+					IAudioSessionManager2* manager = nullptr;
+					IAudioSessionEnumerator* sessions = nullptr;
+					int n = 0;
+					if (SUCCEEDED(devices->Item(d, &device)) &&
+						SUCCEEDED(device->Activate(__uuidof(IAudioSessionManager2), CLSCTX_ALL, nullptr, reinterpret_cast<void**>(&manager))) &&
+						SUCCEEDED(manager->GetSessionEnumerator(&sessions)) && SUCCEEDED(sessions->GetCount(&n))) {
+						for (int i = 0; i < n; ++i) {
+							IAudioSessionControl* control = nullptr;
+							IAudioSessionControl2* control2 = nullptr;
+							ISimpleAudioVolume* volume = nullptr;
+							LPWSTR id = nullptr;
+							DWORD pid = 0;
+							if (SUCCEEDED(sessions->GetSession(i, &control)) &&
+								SUCCEEDED(control->QueryInterface(__uuidof(IAudioSessionControl2), reinterpret_cast<void**>(&control2))) &&
+								SUCCEEDED(control2->GetProcessId(&pid)) && SUCCEEDED(control2->GetSessionIdentifier(&id)) && id &&
+								SUCCEEDED(control->QueryInterface(__uuidof(ISimpleAudioVolume), reinterpret_cast<void**>(&volume)))) {
+								visit(pid, id, volume);
+							}
+							CoTaskMemFree(id);
+							if (volume) volume->Release();
+							if (control2) control2->Release();
+							if (control) control->Release();
+						}
+					}
+					if (sessions) sessions->Release();
+					if (manager) manager->Release();
+					if (device) device->Release();
+				}
+			}
+			if (devices) devices->Release();
+			enumerator->Release();
+		}
+
 		std::string ProcessName(DWORD pid)
 		{
 			HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
@@ -383,6 +429,117 @@ namespace appaudio
 			}
 		}
 		return best;
+	}
+
+	float FollowVolume(float& player, float set, float current, float gain)
+	{
+		// Someone else's value since our last set: the player moved the slider. Near silence the division would
+		// blow a rounding step up, so it waits until the gain is back.
+		if (set >= 0.0f && std::fabs(current - set) > 0.02f && gain > 0.05f) {
+			player = (std::min)(current / gain, 1.0f);
+		}
+		return (std::clamp)(player * gain, 0.0f, 1.0f);
+	}
+
+	void VolumeFollower::Apply(DWORD pid, float gain)
+	{
+		const std::unordered_set<DWORD> tree = ProcessTree(pid);
+		bool save = false;
+		ForEachSession([&](DWORD process, const std::wstring& session, ISimpleAudioVolume* volume) {
+			float current = 1.0f;
+			if (!tree.count(process) || FAILED(volume->GetMasterVolume(&current))) {
+				return;
+			}
+			auto held = std::find_if(mHeld.begin(), mHeld.end(), [&](const Held& h) { return h.mSession == session; });
+			if (held == mHeld.end()) {
+				if (std::fabs(gain - 1.0f) < 0.005f) {
+					return;
+				}
+				// Saved before the first change, so a crash right after it still leaves the way back.
+				mHeld.push_back({ session, current, -1.0f });
+				held = mHeld.end() - 1;
+				save = true;
+				Save();
+			}
+			const float before = held->mPlayer;
+			const float target = FollowVolume(held->mPlayer, held->mSet, current, gain);
+			if (held->mPlayer != before) {
+				LOG("app: the player set the volume to %d%%; following the game from there", static_cast<int>(std::lround(held->mPlayer * 100.0f)));
+				save = true;
+			}
+			if (std::fabs(target - current) > 0.002f && SUCCEEDED(volume->SetMasterVolume(target, nullptr))) {
+				held->mSet = target;
+			}
+		});
+		if (save) {
+			Save();
+		}
+	}
+
+	void VolumeFollower::Restore()
+	{
+		if (mHeld.empty()) {
+			return;
+		}
+		ForEachSession([&](DWORD, const std::wstring& session, ISimpleAudioVolume* volume) {
+			const auto held = std::find_if(mHeld.begin(), mHeld.end(), [&](const Held& h) { return h.mSession == session; });
+			float current = 0.0f;
+			// A value the player chose after our last change stays.
+			if (held != mHeld.end() && SUCCEEDED(volume->GetMasterVolume(&current)) && (held->mSet < 0.0f || std::fabs(current - held->mSet) <= 0.02f)) {
+				volume->SetMasterVolume(held->mPlayer, nullptr);
+			}
+		});
+		mHeld.clear();
+		DeleteFileW(mStateFile.c_str());
+	}
+
+	void VolumeFollower::Save() const
+	{
+		FILE* file = nullptr;
+		if (_wfopen_s(&file, mStateFile.c_str(), L"wb") != 0 || !file) {
+			return;
+		}
+		for (const Held& h : mHeld) {
+			std::fprintf(file, "%.4f\t%s\n", h.mPlayer, logger::ToUtf8(h.mSession.c_str()).c_str());
+		}
+		std::fclose(file);
+	}
+
+	void VolumeFollower::RestoreLeftover(const std::wstring& stateFile)
+	{
+		FILE* file = nullptr;
+		if (_wfopen_s(&file, stateFile.c_str(), L"rb") != 0 || !file) {
+			return;
+		}
+		std::vector<std::pair<float, std::wstring>> left;
+		char line[2048];
+		while (std::fgets(line, sizeof(line), file)) {
+			char* tab = std::strchr(line, '\t');
+			if (!tab) continue;
+			std::string session = tab + 1;
+			while (!session.empty() && (session.back() == '\n' || session.back() == '\r')) session.pop_back();
+			left.emplace_back(static_cast<float>(std::atof(line)), Widen(session));
+		}
+		std::fclose(file);
+		ForEachSession([&](DWORD, const std::wstring& session, ISimpleAudioVolume* volume) {
+			for (auto it = left.begin(); it != left.end(); ++it) {
+				if (it->second == session && SUCCEEDED(volume->SetMasterVolume(it->first, nullptr))) {
+					LOG("app: put a program's volume back to %d%% (the game ended before SDRadio could)", static_cast<int>(std::lround(it->first * 100.0f)));
+					left.erase(it);
+					break;
+				}
+			}
+		});
+		// One that isn't running now keeps its line for the next start.
+		if (left.empty()) {
+			DeleteFileW(stateFile.c_str());
+		}
+		else if (_wfopen_s(&file, stateFile.c_str(), L"wb") == 0 && file) {
+			for (const auto& [player, session] : left) {
+				std::fprintf(file, "%.4f\t%s\n", player, logger::ToUtf8(session.c_str()).c_str());
+			}
+			std::fclose(file);
+		}
 	}
 
 	Sound ParseSound(const std::string& text)
@@ -647,6 +804,18 @@ namespace appaudio
 		// says nothing keeps the last choice. Auto starts direct: most apps play on the default device.
 		bool direct = sound != Sound::kRadio;
 		int loggedDirect = -1;
+		// Heard directly, the app follows the radio's gain in the game through its mixer volume.
+		const std::wstring stateFile = [] {
+			HMODULE module = nullptr;
+			GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+				reinterpret_cast<LPCWSTR>(&IsAuto), &module);
+			wchar_t path[MAX_PATH];
+			const DWORD length = GetModuleFileNameW(module, path, MAX_PATH);
+			std::wstring dir(path, length);
+			return dir.substr(0, dir.find_last_of(L"\\/") + 1) + L"SDRadio-app-volume.txt";
+		}();
+		VolumeFollower::RestoreLeftover(stateFile);
+		VolumeFollower follower(stateFile);
 		// The song title for the HUD, on its own thread: its WinRT calls may block for seconds, the capture
 		// must not. With App = auto it also decides which app is the player's music.
 		std::thread titles([&] { nowplaying::Run(autoPick ? std::wstring() : app, controlApp, stop); });
@@ -711,6 +880,8 @@ namespace appaudio
 			// Every 5 s: the app's sessions in the volume mixer, logged when they change, with a warning for a
 			// setting that silences the station or doubles the sound.
 			DWORD sessionsAt = GetTickCount();
+			float appliedGain = -1.0f;
+			DWORD appliedAt = GetTickCount();
 			std::string sessionsLogged;
 			unsigned warned = 0;
 			while (!stop.load()) {
@@ -786,6 +957,20 @@ namespace appaudio
 					LOG("app: %s exited", name.c_str());
 					break;
 				}
+				if (direct) {
+					// The gain changes by small steps (distance comes every frame near the car, at most every 0.5 s
+					// beyond 50 m), so following it at the read pace (~100 ms) is smooth enough. Unchanged, every 2 s
+					// (a session that appeared, a slider the player moved): enumerating every device's sessions isn't free.
+					const float gain = live::RadioGain();
+					if (std::fabs(gain - appliedGain) > 0.002f || static_cast<int32_t>(GetTickCount() - appliedAt) >= 2'000) {
+						follower.Apply(pid, gain);
+						appliedGain = gain;
+						appliedAt = GetTickCount();
+					}
+				}
+				else {
+					follower.Restore();
+				}
 				samples.clear();
 				if (!capture.Read(samples, 100, error)) {
 					LOG("app: capture of %s stopped: %s", name.c_str(), error.c_str());
@@ -811,6 +996,7 @@ namespace appaudio
 					peak = 0;
 				}
 			}
+			follower.Restore();
 			CloseHandle(process);
 			live::SetWarning({});
 		}

@@ -130,6 +130,19 @@ int main()
 		!appaudio::Direct(Sound::kAuto, {}, false), "auto, nothing renders (paused): the last choice stays");
 	Check(appaudio::Direct(Sound::kDirect, { session(false, true, false, 1.0f) }, false), "direct stays direct");
 	Check(!appaudio::Direct(Sound::kRadio, { session(true, true, false, 1.0f) }, true), "radio stays radio");
+	// The app's mixer volume following the game's radio gain.
+	{
+		float player = 0.8f;
+		Check(std::fabs(appaudio::FollowVolume(player, -1.0f, 0.8f, 0.5f) - 0.4f) < 0.001f && player == 0.8f, "the player's volume × the gain");
+		Check(std::fabs(appaudio::FollowVolume(player, 0.4f, 0.4f, 0.25f) - 0.2f) < 0.001f && player == 0.8f, "our own value isn't the player's");
+		Check(std::fabs(appaudio::FollowVolume(player, 0.2f, 0.3f, 0.5f) - 0.3f) < 0.001f && std::fabs(player - 0.6f) < 0.001f,
+			"a slider the player moved becomes their setting");
+		Check(appaudio::FollowVolume(player, 0.3f, 0.5f, 0.01f) < 0.01f && std::fabs(player - 0.6f) < 0.001f,
+			"near silence a change isn't read as the player's");
+		Check(appaudio::FollowVolume(player, 0.006f, 0.006f, 1.0f) == 0.6f, "back at unity: the player's volume");
+		player = 0.9f;
+		Check(appaudio::FollowVolume(player, 0.5f, 1.0f, 0.5f) == 0.5f && player == 1.0f, "never above 100%");
+	}
 	Check(appaudio::Describe({}) == "none", "no sessions described");
 	Check(appaudio::Describe({ session(true, true, false, 1.0f), session(false, false, true, 0.25f) }) ==
 		"Speakers (default): active, 100%; Steam Streaming Speakers: idle, muted, 25%", "sessions described");

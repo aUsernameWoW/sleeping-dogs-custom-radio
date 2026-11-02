@@ -136,4 +136,15 @@ namespace live
 	// `quietMs`. Wwise reads every ~0.7 s while it plays; the game's pause menu (or losing focus) stops the reads
 	// but keeps the file open, a station switch or leaving the car closes it.
 	bool Listening(DWORD quietMs);
+
+	// The gain the game gives the radio now, as the station's banks define it (Init.bnk's radio_car bus, the
+	// station top node), from the two RTPCs the game sets on the radio: `distance` (listener to car, in meters,
+	// AudioEntity::AudioEntityUpdate; 0 dB up to 85, an S-curve down to -48 dB at 100) and `master_radio_volume`
+	// (the options' 0-10, linear). Curve values for volume are stored as gain - 1 (-1 = silence), which is how
+	// they are read here: an assumption, not checked against Wwise's code. Linear amplitude, 0..1. Pure.
+	float GameRadioGain(float distance, float radioVolume);
+	// The latest RTPC values the hooks saw for the radio (hooks.cc), and the gain from them. 1 until known.
+	void SetRadioDistance(float distance);
+	void SetRadioVolume(float radioVolume);
+	float RadioGain();
 }

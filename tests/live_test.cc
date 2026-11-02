@@ -239,6 +239,22 @@ int main()
 	TestRing();
 	TestReader();
 	TestPhase();
+
+	// The radio's gain in the game (Init.bnk / station bank curves), which a directly heard app follows.
+	const auto close = [](float a, float b) { return std::fabs(a - b) < 0.001f; };
+	Check(close(live::GameRadioGain(0.0f, 10.0f), 1.0f), "in the car at full radio volume: unity");
+	Check(close(live::GameRadioGain(85.0f, 10.0f), 1.0f), "unity up to 85 m");
+	Check(close(live::GameRadioGain(92.5f, 10.0f), 1.0f - 0.996f * 0.5f), "half way down the S-curve at 92.5 m");
+	Check(live::GameRadioGain(88.0f, 10.0f) > live::GameRadioGain(97.0f, 10.0f), "fading as the player walks away");
+	Check(close(live::GameRadioGain(100.0f, 10.0f), 0.004f) && close(live::GameRadioGain(500.0f, 10.0f), 0.004f), "-48 dB from 100 m on");
+	Check(close(live::GameRadioGain(0.0f, 5.0f), 0.5f) && close(live::GameRadioGain(0.0f, 0.0f), 0.0f), "the radio volume option, linear");
+	Check(close(live::GameRadioGain(0.0f, 12.0f), 1.0f), "the option clamped at 10");
+	Check(close(live::RadioGain(), 1.0f), "unity until the hooks say otherwise");
+	live::SetRadioDistance(100.0f);
+	live::SetRadioVolume(5.0f);
+	Check(close(live::RadioGain(), 0.002f), "the hooks' values combine");
+	live::SetRadioDistance(0.0f);
+	live::SetRadioVolume(10.0f);
 	if (gFailures) {
 		return 1;
 	}

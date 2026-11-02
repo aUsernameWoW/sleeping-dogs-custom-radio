@@ -120,6 +120,43 @@ namespace appaudio
 	// another device than the default; `current` while none renders (a paused app says nothing).
 	bool Direct(Sound mode, const std::vector<Session>& sessions, bool current);
 
+	// AppSound = direct: the app's volume mixer volume follows the game's radio gain (live::RadioGain: walking away
+	// from the car, the radio volume option), as a fraction of the player's own setting. Windows keeps a program's
+	// mixer volume, so the player's value goes to `stateFile` before the first change and back on Restore; a file
+	// left by a crash is put back by RestoreLeftover at the next start. Use from one thread with COM initialized.
+	class VolumeFollower
+	{
+	public:
+		explicit VolumeFollower(std::wstring stateFile) : mStateFile(std::move(stateFile)) {}
+		VolumeFollower(const VolumeFollower&) = delete;
+		VolumeFollower& operator=(const VolumeFollower&) = delete;
+		~VolumeFollower() { Restore(); }
+
+		// Sets the sessions of `pid` and its children to the player's volume × `gain`. A volume the player changed
+		// meanwhile becomes their new setting.
+		void Apply(DWORD pid, float gain);
+		// Puts the player's volumes back.
+		void Restore();
+		// Puts back the volumes a crash left in `stateFile`.
+		static void RestoreLeftover(const std::wstring& stateFile);
+
+	private:
+		struct Held
+		{
+			std::wstring mSession; // IAudioSessionControl2::GetSessionIdentifier: what Windows keeps the volume by
+			float mPlayer = 1.0f;  // the player's volume
+			float mSet = -1.0f;    // what we last set
+		};
+		void Save() const;
+
+		std::wstring mStateFile;
+		std::vector<Held> mHeld;
+	};
+
+	// The volume the player's setting becomes at `gain`, and whether a volume `current` (we set `set`) means the
+	// player moved the slider meanwhile (then `player` updates). Pure, for VolumeFollower.
+	float FollowVolume(float& player, float set, float current, float gain);
+
 	// The live source: waits for the app, captures it, starts over when it exits; meanwhile now_playing.hh puts
 	// the app's song on the HUD and, with `controlApp`, pauses the app while the station isn't played. With
 	// IsAuto(exeName) the app is whichever plays (MatchRenderer), and the capture moves when the player switches

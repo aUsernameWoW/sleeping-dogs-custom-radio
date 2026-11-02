@@ -172,9 +172,23 @@ namespace nowplaying
 		bool unavailable = false;
 		DWORD refreshAt = GetTickCount();
 		DWORD quietSince = 0; // when the game stopped playing the live station, 0 while it plays
+		// Tuning in starts the app if it's paused, as tuning a radio to a station plays it: no switching out of the
+		// game to press play (2026-11-02, the user's request). Only at the tune-in: a pause made while on the
+		// station stays. Handled at the next refresh, which has the sessions.
+		bool wasListening = false;
+		bool tunedIn = false;
 		while (!stop.load() && !unavailable) {
 			try {
 				const DWORD now = GetTickCount();
+				const bool listening = live::Listening(3'000);
+				if (listening && !wasListening) {
+					tunedIn = control;
+					refreshAt = now; // now rather than in up to 2 s
+				}
+				else if (!listening) {
+					tunedIn = false;
+				}
+				wasListening = listening;
 				if (control && session) {
 					Control(session, now, quietSince, name);
 				}
@@ -225,13 +239,21 @@ namespace nowplaying
 					}
 					if (autoPick) {
 						const std::string current = ChosenApp();
-						const int chosen = AutoChoose(allIds, allPlaying, current, gPausedByUs.load());
+						int chosen = AutoChoose(allIds, allPlaying, current, gPausedByUs.load());
+						// Tuned in with nothing playing: the only media session there is is the player's music.
+						if (chosen < 0 && tunedIn && allIds.size() == 1) {
+							chosen = 0;
+						}
+						else if (chosen < 0 && tunedIn && allIds.size() > 1) {
+							LOG("media: App = auto: %zu media sessions and none plays; press play in the one to hear", allIds.size());
+							tunedIn = false;
+						}
 						const std::string id = chosen >= 0 ? allIds[chosen] : std::string();
 						if (chosen >= 0) {
 							found = all[chosen];
 						}
 						if (id != current && !id.empty()) {
-							LOG("media: App = auto: following %s (it plays)", id.c_str());
+							LOG("media: App = auto: following %s (%s)", id.c_str(), allPlaying[chosen] ? "it plays" : "the only media session");
 							name = id;
 							choose(id);
 							loggedStatus = -1;
@@ -241,6 +263,15 @@ namespace nowplaying
 					}
 
 					session = found;
+					// A pause of ours is Control's to undo.
+					if (tunedIn && found && !gPausedByUs.load() &&
+						found.GetPlaybackInfo().PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Paused) {
+						auto play = found.TryPlayAsync();
+						if (Finish(play) && play.GetResults()) {
+							LOG("media: started %s (tuned in to the station)", name.c_str());
+						}
+					}
+					tunedIn = false;
 					std::string title;
 					if (found) {
 						missingLogged = false;

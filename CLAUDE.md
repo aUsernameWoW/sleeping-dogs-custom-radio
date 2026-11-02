@@ -409,11 +409,28 @@ unofficial client, against Spotify's terms: weigh that then).
   goes on for the log's levels) and `PauseApp` makes the station a remote; `radio` = through the station as before;
   `auto` (`appaudio::Direct`) = direct while a *rendering* session is on the default device (`eConsole`), radio once
   one renders elsewhere (the player set up routing), the last choice while nothing renders. Zero setup by default,
-  the radio effect for those who route; the default-device warning only applies to radio. Not done: the app's
-  volume following the game (out of the car, ducking under dialogue, the radio volume option): it would need the
-  radio bus's effective gain from Wwise, and setting `ISimpleAudioVolume` changes the player's persisted mixer
-  setting, so it needs a restore. `app_audio_manual auto` with the sine child on Steam Streaming Speakers: radio.
-  Not yet in game.
+  the radio effect for those who route; the default-device warning only applies to radio.
+  `app_audio_manual auto` with the sine child on Steam Streaming Speakers: radio. Not yet in game.
+- **Direct mode follows the game's radio volume** (2026-11-02; the user asked for "the fade when getting out of the
+  car"). What the game really does is in docs/radio-internals.md, "The radio's volume outside the car": no fade on
+  getting out at all (`on_foot` changes nothing on radio_car), full volume up to 85 m from the car, an S-curve to
+  ≈ -48 dB at 100 m (RTPC `distance`), times the radio volume option (`master_radio_volume`); also a `health` LPF
+  and maybe occlusion, which a volume can't or doesn't follow. hooks.cc hooks `UFG::WwiseInterface::SetWwiseRtpcValue`
+  (every RTPC passes it) and keeps those two for the radio's game object (the `AudioEntity*` our events play on,
+  from `CreateAndPlayEvent`; the option also comes as a global value at startup) in `live::SetRadio*`;
+  `live::GameRadioGain` is the curves. `appaudio::VolumeFollower` sets the app's sessions' mixer volume to the
+  player's volume × gain while direct (on a change or every 2 s), takes a slider the player moved as their new
+  volume (`FollowVolume`), and restores on leaving direct, on a capture's end and at the source's stop. Windows keeps
+  a program's mixer volume, so the player's value goes to `SDRadio-app-volume.txt` next to the .asi before the first
+  change; a run that finds one (a crash) puts it back by session identifier first (kept for a program not running).
+  `app_audio_manual gain 0` (sine child on Steam Streaming Speakers): 100% -> 50% -> file left by a "crash" -> 100%
+  -> 25% -> 100%. Diagnostics: `radio: distance` in 5 m steps, `radio: radio volume option`, and
+  `AK::SoundEngine::SetObjectObstructionAndOcclusion` hooked to log `radio: obstruction` for the radio (does the car
+  occlude it?). Not yet in game; ducking under dialogue not covered.
+- **Tuning in starts the app** (2026-11-02): `nowplaying::Run` sees the not-listening -> listening edge and, at the
+  next refresh (done at once), plays the followed session if it's paused and not paused by us (Control resumes
+  those); in auto mode with nothing playing, the only media session there is gets chosen for it (several: logged,
+  the player presses play). Every tune-in, like a radio; a pause made while on the station still stays.
 - Next: maybe next/previous track from the radio (SMTC `TrySkipNextAsync`...).
 
 ## Spotify (2026-10-23, `[Live] Source = spotify`; not yet tried with an account)
