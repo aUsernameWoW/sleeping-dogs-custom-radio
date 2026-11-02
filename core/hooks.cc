@@ -92,6 +92,18 @@ namespace hooks
 		constexpr size_t kRadioFlagsOffset = 0x158;
 		constexpr size_t kWidgetVisibleOffset = 5; // UIHKRadioStationWidget::mVisible
 
+		// Our station as the default (`[Station] Default`, asked for by players, 2026-11-02). The player becoming a
+		// car's driver runs UFG::VehicleAudioComponent::Init, which takes the player's radio and, for another car
+		// than the last one, sets the car model's preferred station (its audio subtype's RadioStation, when > 0),
+		// then 11 (HKPD) in a police or emergency car; back in the last car it restores the station the player had
+		// there (`sm_playerRadioStationSetInLastVehicle`, which is the current station again). Inside Init, a
+		// SetStation that changes the station to another than 11 is the model's pick: that one becomes ours.
+		// HKPD, the restore, a mission car's RadioStation property (VehicleInteractTask::Begin calls SetStation
+		// outside Init) and scripts' set_radio_station stay the game's; so does a car without a preferred station
+		// (no SetStation: the player's own last station plays on).
+		constexpr char kSigVehicleAudioInit[] = "40 55 56 57 48 83 EC 40 48 C7 44 24 30 FE FF FF FF 48 89 5C 24 68 48 8B EA";
+		constexpr uint32_t kCopScannerStation = 11;
+
 		// What the game does to the radio's volume, for AppSound = direct, where the app is heard outside Wwise and
 		// has to follow it itself (live::GameRadioGain). Every RTPC goes through UFG::WwiseInterface::
 		// SetWwiseRtpcValue(rtpcId, value, objectId); the object is the AudioEntity, the same pointer
@@ -133,6 +145,9 @@ namespace hooks
 		using LoadTexturesFn = void(__fastcall*)(void* widget, int oldIndex, int newIndex);
 		using SetRtpcFn = bool(__fastcall*)(uint32_t rtpcId, float value, uint64_t objectId);
 		using SetObstructionFn = int(__fastcall*)(uint64_t objectId, uint32_t listener, float obstruction, float occlusion);
+		using VehicleAudioInitFn = void(__fastcall*)(void* component, const void* name);
+		VehicleAudioInitFn gVehicleAudioInit = nullptr;
+		thread_local bool gInVehicleAudioInit = false;
 		using SetStateFn = int(__fastcall*)(uint32_t group, uint32_t state);
 		SetStateFn gSetState = nullptr;
 		SetRtpcFn gSetRtpc = nullptr;
@@ -150,6 +165,7 @@ namespace hooks
 		WidgetUpdateFn gWidgetUpdate = nullptr;
 		size_t gCurStationOffset = 0; // RadioFullyControlled::m_curStation, from the getter's first instruction
 		std::atomic<uint32_t> gLiveStationId{ 0 }; // 0: no live station
+		std::atomic<uint32_t> gMusicStationId{ 0 }; // 0: no music station
 		StepStationFn gNextStation = nullptr;
 		StepStationFn gPrevStation = nullptr;
 		SetStationFn gSetStation = nullptr;
@@ -241,6 +257,7 @@ namespace hooks
 					sources.push_back({ bank::TrackFileId(next, k), t.mPath, t.mSampleRate, t.mFrames });
 				}
 				if (AddStation(std::move(station), next, std::move(sources))) {
+					gMusicStationId = next;
 					++next;
 					any = true;
 				}
@@ -444,9 +461,34 @@ namespace hooks
 			gLoadTextures(widget, oldIndex, newIndex);
 		}
 
+		// `[Station] Default`: the station that replaces a car model's own, 0 for none.
+		uint32_t DefaultStation()
+		{
+			const uint32_t music = gMusicStationId.load(), live = gLiveStationId.load();
+			if (gConfig.mDefaultStation == "music") return music ? music : live;
+			if (gConfig.mDefaultStation == "live") return live ? live : music;
+			return 0;
+		}
+
+		void __fastcall VehicleAudioInitHook(void* component, const void* name)
+		{
+			gInVehicleAudioInit = true;
+			gVehicleAudioInit(component, name);
+			gInVehicleAudioInit = false;
+		}
+
 		void __fastcall SetStationHook(void* radio, uint32_t index)
 		{
 			const std::string from = DescribeStation(radio);
+			if (gInVehicleAudioInit) {
+				const auto* station = *reinterpret_cast<const uint8_t* const*>(static_cast<const uint8_t*>(radio) + kRadioCurStationOffset);
+				const uint32_t current = station ? *reinterpret_cast<const uint32_t*>(station + kStationIdOffset) : 0;
+				const uint32_t ours = DefaultStation();
+				if (ours && index != kCopScannerStation && index != current && index != ours) {
+					LOG("radio: default station: %u instead of the car's own station %u", ours, index);
+					index = ours;
+				}
+			}
 			gSetStation(radio, index);
 			NoteTuned(radio);
 			LOG("radio: set station %u: %s -> %s (flags 0x%02X)", index, from.c_str(), DescribeStation(radio).c_str(), RadioFlags(radio));
@@ -646,6 +688,12 @@ namespace hooks
 			Hook("NextStation", nextStation, &NextStationHook, gNextStation) & Hook("PrevStation", prevStation, &PrevStationHook, gPrevStation) &
 			Hook("SetStation", setStation, &SetStationHook, gSetStation);
 		LOG("hook: station hooks ready%s", diagnostics ? "" : " (diagnostic hooks missing)");
+		if (gConfig.mDefaultStation != "off") {
+			uint8_t* vehicleAudioInit = scan::FindUnique("UFG::VehicleAudioComponent::Init", kSigVehicleAudioInit);
+			if (!gSetStation || !Hook("VehicleAudioComponent::Init", vehicleAudioInit, &VehicleAudioInitHook, gVehicleAudioInit)) {
+				LOG("hook: SDRadio can't be the default station (the cars keep their own)");
+			}
+		}
 		if (gConfig.mLive && !InstallSongTitle()) {
 			LOG("hook: the live station's song title can't be shown on the HUD (it shows the fixed title)");
 		}

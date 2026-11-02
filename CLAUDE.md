@@ -493,6 +493,22 @@ while they slept, so only tested with a stand-in.
 - Untested: a real Spotify account, discovery through Windows Firewall (likely a prompt on first run), how
   quickly librespot reacts after being held for minutes (its connection may time out), the replay on return.
 
+## Default station (2026-11-02, `[Station] Default = music | live | off`, default music; asked for by players)
+
+- How the game picks the station on getting in (legacy IDA; the installed build's database failed to open with
+  "internal error 1228" that day, after its `.i64` had been rewritten at a close): `VehicleAudioComponent::Init`,
+  for the player as driver (radio enabled), takes `RadioFullyControlled::sm_playerRadio`; back in the last car
+  (`sm_lastPlayerVehicleAudioComponent`) it sets `sm_playerRadioStationSetInLastVehicle` (saved by `Shutdown` from
+  the radio's current station); in another car it sets the audio subtype's RadioStation (float at +49*4 of its
+  property image) when > 0, then 11 in a police or emergency car. A car without one leaves the radio on the
+  player's last station. `VehicleInteractTask::Begin` sets the scene object's `RadioStation` property (mission
+  cars) straight through `Radio::SetStation`; Skookum `set_radio_station` goes through `SetRadioStation`.
+- The user chose (2026-11-02) to replace only the car model's pick: `VehicleAudioInitHook` marks the thread inside
+  Init, and `SetStationHook` turns a station change there to anything but 11 into `DefaultStation()` (music, else
+  live; or live, else music). The restore equals the current station, HKPD is 11, and mission/script stations
+  come from outside Init, so all of those stay. Alternatives offered and not taken: every car entry; once per
+  session. Logged as `radio: default station: X instead of the car's own station Y`. Not yet in game.
+
 ## Design decisions (don't undo without reason)
 
 - **Inside Wwise via files, not voices**: serving a bank + PCM streams keeps every game behavior (bus,

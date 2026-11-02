@@ -18,6 +18,10 @@ struct Config
 	std::string mTextureName = "Logo_Softly";
 	std::string mTexturePack = "Radio_Softly_TexturePack";
 
+	// Which of our stations replaces a car model's own station when the player gets into another car: "music",
+	// "live" or "off" (hooks.cc, DefaultStation).
+	std::string mDefaultStation = "music";
+
 	// A second station playing a live source (live.hh); off by default.
 	bool mLive = false;
 	std::string mLiveName = "SDRADIO LIVE";

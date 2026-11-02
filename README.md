@@ -74,7 +74,7 @@ SleepingDogsDefinitiveEdition\
 
 **第 5 步：在游戏里收听**
 
-照常从 Steam 启动游戏，上一辆车，像平时一样切换电台。新电台排在所有电台的**最后**，图标是霓虹灯风格的「私家台」，台名默认是 “SDRADIO”。
+照常从 Steam 启动游戏，上一辆车，像平时一样切换电台。新电台排在所有电台的**最后**，图标是霓虹灯风格的「私家台」，台名默认是 “SDRADIO”。换上一辆新车时，收音机默认就会直接放 SDRADIO（警车里的警方频道、任务指定的电台除外）。
 
 ### 常见问题
 
@@ -92,6 +92,10 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 **想改台名或者换音乐文件夹**
 
 用记事本打开 `plugins\SDRadio.ini`，改完保存，重启游戏。每一项都有中文说明。台名最多约 21 个汉字。
+
+**不想上车就放 SDRADIO**
+
+在 `plugins\SDRadio.ini` 的 `[Station]` 里把 `Default` 改成 `off`（改成 `live` 则默认放直播电台），保存后重启游戏。旧版本生成的 ini 里没有这一行，没有时按 `music` 处理，自己加上 `Default = off` 就行。
 
 **想换成自己画的电台图标**
 
@@ -245,7 +249,8 @@ SleepingDogsDefinitiveEdition\
 **Step 5: listen in game**
 
 Start the game from Steam as usual, get into a car and switch radio stations as you normally would. The new
-station comes **last**, with a neon 私家台 ("private station") logo, named "SDRADIO" by default.
+station comes **last**, with a neon 私家台 ("private station") logo, named "SDRADIO" by default. Getting into
+another car, the radio plays SDRADIO straight away (except a police car's scanner and stations set by missions).
 
 ### FAQ
 
@@ -268,6 +273,11 @@ is the safest.
 
 Open `plugins\SDRadio.ini` in Notepad, save your changes and restart the game. Every setting is explained in
 the file. The name can be up to 63 bytes.
+
+**Not tuning to SDRADIO when getting into a car**
+
+In `plugins\SDRadio.ini`, under `[Station]`, set `Default` to `off` (or `live` for the live station), save and
+restart the game. An ini from an older version lacks the line and counts as `music`: add `Default = off`.
 
 **Using your own logo**
 

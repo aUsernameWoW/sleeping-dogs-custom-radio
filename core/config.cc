@@ -44,6 +44,13 @@ namespace config
 			"TextureName = Logo_Softly\n"
 			"TexturePack = Radio_Softly_TexturePack\n"
 			"\n"
+			"; 默认电台：换上另一辆车时，游戏会切到这辆车自己的电台；这里改成 SDRadio。music = 音乐电台，live = 直播电台，\n"
+			"; off = 保持游戏原样。警车/救护车的 HKPD、回到刚下的车时恢复的电台、任务车和脚本指定的电台不受影响。\n"
+			"; Default station: getting into another car, the game tunes to that car's own station; this tunes to SDRadio\n"
+			"; instead. music = the music station, live = the live station, off = as the game does. A police or emergency\n"
+			"; car's HKPD, the station restored in the car you just left, and stations set by missions or scripts stay.\n"
+			"Default = music\n"
+			"\n"
 			"[Live]\n"
 			"; 实验功能：再加一个「直播」电台，播放实时音源（以后是网络电台等）。1 = 开启。\n"
 			"; Experimental: a second, live station playing a real-time source (internet radio and more later). 1 = on.\n"
@@ -171,6 +178,11 @@ namespace config
 		get("Station.MusicFolder", folder);
 		if (auto it = values.find("Station.CustomLogo"); it != values.end()) {
 			gConfig.mCustomLogo = it->second != "0";
+		}
+		if (auto it = values.find("Station.Default"); it != values.end()) {
+			std::string value = it->second;
+			for (char& c : value) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+			gConfig.mDefaultStation = value == "live" || value == "off" || value == "0" ? (value == "0" ? "off" : value) : "music";
 		}
 		if (auto it = values.find("Live.Enabled"); it != values.end()) {
 			gConfig.mLive = it->second == "1";
