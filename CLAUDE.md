@@ -385,6 +385,20 @@ unofficial client, against Spotify's terms: weigh that then).
   mod could only take effect once Apple Music restarts, and moving it back after the game the same way (a wrong
   restore leaves the player's music playing into an unheard device): not worth it. `app_audio_manual media <exe>
   play|pause|stop|next|previous` prints the sessions after each.
+- **`App = auto`** (2026-11-02, the default in a new ini; an empty `App` means it too): no process name to look up.
+  The user found the setup too fiddly for players ("like OBS would be nicer"); OBS's application audio capture is
+  the same process loopback, so the capture was never the hard part: naming the app, and the doubled sound
+  (still open: a direct mode without capture was proposed). `nowplaying::AutoChoose` picks the SMTC session: the
+  followed one while it exists, unless it stopped playing, we didn't pause it and another plays; else the first
+  that plays. `ChosenApp()` publishes its app ID; `appaudio::Renderers()` lists every process but the game with an
+  *active* session, `MatchRenderer` finds the followed app's: package family before the `!` first (Apple Music's
+  agent), then the exe's name as a **whole word** of the ID (`Spotify.exe`, `Chrome`, `VideoLAN.VLC`, `...!Spotify`;
+  a substring as in the named mode let `x.exe` match inside Apple Music's ID: these names are whatever runs).
+  Without a matching session (no SMTC, NetEase's default; Firefox's ID is a hash) the only renderer is taken, but
+  only for the first pick: while capturing, every 5 s only the SMTC choice can move the capture to another
+  process, so a notification sound can't take the station over. `app_audio_manual auto [s]` runs it (2026-11-02,
+  nothing playing: waits; the sine child alone on Steam Streaming Speakers: captured it). Not yet with real players
+  or in game.
 - Next: maybe next/previous track from the radio (SMTC `TrySkipNextAsync`...).
 
 ## Spotify (2026-10-23, `[Live] Source = spotify`; not yet tried with an account)

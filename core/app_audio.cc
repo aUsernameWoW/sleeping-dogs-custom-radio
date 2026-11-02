@@ -165,6 +165,14 @@ namespace appaudio
 			return s;
 		}
 
+		std::wstring Widen(const std::string& utf8)
+		{
+			std::wstring wide(utf8.size(), L'\0');
+			wide.resize(static_cast<size_t>((std::max)(0, MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()),
+				wide.data(), static_cast<int>(wide.size())))));
+			return wide;
+		}
+
 		double PeakDb(int peak)
 		{
 			return peak > 0 ? 20.0 * std::log10(peak / 32768.0) : -96.0;
@@ -377,6 +385,60 @@ namespace appaudio
 		return best;
 	}
 
+	bool IsAuto(const std::wstring& app)
+	{
+		return app.empty() || Lower(app) == L"auto";
+	}
+
+	std::vector<Renderer> Renderers()
+	{
+		const DWORD self = GetCurrentProcessId();
+		std::vector<Renderer> result;
+		for (const Session& s : AllSessions([self](DWORD pid) { return pid != self; })) {
+			if (!s.mActive || std::any_of(result.begin(), result.end(), [&](const Renderer& r) { return r.mProcess == s.mProcess; })) {
+				continue;
+			}
+			Renderer renderer;
+			renderer.mProcess = s.mProcess;
+			renderer.mExe = Widen(ProcessName(s.mProcess));
+			renderer.mFamily = PackageFamily(s.mProcess);
+			result.push_back(std::move(renderer));
+		}
+		return result;
+	}
+
+	int MatchRenderer(const std::vector<Renderer>& renderers, const std::string& appId, bool allowSole)
+	{
+		if (!appId.empty()) {
+			const std::wstring id = Lower(Widen(appId));
+			// A Store app's ID is "<family>!<app>"; its sound may come from another process of the package
+			// (Apple Music's AMPLibraryAgent.exe), which has the family but not the name.
+			for (size_t i = 0; i < renderers.size(); ++i) {
+				const std::wstring family = Lower(renderers[i].mFamily);
+				if (!family.empty() && id.compare(0, family.size(), family) == 0 && (id.size() == family.size() || id[family.size()] == L'!')) {
+					return static_cast<int>(i);
+				}
+			}
+			// The exe's name as a whole word of the ID ("Spotify.exe", "Chrome", "VideoLAN.VLC", a path), not a
+			// substring as with a named App: these names are whatever runs, and a short one ("x.exe") would match
+			// inside any long ID.
+			const auto isWordChar = [](wchar_t c) { return iswalnum(c) != 0; };
+			for (size_t i = 0; i < renderers.size(); ++i) {
+				std::wstring key = Lower(renderers[i].mExe);
+				if (key.size() > 4 && key.compare(key.size() - 4, 4, L".exe") == 0) {
+					key.resize(key.size() - 4);
+				}
+				for (size_t at = key.empty() ? std::wstring::npos : id.find(key); at != std::wstring::npos; at = id.find(key, at + 1)) {
+					const size_t end = at + key.size();
+					if ((at == 0 || !isWordChar(id[at - 1])) && (end == id.size() || !isWordChar(id[end]))) {
+						return static_cast<int>(i);
+					}
+				}
+			}
+		}
+		return allowSole && renderers.size() == 1 ? 0 : -1;
+	}
+
 	unsigned Warnings(const std::vector<Session>& sessions)
 	{
 		unsigned warnings = 0;
@@ -549,17 +611,24 @@ namespace appaudio
 		}
 	}
 
-	void Run(const std::wstring& exeName, bool controlApp, const std::atomic<bool>& stop)
+	void Run(const std::wstring& app, bool controlApp, const std::atomic<bool>& stop)
 	{
 		const HRESULT com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-		const std::string name = logger::ToUtf8(exeName.c_str());
+		const bool autoPick = IsAuto(app);
 		// The song title for the HUD, on its own thread: its WinRT calls may block for seconds, the capture
-		// must not.
-		std::thread titles([&] { nowplaying::Run(exeName, controlApp, stop); });
+		// must not. With App = auto it also decides which app is the player's music.
+		std::thread titles([&] { nowplaying::Run(autoPick ? std::wstring() : app, controlApp, stop); });
 		Feeder feeder;
 		bool waitingLogged = false;
 		std::vector<int16_t> samples;
 		while (!stop.load()) {
+			std::wstring exeName = app;
+			if (autoPick) {
+				const std::vector<Renderer> renderers = Renderers();
+				const int match = MatchRenderer(renderers, nowplaying::ChosenApp(), true);
+				exeName = match >= 0 ? renderers[match].mExe : std::wstring();
+			}
+			const std::string name = logger::ToUtf8(exeName.c_str());
 			const DWORD root = exeName.empty() ? 0 : FindProcess(exeName);
 			// Apple Music plays from AMPLibraryAgent.exe, a process of its package outside its own tree.
 			const DWORD pid = AudioProcess(root);
@@ -570,8 +639,12 @@ namespace appaudio
 				if (pid && process) {
 					LOG("app: can't capture %s (process %lu): %s", name.c_str(), pid, error.c_str());
 				}
+				else if (!waitingLogged && autoPick) {
+					LOG("app: App = auto: no program plays music yet; waiting for one (a media session that plays, or the only "
+						"program making sound)");
+				}
 				else if (!waitingLogged) {
-					LOG("app: %s isn't running; waiting for it", exeName.empty() ? "(no [Live] App set)" : name.c_str());
+					LOG("app: %s isn't running; waiting for it", name.c_str());
 				}
 				waitingLogged = true;
 				if (process) CloseHandle(process);
@@ -616,6 +689,18 @@ namespace appaudio
 					if (other != pid && (sessions.empty() || renders(Sessions(other)))) {
 						LOG("app: %s's sound plays from another of its processes now; capturing that instead", name.c_str());
 						break;
+					}
+					// App = auto: the player started another app (its media session now plays, see AutoChoose). Only a
+					// media session moves the capture: the only process making sound picks the first app, but a
+					// notification sound later mustn't take the station over.
+					if (autoPick) {
+						const std::vector<Renderer> renderers = Renderers();
+						const int match = MatchRenderer(renderers, nowplaying::ChosenApp(), false);
+						if (match >= 0 && !ProcessTree(root).count(renderers[match].mProcess) && renderers[match].mProcess != pid) {
+							LOG("app: App = auto: the music plays from %s now; capturing that instead",
+								logger::ToUtf8(renderers[match].mExe.c_str()).c_str());
+							break;
+						}
 					}
 					const std::string described = Describe(sessions);
 					if (described != sessionsLogged) {

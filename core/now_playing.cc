@@ -8,6 +8,7 @@
 #include <winrt/Windows.Media.Control.h>
 
 #include <chrono>
+#include <mutex>
 
 #include "live.hh"
 #include "log.hh"
@@ -46,6 +47,9 @@ namespace nowplaying
 		// Whether the app is paused because the game stopped playing the live station. Outlives a source run (it
 		// stops 10 s after the station is left), so the next run knows to resume it.
 		std::atomic<bool> gPausedByUs{ false };
+
+		std::mutex gChosenLock;
+		std::string gChosen; // AutoChoose's session's app ID
 
 		// Pauses the app once the game hasn't played the live station for a moment, and resumes it when the game
 		// plays it again, but only a pause of ours: a pause the player made stays, and a program the player
@@ -116,18 +120,46 @@ namespace nowplaying
 		return who.empty() ? title : who + " - " + title;
 	}
 
+	int AutoChoose(const std::vector<std::string>& appIds, const std::vector<bool>& playing, const std::string& current, bool pausedByUs)
+	{
+		int kept = -1, firstPlaying = -1;
+		for (size_t i = 0; i < appIds.size() && i < playing.size(); ++i) {
+			if (!current.empty() && appIds[i] == current && (kept < 0 || playing[i])) {
+				kept = static_cast<int>(i);
+			}
+			if (playing[i] && firstPlaying < 0) {
+				firstPlaying = static_cast<int>(i);
+			}
+		}
+		// Paused by us, it's still the player's music: the game only left the station. Paused by the player while
+		// another app plays, the player has moved on.
+		if (kept >= 0 && (playing[kept] || pausedByUs || firstPlaying < 0)) {
+			return kept;
+		}
+		return firstPlaying;
+	}
+
+	std::string ChosenApp()
+	{
+		std::lock_guard<std::mutex> lock(gChosenLock);
+		return gChosen;
+	}
+
 	void Run(const std::wstring& exeName, bool control, const std::atomic<bool>& stop)
 	{
 		const std::string key = MatchKey(exeName);
-		if (key.empty()) {
-			return;
-		}
+		const bool autoPick = key.empty();
+		const auto choose = [](const std::string& id) {
+			std::lock_guard<std::mutex> lock(gChosenLock);
+			gChosen = id;
+		};
+		choose({});
 		if (!WinRtPresent()) {
 			LOG("media: no WinRT here; the HUD shows the program's name instead of its song");
 			return;
 		}
 		const HRESULT com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-		const std::string name = logger::ToUtf8(exeName.c_str());
+		std::string name = autoPick ? std::string("(no app yet)") : logger::ToUtf8(exeName.c_str());
 
 		GlobalSystemMediaTransportControlsSessionManager manager{ nullptr };
 		GlobalSystemMediaTransportControlsSession session{ nullptr };
@@ -164,13 +196,22 @@ namespace nowplaying
 					GlobalSystemMediaTransportControlsSession found{ nullptr };
 					bool foundPlaying = false;
 					std::string ids;
+					std::vector<GlobalSystemMediaTransportControlsSession> all;
+					std::vector<std::string> allIds;
+					std::vector<bool> allPlaying;
 					for (const auto& candidate : manager.GetSessions()) {
 						const std::string id = winrt::to_string(candidate.SourceAppUserModelId());
 						ids += (ids.empty() ? "" : ", ") + id;
+						const bool playing = candidate.GetPlaybackInfo().PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing;
+						if (autoPick) {
+							all.push_back(candidate);
+							allIds.push_back(id);
+							allPlaying.push_back(playing);
+							continue;
+						}
 						if (!Matches(id, key) || foundPlaying) {
 							continue;
 						}
-						const bool playing = candidate.GetPlaybackInfo().PlaybackStatus() == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing;
 						if (!found || playing) {
 							found = candidate;
 							foundPlaying = playing;
@@ -179,6 +220,22 @@ namespace nowplaying
 					if (ids != loggedIds) {
 						LOG("media: sessions: %s", ids.empty() ? "(none)" : ids.c_str());
 						loggedIds = ids;
+					}
+					if (autoPick) {
+						const std::string current = ChosenApp();
+						const int chosen = AutoChoose(allIds, allPlaying, current, gPausedByUs.load());
+						const std::string id = chosen >= 0 ? allIds[chosen] : std::string();
+						if (chosen >= 0) {
+							found = all[chosen];
+						}
+						if (id != current && !id.empty()) {
+							LOG("media: App = auto: following %s (it plays)", id.c_str());
+							name = id;
+							choose(id);
+							loggedStatus = -1;
+							// A pause of ours belonged to the app we followed before.
+							gPausedByUs = false;
+						}
 					}
 
 					session = found;
@@ -202,6 +259,10 @@ namespace nowplaying
 								LOG("media: artist \"%s\", album \"%s\"", artist.c_str(), album.c_str());
 							}
 						}
+					}
+					else if (!missingLogged && autoPick) {
+						LOG("media: App = auto: no media session plays yet; waiting for one (NetEase Cloud Music: tick SMTC in its settings)");
+						missingLogged = true;
 					}
 					else if (!missingLogged) {
 						LOG("media: no media session of %s, so no song title (NetEase Cloud Music: tick SMTC in its settings)", name.c_str());

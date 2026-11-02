@@ -66,6 +66,41 @@ int main()
 	Check(nowplaying::Format("GUTS", "vampire", "GUTS") == "GUTS - vampire", "an artist that is only the album name stays");
 	Check(nowplaying::Format("Band \xE2\x80\x94 Live", "Song", "Other") == "Band \xE2\x80\x94 Live - Song", "a dash in the artist itself stays");
 
+	// App = auto: which media session it follows.
+	using nowplaying::AutoChoose;
+	const std::string apple = "AppleInc.AppleMusicWin_nzyj5cx40ttqa!App";
+	Check(AutoChoose({}, {}, "", false) == -1, "no sessions, nothing to follow");
+	Check(AutoChoose({ apple, "Chrome" }, { false, false }, "", false) == -1, "nothing plays: wait for one that does");
+	Check(AutoChoose({ apple, "Chrome" }, { false, true }, "", false) == 1, "the one that plays");
+	Check(AutoChoose({ apple, "Chrome" }, { true, true }, "Chrome", false) == 1, "the followed one while it plays, though another does too");
+	Check(AutoChoose({ apple, "Chrome" }, { false, true }, apple, true) == 0, "paused by us, it stays the music while the browser plays");
+	Check(AutoChoose({ apple, "Chrome" }, { false, true }, apple, false) == 1, "paused by the player while another plays: follow that");
+	Check(AutoChoose({ apple, "Chrome" }, { false, false }, apple, false) == 0, "paused by the player and nothing else plays: stay");
+	Check(AutoChoose({ "Chrome" }, { false }, apple, true) == -1, "the followed app closed and nothing plays");
+	Check(AutoChoose({ "Chrome", "Chrome" }, { false, true }, "Chrome", false) == 1, "of two sessions of the followed app, the one that plays");
+
+	// App = auto: which process the followed session's sound comes from.
+	using appaudio::Renderer;
+	const std::vector<Renderer> renderers = {
+		{ 100, L"Discord.exe", L"" },
+		{ 200, L"AMPLibraryAgent.exe", L"AppleInc.AppleMusicWin_nzyj5cx40ttqa" },
+		{ 300, L"chrome.exe", L"" },
+	};
+	Check(appaudio::MatchRenderer(renderers, apple, false) == 1, "a Store app's sound by its package (Apple Music's agent)");
+	Check(appaudio::MatchRenderer(renderers, "Chrome", false) == 2, "a desktop app by its name");
+	Check(appaudio::MatchRenderer(renderers, "308046B0AF4A39CB", true) == -1, "an ID that names no process, several renderers: none");
+	Check(appaudio::MatchRenderer({ renderers[2] }, "308046B0AF4A39CB", true) == 0, "an ID that names no process, one renderer: that one");
+	Check(appaudio::MatchRenderer({ renderers[2] }, "", false) == -1, "no session and no fallback: none");
+	Check(appaudio::MatchRenderer({ renderers[0] }, "", true) == 0, "no session: the only program making sound");
+	Check(appaudio::MatchRenderer({ { 1, L"y.exe", L"AppleInc.AppleMusicWin_nzyj5cx40ttqaX" } }, apple, false) == -1,
+		"a package family must end where the ID's does");
+	Check(appaudio::MatchRenderer({ { 1, L"x.exe", L"" } }, apple, false) == -1, "a short name inside a long ID isn't a match");
+	Check(appaudio::MatchRenderer({ { 1, L"Spotify.exe", L"" } }, "SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify", false) == 0,
+		"Spotify from the Store, by its app name after the '!'");
+	Check(appaudio::MatchRenderer({ { 1, L"vlc.exe", L"" } }, "VideoLAN.VLC", false) == 0, "a dotted ID's word");
+	Check(appaudio::MatchRenderer({ { 1, L"msedge.exe", L"" } }, "MSEdge", false) == 0, "Edge");
+	Check(appaudio::IsAuto(L"") && appaudio::IsAuto(L"AUTO") && !appaudio::IsAuto(L"AppleMusic.exe"), "App = auto or empty");
+
 	using appaudio::Session;
 	const auto session = [](bool defaultDevice, bool active, bool muted, float volume) {
 		Session s;
@@ -95,6 +130,10 @@ int main()
 	Check(appaudio::PackageFamily(GetCurrentProcessId()).empty(), "an ordinary program has no package");
 	Check(appaudio::AudioProcess(GetCurrentProcessId()) == GetCurrentProcessId(), "an ordinary program is captured itself");
 	Check(appaudio::AudioProcess(0) == 0, "no process, nothing to capture");
+	const std::vector<Renderer> live = appaudio::Renderers();
+	Check(std::none_of(live.begin(), live.end(), [](const Renderer& r) { return r.mProcess == GetCurrentProcessId(); }),
+		"the game (here: the test) is never a renderer");
+	std::printf("programs making sound now: %zu\n", live.size());
 	appaudio::Capture capture;
 	std::string error;
 	if (capture.Open(GetCurrentProcessId(), error)) {

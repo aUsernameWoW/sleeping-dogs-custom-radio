@@ -84,8 +84,27 @@ namespace appaudio
 	// The sessions for the log, e.g. "Speakers (default): active, 100%; Steam Streaming Speakers: active, muted".
 	std::string Describe(const std::vector<Session>& sessions);
 
+	// `App = auto` (or empty): no program named, the mod picks the one that plays music.
+	bool IsAuto(const std::wstring& app);
+
+	// A process with a session that renders now, as `App = auto` chooses among them.
+	struct Renderer
+	{
+		DWORD mProcess = 0;
+		std::wstring mExe;    // "AMPLibraryAgent.exe"
+		std::wstring mFamily; // package family of a Store app, else empty
+	};
+	// Every process but the game with a session that renders now, on any output device. Use with COM initialized.
+	std::vector<Renderer> Renderers();
+	// The renderer of the media session `appId` follows (now_playing.hh's ChosenApp: a package family before '!',
+	// or a name containing the exe's, as nowplaying::Matches takes it); without one and with `allowSole`, the only
+	// renderer if there's exactly one (a player without a media session, such as NetEase Cloud Music by default).
+	// -1 for none.
+	int MatchRenderer(const std::vector<Renderer>& renderers, const std::string& appId, bool allowSole);
+
 	// The live source: waits for the app, captures it, starts over when it exits; meanwhile now_playing.hh puts
-	// the app's song on the HUD and, with `controlApp`, pauses the app while the station isn't played. Returns
-	// once `stop` is set.
+	// the app's song on the HUD and, with `controlApp`, pauses the app while the station isn't played. With
+	// IsAuto(exeName) the app is whichever plays (MatchRenderer), and the capture moves when the player switches
+	// to another app. Returns once `stop` is set.
 	void Run(const std::wstring& exeName, bool controlApp, const std::atomic<bool>& stop);
 }

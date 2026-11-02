@@ -7,6 +7,7 @@
 //   app_audio_manual <index> sessions     the volume mixer warnings: the child's session as it is, then muted
 //   app_audio_manual titles <exe>         the HUD title for that program, from its media session
 //   app_audio_manual control <exe>        pausing and resuming that program as the station is left and played
+//   app_audio_manual auto [s]             App = auto: which program it follows and captures
 //   app_audio_manual move <exe> <index>   sending that program to that output device and back
 //   app_audio_manual follow <index>       whether a child playing on the default device follows such a move
 //   app_audio_manual play <index>|default <s>  (the child) play the sine
@@ -343,6 +344,25 @@ int wmain(int argc, wchar_t** argv)
 		live::Release();
 		stop = true;
 		control.join();
+		return 0;
+	}
+	if (argc >= 2 && std::wstring(argv[1]) == L"auto") {
+		// App = auto as the live source runs it, for <s> seconds (default 20; start, pause or switch players meanwhile):
+		// which app it follows and captures, and the level. Never pauses anything. Log in app_audio_manual.log.
+		DeleteFileW(L"app_audio_manual.log");
+		logger::Open(L"app_audio_manual.log");
+		CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+		for (const appaudio::Renderer& r : appaudio::Renderers()) {
+			std::printf("making sound: %s (process %lu%s%s)\n", logger::ToUtf8(r.mExe.c_str()).c_str(), r.mProcess,
+				r.mFamily.empty() ? "" : ", package ", logger::ToUtf8(r.mFamily.c_str()).c_str());
+		}
+		std::atomic<bool> stop{ false };
+		std::thread source([&] { appaudio::Run(L"auto", false, stop); });
+		Sleep(static_cast<DWORD>((argc >= 3 ? _wtoi(argv[2]) : 20) * 1000));
+		stop = true;
+		source.join();
+		std::printf("followed: \"%s\", now playing: \"%s\" (log: app_audio_manual.log)\n", nowplaying::ChosenApp().c_str(),
+			live::NowPlaying().c_str());
 		return 0;
 	}
 	if (argc >= 4 && std::wstring(argv[1]) == L"play") {
