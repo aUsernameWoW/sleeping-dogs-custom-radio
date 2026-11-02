@@ -119,6 +119,17 @@ int main()
 	Check(appaudio::Warnings({ session(true, false, true, 0.0f), session(false, true, false, 1.0f) }) == 0,
 		"an idle session (left over on the default device) says nothing");
 	Check(appaudio::Warnings({ session(true, true, true, 1.0f) }) == (appaudio::kWarnMuted | appaudio::kWarnDefaultDevice), "both");
+	using appaudio::Sound;
+	Check(appaudio::ParseSound("Direct") == Sound::kDirect && appaudio::ParseSound("radio") == Sound::kRadio &&
+		appaudio::ParseSound("") == Sound::kAuto && appaudio::ParseSound("whatever") == Sound::kAuto, "AppSound values");
+	Check(appaudio::Direct(Sound::kAuto, { session(true, true, false, 1.0f) }, false), "auto, playing on the default device: direct");
+	Check(!appaudio::Direct(Sound::kAuto, { session(false, true, false, 1.0f) }, true), "auto, playing on another device: radio");
+	Check(!appaudio::Direct(Sound::kAuto, { session(true, false, false, 1.0f), session(false, true, false, 1.0f) }, true),
+		"auto: an idle session left on the default device doesn't count");
+	Check(appaudio::Direct(Sound::kAuto, { session(false, false, false, 1.0f) }, true) &&
+		!appaudio::Direct(Sound::kAuto, {}, false), "auto, nothing renders (paused): the last choice stays");
+	Check(appaudio::Direct(Sound::kDirect, { session(false, true, false, 1.0f) }, false), "direct stays direct");
+	Check(!appaudio::Direct(Sound::kRadio, { session(true, true, false, 1.0f) }, true), "radio stays radio");
 	Check(appaudio::Describe({}) == "none", "no sessions described");
 	Check(appaudio::Describe({ session(true, true, false, 1.0f), session(false, false, true, 0.25f) }) ==
 		"Speakers (default): active, 100%; Steam Streaming Speakers: idle, muted, 25%", "sessions described");

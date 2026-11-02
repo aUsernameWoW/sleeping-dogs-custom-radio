@@ -102,9 +102,28 @@ namespace appaudio
 	// -1 for none.
 	int MatchRenderer(const std::vector<Renderer>& renderers, const std::string& appId, bool allowSole);
 
+	// How the player hears the app (`[Live] AppSound`).
+	enum class Sound
+	{
+		// Direct while the app plays on the default output device (nobody set anything up), radio on another one.
+		kAuto,
+		// The app's own sound; the station stays silent and only pauses/resumes the app (now_playing.hh). No setup,
+		// no radio effect; without this the player would hear the app twice (the direct sound masks the radio copy:
+		// "it's just a remote", 2026-11-02).
+		kDirect,
+		// Through the station (the radio's bus and effect); the player sends the app to an unheard device.
+		kRadio,
+	};
+	// "direct", "radio", else auto.
+	Sound ParseSound(const std::string& text);
+	// Whether the app is heard directly now, from its sessions: with kAuto, direct unless one that renders is on
+	// another device than the default; `current` while none renders (a paused app says nothing).
+	bool Direct(Sound mode, const std::vector<Session>& sessions, bool current);
+
 	// The live source: waits for the app, captures it, starts over when it exits; meanwhile now_playing.hh puts
 	// the app's song on the HUD and, with `controlApp`, pauses the app while the station isn't played. With
 	// IsAuto(exeName) the app is whichever plays (MatchRenderer), and the capture moves when the player switches
-	// to another app. Returns once `stop` is set.
-	void Run(const std::wstring& exeName, bool controlApp, const std::atomic<bool>& stop);
+	// to another app. While Direct, the capture goes on (for the log) but the station gets silence. Returns once
+	// `stop` is set.
+	void Run(const std::wstring& exeName, bool controlApp, Sound sound, const std::atomic<bool>& stop);
 }

@@ -404,7 +404,16 @@ unofficial client, against Spotify's terms: weigh that then).
   resume. The choice now outlives runs like `gPausedByUs`; auto rechecks every 0.5 s while waiting so the capture
   starts soon after the resume. Apple Music was on the default device that time (the log's WARNING), and the user
   felt the station was "just a remote": the direct sound, louder and earlier, masks the radio copy. That is the
-  direct mode in effect, doubled; see the plan.
+  direct mode in effect, doubled, which led to the next item.
+- **`AppSound`** (2026-11-02, `auto` default): `direct` = the app's own sound, the station plays silence (the capture
+  goes on for the log's levels) and `PauseApp` makes the station a remote; `radio` = through the station as before;
+  `auto` (`appaudio::Direct`) = direct while a *rendering* session is on the default device (`eConsole`), radio once
+  one renders elsewhere (the player set up routing), the last choice while nothing renders. Zero setup by default,
+  the radio effect for those who route; the default-device warning only applies to radio. Not done: the app's
+  volume following the game (out of the car, ducking under dialogue, the radio volume option): it would need the
+  radio bus's effective gain from Wwise, and setting `ISimpleAudioVolume` changes the player's persisted mixer
+  setting, so it needs a restore. `app_audio_manual auto` with the sine child on Steam Streaming Speakers: radio.
+  Not yet in game.
 - Next: maybe next/previous track from the radio (SMTC `TrySkipNextAsync`...).
 
 ## Spotify (2026-10-23, `[Live] Source = spotify`; not yet tried with an account)

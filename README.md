@@ -107,7 +107,7 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 
 **想在车里听 Apple Music、Spotify、网易云音乐等程序放的歌（实验功能，需要 Windows 11）**
 
-用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `app`，`App` 保持 `auto`（或者留空），保存后重启游戏。`auto` 会自动找正在放歌的程序：Windows 媒体浮窗里显示正在播放的那个，没有的话就是唯一一个正在出声的程序；你换了个播放器放歌，它也会跟过去。想固定某个程序，就把 `App` 改成它的进程名，例如 `AppleMusic.exe`（Microsoft Store 里的 Apple Music）、`Spotify.exe` 或 `cloudmusic.exe`（网易云音乐）（进程名可以在任务管理器的「详细信息」页找）。切到「SDRADIO LIVE」就能听到这个程序正在放的歌，带上游戏电台的效果。为了不同时听到两份声音：打开 Windows 的 设置 → 系统 → 声音 → 音量合成器，把这个程序的输出设备改成一个你不用的设备（例如显示器的扬声器、Steam Streaming Speakers），或者把那个设备静音。**网易云音乐不听 Windows 的这个设置**，要在网易云自己的设置里把音频输出设备改成那个设备（例如「WASAPI: Steam Streaming Speakers」）。**不要在音量合成器里把程序本身静音**，那样游戏里也听不到了：程序的声音本来就只该从游戏里听到，改完输出设备后程序那边「没声音」是正常的。如果程序被静音了，或者还在用默认输出设备（会听到两份），`plugins\SDRadio.log` 里会写一行 `WARNING` 提醒你；被静音时 HUD 的歌名那一行也会直接显示「AppleMusic.exe is muted in the volume mixer」。HUD 上会显示程序正在放的歌名（取自 Windows 的媒体信息，也就是按音量键时弹出的那个浮窗里的内容）；Apple Music 和 Spotify 默认就有，网易云音乐需要在它的设置里勾选「SMTC」才会提供歌名。同样借助 SMTC，换到别的台、关掉电台、下车或打开暂停菜单时，程序会自动暂停，回到这个台时继续播放（只恢复 mod 暂停的；不想要这个功能就在 ini 里把 `PauseApp` 改成 `0`）。
+用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `app`，`App` 保持 `auto`（或者留空），保存后重启游戏。`auto` 会自动找正在放歌的程序：Windows 媒体浮窗里显示正在播放的那个，没有的话就是唯一一个正在出声的程序；你换了个播放器放歌，它也会跟过去。想固定某个程序，就把 `App` 改成它的进程名，例如 `AppleMusic.exe`（Microsoft Store 里的 Apple Music）、`Spotify.exe` 或 `cloudmusic.exe`（网易云音乐）（进程名可以在任务管理器的「详细信息」页找）。切到「SDRADIO LIVE」，程序就开始放歌；切走、关电台、下车或打开暂停菜单时它会暂停。什么都不用设置：你听到的是程序自己的声音，电台本身不出声（`AppSound = auto`）。想让歌声带上游戏电台的效果（车载收音机的音色、下车后变闷）：打开 Windows 的 设置 → 系统 → 声音 → 音量合成器，把这个程序的输出设备改成一个你不用的设备（例如显示器的扬声器、Steam Streaming Speakers），或者把那个设备静音，mod 发现程序不在默认设备上，就会改为通过电台播放它。**网易云音乐不听 Windows 的这个设置**，要在网易云自己的设置里把音频输出设备改成那个设备（例如「WASAPI: Steam Streaming Speakers」）。**不要在音量合成器里把程序本身静音**，那样游戏里也听不到了：程序的声音本来就只该从游戏里听到，改完输出设备后程序那边「没声音」是正常的。如果程序被静音了，`plugins\SDRadio.log` 里会写一行 `WARNING` 提醒你；被静音时 HUD 的歌名那一行也会直接显示「AppleMusic.exe is muted in the volume mixer」。HUD 上会显示程序正在放的歌名（取自 Windows 的媒体信息，也就是按音量键时弹出的那个浮窗里的内容）；Apple Music 和 Spotify 默认就有，网易云音乐需要在它的设置里勾选「SMTC」才会提供歌名。同样借助 SMTC，换到别的台、关掉电台、下车或打开暂停菜单时，程序会自动暂停，回到这个台时继续播放（只恢复 mod 暂停的；不想要这个功能就在 ini 里把 `PauseApp` 改成 `0`）。
 
 **想在车里听 Spotify（实验功能，需要 Spotify Premium）**
 
@@ -294,13 +294,15 @@ Open `plugins\SDRadio.ini` in Notepad; in the `[Live]` section set `Enabled` to 
 pop-up shows as playing, else the only program making sound; start music in another player and it follows. To stick
 to one program, set `App` to its process name instead, e.g. `AppleMusic.exe` (Apple Music from the Microsoft Store),
 `Spotify.exe` or `cloudmusic.exe` (NetEase Cloud Music) (Task Manager's Details tab lists them). Tune to "SDRADIO
-LIVE" to hear what that program plays,
-through the game's radio effect. So you don't hear it twice: in Windows Settings > System > Sound > Volume
-mixer, set the program's output device to one you don't listen to (a monitor's speakers, Steam Streaming
-Speakers...), or mute that device. **NetEase Cloud Music ignores that Windows setting**: choose the device in
+LIVE" and the program plays; it pauses when you switch away, turn the radio off, leave the car or open the
+pause menu. Nothing to set up: you hear the program's own sound and the station itself stays silent
+(`AppSound = auto`). For the game's radio effect (the car radio's sound, muffled outside the car): in Windows
+Settings > System > Sound > Volume mixer, set the program's output device to one you don't listen to (a monitor's
+speakers, Steam Streaming Speakers...), or mute that device; seeing the program off the default device, the mod
+plays it through the station instead. **NetEase Cloud Music ignores that Windows setting**: choose the device in
 its own settings instead (e.g. "WASAPI: Steam Streaming Speakers"). **Don't mute the program itself in the mixer**: the game would hear silence too. Once its output device is
-changed, the program sounding silent on its own is expected; you hear it in the game. If the program is muted, or
-still plays on the default output device (you'd hear it twice), `plugins\SDRadio.log` has a `WARNING` line saying so;
+changed, the program sounding silent on its own is expected; you hear it in the game. If the program is muted,
+`plugins\SDRadio.log` has a `WARNING` line saying so;
 while it's muted the HUD's song line says "AppleMusic.exe is muted in the volume mixer" too. The HUD shows the song
 the program plays (from Windows' media info, what the volume keys' pop-up shows); Apple Music and Spotify always
 provide it, NetEase Cloud Music only with "SMTC" ticked in its settings. Through SMTC too, the program pauses when you

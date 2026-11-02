@@ -227,7 +227,9 @@ namespace hooks
 				}
 				else if (gConfig.mLiveSource == "app") {
 					const std::string app = appaudio::IsAuto(gConfig.mLiveApp) ? std::string("auto") : logger::ToUtf8(gConfig.mLiveApp.c_str());
-					live::SetSource("app " + app, [exe = gConfig.mLiveApp, control = gConfig.mLivePauseApp](const std::atomic<bool>& stop) { appaudio::Run(exe, control, stop); });
+					live::SetSource("app " + app, [exe = gConfig.mLiveApp, control = gConfig.mLivePauseApp, sound = appaudio::ParseSound(gConfig.mLiveAppSound)](const std::atomic<bool>& stop) {
+						appaudio::Run(exe, control, sound, stop);
+					});
 					title = app.empty() ? "app" : app;
 				}
 				else if (gConfig.mLiveSource == "spotify") {

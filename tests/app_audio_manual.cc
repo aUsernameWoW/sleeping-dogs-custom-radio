@@ -357,7 +357,7 @@ int wmain(int argc, wchar_t** argv)
 				r.mFamily.empty() ? "" : ", package ", logger::ToUtf8(r.mFamily.c_str()).c_str());
 		}
 		std::atomic<bool> stop{ false };
-		std::thread source([&] { appaudio::Run(L"auto", false, stop); });
+		std::thread source([&] { appaudio::Run(L"auto", false, appaudio::Sound::kAuto, stop); });
 		Sleep(static_cast<DWORD>((argc >= 3 ? _wtoi(argv[2]) : 20) * 1000));
 		stop = true;
 		source.join();

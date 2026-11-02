@@ -385,6 +385,30 @@ namespace appaudio
 		return best;
 	}
 
+	Sound ParseSound(const std::string& text)
+	{
+		std::string lower = text;
+		for (char& c : lower) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+		return lower == "direct" ? Sound::kDirect : lower == "radio" ? Sound::kRadio : Sound::kAuto;
+	}
+
+	bool Direct(Sound mode, const std::vector<Session>& sessions, bool current)
+	{
+		if (mode != Sound::kAuto) {
+			return mode == Sound::kDirect;
+		}
+		bool renders = false;
+		for (const Session& s : sessions) {
+			if (s.mActive) {
+				renders = true;
+				if (!s.mDefaultDevice) {
+					return false;
+				}
+			}
+		}
+		return renders ? true : current;
+	}
+
 	bool IsAuto(const std::wstring& app)
 	{
 		return app.empty() || Lower(app) == L"auto";
@@ -611,10 +635,18 @@ namespace appaudio
 		}
 	}
 
-	void Run(const std::wstring& app, bool controlApp, const std::atomic<bool>& stop)
+	void Run(const std::wstring& app, bool controlApp, Sound sound, const std::atomic<bool>& stop)
 	{
 		const HRESULT com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 		const bool autoPick = IsAuto(app);
+		if (sound != Sound::kRadio && !controlApp) {
+			LOG("app: PauseApp = 0 with AppSound = %s: heard directly, the app keeps playing off the station too",
+				sound == Sound::kDirect ? "direct" : "auto");
+		}
+		// Heard directly (the station silent) or through the station; kept across captures, so a paused app that
+		// says nothing keeps the last choice. Auto starts direct: most apps play on the default device.
+		bool direct = sound != Sound::kRadio;
+		int loggedDirect = -1;
 		// The song title for the HUD, on its own thread: its WinRT calls may block for seconds, the capture
 		// must not. With App = auto it also decides which app is the player's music.
 		std::thread titles([&] { nowplaying::Run(autoPick ? std::wstring() : app, controlApp, stop); });
@@ -623,13 +655,19 @@ namespace appaudio
 		std::vector<int16_t> samples;
 		while (!stop.load()) {
 			std::wstring exeName = app;
+			DWORD renderer = 0;
 			if (autoPick) {
 				const std::vector<Renderer> renderers = Renderers();
 				const int match = MatchRenderer(renderers, nowplaying::ChosenApp(), true);
 				exeName = match >= 0 ? renderers[match].mExe : std::wstring();
+				renderer = match >= 0 ? renderers[match].mProcess : 0;
 			}
 			const std::string name = logger::ToUtf8(exeName.c_str());
-			const DWORD root = exeName.empty() ? 0 : FindProcess(exeName);
+			DWORD root = exeName.empty() ? 0 : FindProcess(exeName);
+			// Another tree of the same name (a second instance) mustn't take the place of the one that renders.
+			if (renderer && !ProcessTree(root).count(renderer)) {
+				root = renderer;
+			}
 			// Apple Music plays from AMPLibraryAgent.exe, a process of its package outside its own tree.
 			const DWORD pid = AudioProcess(root);
 			HANDLE process = pid ? OpenProcess(SYNCHRONIZE, FALSE, pid) : nullptr;
@@ -703,12 +741,28 @@ namespace appaudio
 							break;
 						}
 					}
+					direct = Direct(sound, sessions, direct);
+					if (static_cast<int>(direct) != loggedDirect) {
+						loggedDirect = direct;
+						const char* why = sound == Sound::kDirect ? "direct"
+							: sound == Sound::kRadio                ? "radio"
+							: !renders(sessions)                    ? "auto, until it plays somewhere"
+							: direct                                ? "auto, it plays on the default output device"
+																	: "auto, it plays on another output device";
+						if (direct) {
+							LOG("app: %s heard directly (AppSound = %s): the station stays silent and only pauses/resumes it", name.c_str(), why);
+						}
+						else {
+							LOG("app: %s heard through the station (AppSound = %s)", name.c_str(), why);
+						}
+					}
 					const std::string described = Describe(sessions);
 					if (described != sessionsLogged) {
 						sessionsLogged = described;
 						LOG("app: %s's audio sessions: %s", name.c_str(), described.c_str());
 					}
-					const unsigned warnings = Warnings(sessions);
+					// Heard directly, the default device is where it belongs.
+					const unsigned warnings = Warnings(sessions) & (direct ? ~unsigned{ kWarnDefaultDevice } : ~0u);
 					if ((warnings & kWarnMuted) && !(warned & kWarnMuted)) {
 						LOG("app: WARNING: %s is muted (or at 0) in the volume mixer, so the station hears silence. Unmute it "
 							"and mute or turn down its output device instead", name.c_str());
@@ -742,6 +796,10 @@ namespace appaudio
 						peak = (std::max)(peak, std::abs(static_cast<int>(s)));
 					}
 					captured += samples.size() / kChannels;
+					// Heard directly: the station plays silence, or the player would hear the app twice.
+					if (direct) {
+						std::fill(samples.begin(), samples.end(), int16_t{ 0 });
+					}
 					feeder.Push(samples);
 				}
 				padded += feeder.PadSilence();

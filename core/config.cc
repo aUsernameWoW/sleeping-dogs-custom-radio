@@ -69,6 +69,13 @@ namespace config
 			"; 1 = pause the program while the game doesn't play this station (another station, radio off, out of the car,\n"
 			"; the pause menu) and resume it when it does; 0 = leave the program alone.\n"
 			"PauseApp = 1\n"
+			"; 怎么听到这个程序：direct = 直接听程序自己的声音，电台不出声，只是跟着电台暂停/继续（什么都不用设置）；\n"
+			"; radio = 通过游戏电台听（带收音机效果），要在音量合成器里把程序的输出设备改成一个你不用的设备，不然会听到两份；\n"
+			"; auto = 程序在默认输出设备上就用 direct，改到了别的设备就用 radio。\n"
+			"; How the program is heard: direct = its own sound, the station stays silent and only pauses/resumes it (no setup);\n"
+			"; radio = through the game's radio (its effect), with the program sent to an output device you don't listen to\n"
+			"; (Volume mixer), else you hear it twice; auto = direct while it plays on the default output device, radio on another.\n"
+			"AppSound = auto\n"
 			"; Source = spotify：mod 启动 librespot，在 Spotify 里选择下面这个名字的设备即可在电台里播放（需要 Spotify Premium）。\n"
 			"; librespot.exe 的位置，留空 = .asi 旁边的 librespot.exe。\n"
 			"; For Source = spotify: the mod runs librespot, a Spotify Connect device you pick in the Spotify app (Premium).\n"
@@ -177,6 +184,7 @@ namespace config
 		if (auto it = values.find("Live.PauseApp"); it != values.end()) {
 			gConfig.mLivePauseApp = it->second != "0";
 		}
+		get("Live.AppSound", gConfig.mLiveAppSound);
 		std::string librespot;
 		get("Live.Librespot", librespot);
 		gConfig.mLibrespot = librespot.empty() ? dir + L"\\librespot.exe" : Widen(librespot);
