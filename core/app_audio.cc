@@ -648,8 +648,9 @@ namespace appaudio
 				}
 				waitingLogged = true;
 				if (process) CloseHandle(process);
-				// Retry every 2 s (5 s after a failed capture), silent meanwhile.
-				for (int i = 0; i < (pid ? 50 : 20) && !stop.load(); ++i) {
+				// Retry every 2 s (5 s after a failed capture), silent meanwhile. App = auto every 0.5 s: its app is
+				// typically there but paused (by us, until the station plays again), and the resume shouldn't wait.
+				for (int i = 0; i < (pid ? 50 : autoPick ? 5 : 20) && !stop.load(); ++i) {
 					Sleep(100);
 					feeder.PadSilence();
 				}

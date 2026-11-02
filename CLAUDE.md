@@ -397,8 +397,14 @@ unofficial client, against Spotify's terms: weigh that then).
   Without a matching session (no SMTC, NetEase's default; Firefox's ID is a hash) the only renderer is taken, but
   only for the first pick: while capturing, every 5 s only the SMTC choice can move the capture to another
   process, so a notification sound can't take the station over. `app_audio_manual auto [s]` runs it (2026-11-02,
-  nothing playing: waits; the sine child alone on Steam Streaming Speakers: captured it). Not yet with real players
-  or in game.
+  nothing playing: waits; the sine child alone on Steam Streaming Speakers: captured it).
+  In game (2026-11-02, Apple Music): followed its session, captured `AMPLibraryAgent.exe` (-10.6 dBFS, no padded
+  silence), paused it on leaving; but **resumed only when back within 10 s**: the source run stops 10 s after the
+  station is left, and the next run cleared the choice, found nothing playing (paused by us) and so had no session to
+  resume. The choice now outlives runs like `gPausedByUs`; auto rechecks every 0.5 s while waiting so the capture
+  starts soon after the resume. Apple Music was on the default device that time (the log's WARNING), and the user
+  felt the station was "just a remote": the direct sound, louder and earlier, masks the radio copy. That is the
+  direct mode in effect, doubled; see the plan.
 - Next: maybe next/previous track from the radio (SMTC `TrySkipNextAsync`...).
 
 ## Spotify (2026-10-23, `[Live] Source = spotify`; not yet tried with an account)

@@ -149,17 +149,19 @@ namespace nowplaying
 	{
 		const std::string key = MatchKey(exeName);
 		const bool autoPick = key.empty();
+		// Not cleared here: like gPausedByUs, the choice outlives a source run (it stops 10 s after the station is
+		// left). Cleared, the next run found nothing playing (the app paused by us) and never resumed it (2026-11-02,
+		// in game).
 		const auto choose = [](const std::string& id) {
 			std::lock_guard<std::mutex> lock(gChosenLock);
 			gChosen = id;
 		};
-		choose({});
 		if (!WinRtPresent()) {
 			LOG("media: no WinRT here; the HUD shows the program's name instead of its song");
 			return;
 		}
 		const HRESULT com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-		std::string name = autoPick ? std::string("(no app yet)") : logger::ToUtf8(exeName.c_str());
+		std::string name = autoPick ? (ChosenApp().empty() ? std::string("(no app yet)") : ChosenApp()) : logger::ToUtf8(exeName.c_str());
 
 		GlobalSystemMediaTransportControlsSessionManager manager{ nullptr };
 		GlobalSystemMediaTransportControlsSession session{ nullptr };
