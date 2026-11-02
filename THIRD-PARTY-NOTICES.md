@@ -4,6 +4,19 @@
 `dinput8.dll`, which itself contains MinHook, miniz and FunctionHookMinHook, under the licenses reproduced
 below.
 
+## Special thanks
+
+To sneakyevil and the [SDmodding](https://github.com/SDmodding) team, to every creator in this community, to
+every player who ever tried this, and to every commenter from Reddit.
+
+To Claude, who wrote all of it. And to Anthropic, for banning my account that one time: no hard feelings
+(some hard feelings).
+
+And to you, reading this file right now. Yes, you. Hi.
+
+To Chappell Roan and Olivia Rodrigo, for performing "My Kink Is Karma" and "the cure": mothers, icons,
+goddesses, they ate and left no crumbs ✨💅🏳️‍🌈
+
 ## MinHook 1.3.4
 
 https://github.com/TsudaKageyu/minhook — the hooking library, built from source (includes Hacker Disassembler Engine 64).
