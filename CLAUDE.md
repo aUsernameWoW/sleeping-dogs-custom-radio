@@ -434,6 +434,13 @@ unofficial client, against Spotify's terms: weigh that then).
   -> 25% -> 100%. Diagnostics: `radio: distance` in 5 m steps, `radio: radio volume option`, and
   `AK::SoundEngine::SetObjectObstructionAndOcclusion` hooked to log `radio: obstruction` for the radio (does the car
   occlude it?). Not yet in game; ducking under dialogue not covered.
+- **Leaving the station pauses at once** (2026-11-02; in game the crossfades felt right, but switching stations the
+  app played on for ~2 s over the next station: Control paused only after 3 s without Wwise reads plus 1.5 s grace,
+  at full volume meanwhile). The station-switch hooks (`NoteTuned` after Next/Prev/SetStation) tell
+  `live::SetLiveTuned` whether the radio's station is the live one; leaving it, `RadioGain` follows the game's
+  `StopTrack(500)` (0.5 s linear), and `live::LeftFor(500)` (also true 0.5 s after `radio_off`) has Control pause
+  right then. Listening for Control and for the tune-in edge is `Listening(3 s) && !LeftFor(0)`, or the reads of
+  the last 3 s would resume the app straight after the pause. Not yet in game.
 - **Tuning in starts the app** (2026-11-02): `nowplaying::Run` sees the not-listening -> listening edge and, at the
   next refresh (done at once), plays the followed session if it's paused and not paused by us (Control resumes
   those); in auto mode with nothing playing, the only media session there is gets chosen for it (several: logged,

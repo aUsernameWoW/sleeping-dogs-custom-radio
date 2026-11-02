@@ -388,11 +388,25 @@ namespace hooks
 			return static_cast<const uint8_t*>(radio)[kRadioFlagsOffset];
 		}
 
+		// Whether the radio is on the live station now, for a directly heard app: leaving it, the game stops our track
+		// with a 0.5 s fade (Radio::NextStation / PrevStation: StopTrack(500)), which the app follows and then pauses
+		// at once, rather than once Wwise's reads have stopped for seconds (2 s of the app over the next station,
+		// 2026-11-02).
+		void NoteTuned(const void* radio)
+		{
+			const uint32_t live = gLiveStationId.load();
+			const auto* station = *reinterpret_cast<const uint8_t* const*>(static_cast<const uint8_t*>(radio) + kRadioCurStationOffset);
+			if (live && station) {
+				live::SetLiveTuned(*reinterpret_cast<const uint32_t*>(station + kStationIdOffset) == live);
+			}
+		}
+
 		void LogStep(const char* what, void* radio, StepStationFn original, bool displayStationId)
 		{
 			const std::string from = DescribeStation(radio);
 			const uint8_t flags = RadioFlags(radio);
 			original(radio, displayStationId);
+			NoteTuned(radio);
 			const std::string to = DescribeStation(radio);
 			if (to == from) {
 				LOG("radio: %s station ignored on %s (flags 0x%02X: on %d, waiting for the HUD %d)", what, from.c_str(), flags, flags & 1,
@@ -429,6 +443,7 @@ namespace hooks
 		{
 			const std::string from = DescribeStation(radio);
 			gSetStation(radio, index);
+			NoteTuned(radio);
 			LOG("radio: set station %u: %s -> %s (flags 0x%02X)", index, from.c_str(), DescribeStation(radio).c_str(), RadioFlags(radio));
 		}
 

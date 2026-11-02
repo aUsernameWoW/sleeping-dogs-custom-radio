@@ -273,6 +273,23 @@ int main()
 	Check(live::RadioGain() < 0.01f, "turned on: starts silent");
 	Sleep(2'600);
 	Check(close(live::RadioGain(), 1.0f), "turned on: full after 2.5 s");
+
+	// Leaving the live station: the track's 0.5 s stop fade, and LeftFor for pausing at once.
+	Check(!live::LeftFor(0), "on the station: not left");
+	live::SetLiveTuned(false);
+	Check(live::LeftFor(0) && !live::LeftFor(400), "left just now");
+	Sleep(250);
+	const float halfway = live::RadioGain();
+	Check(halfway > 0.3f && halfway < 0.7f, "half way through the track's fade");
+	Sleep(300);
+	Check(live::RadioGain() == 0.0f && live::LeftFor(500), "silent after 0.5 s, time to pause");
+	live::SetLiveTuned(true);
+	Check(close(live::RadioGain(), 1.0f) && !live::LeftFor(0), "back on the station: full at once");
+	live::SetRadioOn(false);
+	Sleep(550);
+	Check(live::LeftFor(500), "the radio turned off counts as leaving too");
+	live::SetRadioOn(true);
+	Check(!live::LeftFor(0), "turned on again: not left");
 	if (gFailures) {
 		return 1;
 	}

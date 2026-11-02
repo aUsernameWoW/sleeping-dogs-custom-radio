@@ -58,7 +58,10 @@ namespace nowplaying
 		{
 			constexpr DWORD kQuietMs = 3'000; // Wwise reads every ~0.7 s while it plays
 			constexpr DWORD kGraceMs = 1'500; // a track change closes and reopens the file at once
-			const bool listening = live::Listening(kQuietMs);
+			constexpr DWORD kTrackFadeMs = 500; // the game's StopTrack(500) on leaving the station or turning the radio off
+			// Leaving the station (or turning the radio off) is known from the hooks at once: pause once the track's
+			// fade is over, not seconds later when Wwise's reads have stopped (live::LeftFor).
+			const bool listening = live::Listening(kQuietMs) && !live::LeftFor(0);
 			if (listening) {
 				quietSince = 0;
 			}
@@ -66,7 +69,8 @@ namespace nowplaying
 				quietSince = now ? now : 1;
 			}
 			const auto status = session.GetPlaybackInfo().PlaybackStatus();
-			if (!listening && !gPausedByUs.load() && now - quietSince >= kGraceMs && status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing) {
+			if (!listening && !gPausedByUs.load() && (live::LeftFor(kTrackFadeMs) || now - quietSince >= kGraceMs) &&
+				status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing) {
 				auto pause = session.TryPauseAsync();
 				if (Finish(pause) && pause.GetResults()) {
 					gPausedByUs = true;
@@ -180,7 +184,7 @@ namespace nowplaying
 		while (!stop.load() && !unavailable) {
 			try {
 				const DWORD now = GetTickCount();
-				const bool listening = live::Listening(3'000);
+				const bool listening = live::Listening(3'000) && !live::LeftFor(0);
 				if (listening && !wasListening) {
 					tunedIn = control;
 					refreshAt = now; // now rather than in up to 2 s

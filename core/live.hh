@@ -153,5 +153,12 @@ namespace live
 	void SetRadioDistance(float distance);
 	void SetRadioVolume(float radioVolume);
 	void SetRadioOn(bool on);
+	// The radio's station is (no longer) the live one (hooks.cc, after every station switch). Leaving it, the game
+	// stops the track with a 0.5 s fade, which RadioGain includes; back on it, the track starts without one.
+	void SetLiveTuned(bool tuned);
 	float RadioGain();
+	// Whether the game left the live station (another station, or the radio off) at least `ms` ago: the app
+	// pauses then, and resumes only once the station is back, not while Wwise's last reads still count as
+	// Listening.
+	bool LeftFor(DWORD ms);
 }

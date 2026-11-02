@@ -327,6 +327,9 @@ namespace live
 		bool gRadioOn = true;
 		ULONGLONG gRadioStateAt = 0;
 		float gRadioStateFrom = 1.0f;
+		// The live station tuned (or not), since when.
+		bool gTuned = true;
+		ULONGLONG gTunedAt = 0;
 
 		float StateGainNow()
 		{
@@ -386,14 +389,34 @@ namespace live
 		gRadioVolume = radioVolume;
 	}
 
+	void SetLiveTuned(bool tuned)
+	{
+		std::lock_guard lock(gRadioStateLock);
+		if (tuned != gTuned) {
+			gTuned = tuned;
+			gTunedAt = GetTickCount64();
+		}
+	}
+
 	float RadioGain()
 	{
-		float state;
+		float state, track = 1.0f;
 		{
 			std::lock_guard lock(gRadioStateLock);
 			state = StateGainNow();
+			if (!gTuned) {
+				// StopTrack(500): the track fades out over 0.5 s, linear.
+				track = (std::max)(0.0f, 1.0f - static_cast<float>(GetTickCount64() - gTunedAt) / 500.0f);
+			}
 		}
-		return GameRadioGain(gRadioDistance.load(), gRadioVolume.load()) * state;
+		return GameRadioGain(gRadioDistance.load(), gRadioVolume.load()) * state * track;
+	}
+
+	bool LeftFor(DWORD ms)
+	{
+		std::lock_guard lock(gRadioStateLock);
+		const ULONGLONG now = GetTickCount64();
+		return (!gTuned && now - gTunedAt >= ms) || (!gRadioOn && gRadioStateAt && now - gRadioStateAt >= ms);
 	}
 
 	bool Listening(DWORD quietMs)
