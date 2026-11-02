@@ -107,7 +107,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## dr_mp3 0.7.4, dr_flac 0.13.4, dr_wav 0.14.6
 
-https://github.com/mackron/dr_libs (commit dfe8377) — the MP3, FLAC and WAV decoders, built from source.
+https://github.com/mackron/dr_libs (commit a466dbe) — the MP3, FLAC and WAV decoders, built from source.
 Public domain or MIT No Attribution, at the user's choice; SDRadio uses them under MIT-0.
 
 ```text
