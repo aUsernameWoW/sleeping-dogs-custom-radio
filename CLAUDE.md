@@ -136,8 +136,8 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   variables `NEXUS_MOD_ID`, `NEXUS_CI_FILE_ID`, `NEXUS_RELEASE_FILE_ID` (v3 IDs from a file's "Advanced"
   dialog, not the `175` in the URL) and secret `NEXUSMODS_API_KEY`. Current values: mod `14933601288367`,
   release file `8038689` (uploaded by hand with build-12 as "SDRadio build 12 (1414af9)"; the first release
-  through the workflow renames it "SDRadio"), CI file not created yet (the job is skipped until
-  `NEXUS_CI_FILE_ID` is set). The public GraphQL API (`api.nexusmods.com/v2/graphql`, no key) lists a mod's
+  through the workflow renames it "SDRadio"), CI file `8298555` (created 2026-11-02 by hand with build-75
+  as version "75"; the job then uploaded "build-75" over it, so later builds dedupe normally). The public GraphQL API (`api.nexusmods.com/v2/graphql`, no key) lists a mod's
   files (`modFiles(modId: 175, gameId: 3477)`) when the site sits behind a bot check.
 - `art/` — the station logo **私家台** (neon tubes; 私家 as in 私家車, the player's own car and music), final
   2026-09-26; `logo_512.png` is embedded as the default logo, so rerun `neon.py` before building after a
