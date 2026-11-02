@@ -441,6 +441,13 @@ unofficial client, against Spotify's terms: weigh that then).
   `StopTrack(500)` (0.5 s linear), and `live::LeftFor(500)` (also true 0.5 s after `radio_off`) has Control pause
   right then. Listening for Control and for the tune-in edge is `Listening(3 s) && !LeftFor(0)`, or the reads of
   the last 3 s would resume the app straight after the pause. Not yet in game.
+- **The pause menu** (2026-11-02; switching felt right, but Esc didn't pause the app; wanted: a crossfaded pause and
+  resume like the game's stations): the game posts `pause_game` (Pause All Except a UI sound, 1 s linear fade) and
+  `resume_game` / `resume_all` (docs/radio-internals.md). The `CreateAndPlayEvent` hook sees them
+  (`live::SetGamePaused`, `PauseGain`: 1 s out, 1 s back in, from where a fade had got to), `LeftFor` counts the
+  pause, and Control pauses on `live::FadedOut()` (each cause's own fade over: 0.5 s for another station or the
+  radio off, 1 s for the pause menu) instead of a fixed 0.5 s. Resuming calls `NoteRead`, so Listening is true at
+  once instead of after Wwise's next read. Not yet in game.
 - **Tuning in starts the app** (2026-11-02): `nowplaying::Run` sees the not-listening -> listening edge and, at the
   next refresh (done at once), plays the followed session if it's paused and not paused by us (Control resumes
   those); in auto mode with nothing playing, the only media session there is gets chosen for it (several: logged,

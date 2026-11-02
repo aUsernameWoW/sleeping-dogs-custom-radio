@@ -290,6 +290,29 @@ int main()
 	Check(live::LeftFor(500), "the radio turned off counts as leaving too");
 	live::SetRadioOn(true);
 	Check(!live::LeftFor(0), "turned on again: not left");
+	Sleep(2'600); // the radio's fade in
+
+	// The pause menu: 1 s linear out, pause; 1 s back in.
+	Check(close(live::PauseGain(true, 1.0f, 0), 1.0f) && close(live::PauseGain(true, 1.0f, 500), 0.5f) &&
+		live::PauseGain(true, 1.0f, 1'000) == 0.0f, "pausing: 1 s linear fade");
+	Check(live::PauseGain(false, 0.0f, 0) == 0.0f && close(live::PauseGain(false, 0.0f, 250), 0.25f) &&
+		close(live::PauseGain(false, 0.0f, 1'000), 1.0f), "resuming: 1 s back in");
+	Check(close(live::PauseGain(false, 0.6f, 500), 0.8f), "resumed during the fade: from where it had got to");
+	Check(!live::FadedOut(), "playing: not faded out");
+	live::SetGamePaused(true);
+	Sleep(600);
+	Check(live::LeftFor(0) && !live::FadedOut() && live::RadioGain() > 0.2f && live::RadioGain() < 0.6f,
+		"0.6 s into the pause menu: still fading, not time to pause");
+	Sleep(500);
+	Check(live::FadedOut() && live::RadioGain() == 0.0f, "1 s in: silent, time to pause");
+	live::SetGamePaused(false);
+	Check(!live::LeftFor(0) && live::RadioGain() < 0.1f, "resumed: back on, from silence");
+	Sleep(1'100);
+	Check(close(live::RadioGain(), 1.0f), "resumed: full after 1 s");
+	live::SetLiveTuned(false);
+	Sleep(550);
+	Check(live::FadedOut(), "another station: faded out after 0.5 s");
+	live::SetLiveTuned(true);
 	if (gFailures) {
 		return 1;
 	}

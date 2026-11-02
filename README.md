@@ -107,7 +107,7 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 
 **想在车里听 Apple Music、Spotify、网易云音乐等程序放的歌（实验功能，需要 Windows 11）**
 
-用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `app`，`App` 保持 `auto`（或者留空），保存后重启游戏。`auto` 会自动找正在放歌的程序：Windows 媒体浮窗里显示正在播放的那个，没有的话就是唯一一个正在出声的程序；你换了个播放器放歌，它也会跟过去。想固定某个程序，就把 `App` 改成它的进程名，例如 `AppleMusic.exe`（Microsoft Store 里的 Apple Music）、`Spotify.exe` 或 `cloudmusic.exe`（网易云音乐）（进程名可以在任务管理器的「详细信息」页找）。切到「SDRADIO LIVE」，程序就开始放歌（它暂停着也没关系，只要 Windows 媒体浮窗里只有它一个）；切走、关电台或打开暂停菜单时它会暂停。什么都不用设置：你听到的是程序自己的声音，电台本身不出声（`AppSound = auto`）。它的音量跟着游戏的电台走：下车熄火时和游戏电台一样淡出，上车打火后淡入，游戏设置里的电台音量对它也有效。mod 是通过音量合成器里这个程序的音量来做的，离开时会改回你原来的音量。想让歌声完整地走游戏的电台混音（慢动作时的效果、血量低时变闷等）：打开 Windows 的 设置 → 系统 → 声音 → 音量合成器，把这个程序的输出设备改成一个你不用的设备（例如显示器的扬声器、Steam Streaming Speakers），或者把那个设备静音，mod 发现程序不在默认设备上，就会改为通过电台播放它。**网易云音乐不听 Windows 的这个设置**，要在网易云自己的设置里把音频输出设备改成那个设备（例如「WASAPI: Steam Streaming Speakers」）。**不要在音量合成器里把程序本身静音**，那样游戏里也听不到了：程序的声音本来就只该从游戏里听到，改完输出设备后程序那边「没声音」是正常的。如果程序被静音了，`plugins\SDRadio.log` 里会写一行 `WARNING` 提醒你；被静音时 HUD 的歌名那一行也会直接显示「AppleMusic.exe is muted in the volume mixer」。HUD 上会显示程序正在放的歌名（取自 Windows 的媒体信息，也就是按音量键时弹出的那个浮窗里的内容）；Apple Music 和 Spotify 默认就有，网易云音乐需要在它的设置里勾选「SMTC」才会提供歌名。同样借助 SMTC，换到别的台、关掉电台、下车或打开暂停菜单时，程序会自动暂停，回到这个台时继续播放（只恢复 mod 暂停的；不想要这个功能就在 ini 里把 `PauseApp` 改成 `0`）。
+用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `app`，`App` 保持 `auto`（或者留空），保存后重启游戏。`auto` 会自动找正在放歌的程序：Windows 媒体浮窗里显示正在播放的那个，没有的话就是唯一一个正在出声的程序；你换了个播放器放歌，它也会跟过去。想固定某个程序，就把 `App` 改成它的进程名，例如 `AppleMusic.exe`（Microsoft Store 里的 Apple Music）、`Spotify.exe` 或 `cloudmusic.exe`（网易云音乐）（进程名可以在任务管理器的「详细信息」页找）。切到「SDRADIO LIVE」，程序就开始放歌（它暂停着也没关系，只要 Windows 媒体浮窗里只有它一个）；切走、关电台或打开暂停菜单时它会暂停。什么都不用设置：你听到的是程序自己的声音，电台本身不出声（`AppSound = auto`）。它的音量跟着游戏的电台走：下车熄火时和游戏电台一样淡出，上车打火后淡入，打开/关闭暂停菜单时淡出暂停、淡入继续，游戏设置里的电台音量对它也有效。mod 是通过音量合成器里这个程序的音量来做的，离开时会改回你原来的音量。想让歌声完整地走游戏的电台混音（慢动作时的效果、血量低时变闷等）：打开 Windows 的 设置 → 系统 → 声音 → 音量合成器，把这个程序的输出设备改成一个你不用的设备（例如显示器的扬声器、Steam Streaming Speakers），或者把那个设备静音，mod 发现程序不在默认设备上，就会改为通过电台播放它。**网易云音乐不听 Windows 的这个设置**，要在网易云自己的设置里把音频输出设备改成那个设备（例如「WASAPI: Steam Streaming Speakers」）。**不要在音量合成器里把程序本身静音**，那样游戏里也听不到了：程序的声音本来就只该从游戏里听到，改完输出设备后程序那边「没声音」是正常的。如果程序被静音了，`plugins\SDRadio.log` 里会写一行 `WARNING` 提醒你；被静音时 HUD 的歌名那一行也会直接显示「AppleMusic.exe is muted in the volume mixer」。HUD 上会显示程序正在放的歌名（取自 Windows 的媒体信息，也就是按音量键时弹出的那个浮窗里的内容）；Apple Music 和 Spotify 默认就有，网易云音乐需要在它的设置里勾选「SMTC」才会提供歌名。同样借助 SMTC，换到别的台、关掉电台、下车或打开暂停菜单时，程序会自动暂停，回到这个台时继续播放（只恢复 mod 暂停的；不想要这个功能就在 ini 里把 `PauseApp` 改成 `0`）。
 
 **想在车里听 Spotify（实验功能，需要 Spotify Premium）**
 
@@ -297,8 +297,8 @@ to one program, set `App` to its process name instead, e.g. `AppleMusic.exe` (Ap
 LIVE" and the program plays (even if it was paused, as long as it's the only one in Windows' media pop-up); it
 pauses when you switch away, turn the radio off or open the pause menu. Nothing to set up: you hear the program's
 own sound and the station itself stays silent (`AppSound = auto`). Its volume follows the game's radio: it
-fades out as you get out of the car and in as you start it again, like the game's stations, and the game's radio
-volume setting applies to it. The mod does this with the program's volume in the volume mixer and puts your volume back when you leave.
+fades out as you get out of the car and in as you start it again, fades out and pauses in the pause menu and fades
+back in after it, like the game's stations, and the game's radio volume setting applies to it. The mod does this with the program's volume in the volume mixer and puts your volume back when you leave.
 For everything the game's radio mix does (its slow-motion effect, muffling at low health...): in Windows
 Settings > System > Sound > Volume mixer, set the program's output device to one you don't listen to (a monitor's
 speakers, Steam Streaming Speakers...), or mute that device; seeing the program off the default device, the mod

@@ -330,6 +330,16 @@ namespace live
 		// The live station tuned (or not), since when.
 		bool gTuned = true;
 		ULONGLONG gTunedAt = 0;
+		// The game paused (or not), since when, from which gain.
+		bool gPaused = false;
+		ULONGLONG gPausedAt = 0;
+		float gPauseFrom = 1.0f;
+
+		float PauseGainNow()
+		{
+			const ULONGLONG elapsed = gPausedAt ? GetTickCount64() - gPausedAt : 1'000'000;
+			return PauseGain(gPaused, gPauseFrom, static_cast<uint32_t>((std::min)(elapsed, ULONGLONG{ 1'000'000 })));
+		}
 
 		float StateGainNow()
 		{
@@ -389,6 +399,28 @@ namespace live
 		gRadioVolume = radioVolume;
 	}
 
+	float PauseGain(bool paused, float from, uint32_t elapsedMs)
+	{
+		const float t = (std::min)(static_cast<float>(elapsedMs) / 1'000.0f, 1.0f);
+		return paused ? from * (1.0f - t) : from + (1.0f - from) * t;
+	}
+
+	void SetGamePaused(bool paused)
+	{
+		{
+			std::lock_guard lock(gRadioStateLock);
+			if (paused == gPaused) {
+				return;
+			}
+			gPauseFrom = PauseGainNow();
+			gPaused = paused;
+			gPausedAt = GetTickCount64();
+		}
+		if (!paused) {
+			NoteRead();
+		}
+	}
+
 	void SetLiveTuned(bool tuned)
 	{
 		std::lock_guard lock(gRadioStateLock);
@@ -403,7 +435,7 @@ namespace live
 		float state, track = 1.0f;
 		{
 			std::lock_guard lock(gRadioStateLock);
-			state = StateGainNow();
+			state = StateGainNow() * PauseGainNow();
 			if (!gTuned) {
 				// StopTrack(500): the track fades out over 0.5 s, linear.
 				track = (std::max)(0.0f, 1.0f - static_cast<float>(GetTickCount64() - gTunedAt) / 500.0f);
@@ -416,7 +448,16 @@ namespace live
 	{
 		std::lock_guard lock(gRadioStateLock);
 		const ULONGLONG now = GetTickCount64();
-		return (!gTuned && now - gTunedAt >= ms) || (!gRadioOn && gRadioStateAt && now - gRadioStateAt >= ms);
+		return (!gTuned && now - gTunedAt >= ms) || (!gRadioOn && gRadioStateAt && now - gRadioStateAt >= ms) ||
+			(gPaused && now - gPausedAt >= ms);
+	}
+
+	bool FadedOut()
+	{
+		std::lock_guard lock(gRadioStateLock);
+		const ULONGLONG now = GetTickCount64();
+		return (!gTuned && now - gTunedAt >= 500) || (!gRadioOn && gRadioStateAt && now - gRadioStateAt >= 500) ||
+			(gPaused && now - gPausedAt >= 1'000);
 	}
 
 	bool Listening(DWORD quietMs)

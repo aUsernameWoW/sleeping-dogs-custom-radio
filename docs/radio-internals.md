@@ -124,6 +124,17 @@ What a player hears getting out and in; `AppSound = direct` follows the first th
 - **Obstruction / occlusion**: `AudioEntityUpdate` calls `AK::SoundEngine::SetObjectObstructionAndOcclusion` for each
   entity from `SetObsOccValues` (raycasts), easing at `TiDo::sm_occlusionRate`. Whether the radio gets any is not
   known yet: SDRadio logs it for the radio's object (`radio: obstruction`).
+- **The pause menu** (2026-11-02): `TidoGame::EnterAudioState` / `ExitAudioState` post Wwise events through
+  `AudioEntity::CreateAndPlayEvent` (`SetMix` and `PlayDLCHudEvent` do too; the decompiler shows their string
+  literals shifted, the events' names come from the banks, bank 1777182227): **`pause_game`** = Pause All Except
+  (action 0x0208, transition 1000 ms, curve 4 linear; exceptions: Sound 343881207 in bank 887576358 and an object
+  1048063247 in no bank) + SetState group 3813406269 -> 319258907; **`resume_game`** = Resume All (0x0304, no
+  transition) + that group -> 984691642 (also `loadfinish`); `resume_all` = Resume All (0x0305); `insta_pause` /
+  `insta_resume` pause/resume only bus 3444197610. Group 3813406269 silences (-96 dB) master_aux, ambient_music,
+  karaoke_player and other buses per state, transition 1 s by default; radio_car has the group with no states. So
+  the radio fades out over 1 s and is paused (its stream's reads stop once Wwise's buffer is full, which in direct
+  mode, where nothing is heard from it, never paused the app), and resumes at once while the state's buses come back
+  over 1 s.
 - Not looked at: HDR / ducking of master_music under dialogue.
 
 ## Wwise 2012.2 bank objects used (v88)

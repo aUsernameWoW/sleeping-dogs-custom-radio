@@ -113,6 +113,11 @@ namespace hooks
 		constexpr uint32_t kStateVehicle = 3424178224;     // "ms_vehicle"
 		constexpr uint32_t kStateInVehicle = 1065084817;   // "in_vehicle"
 		constexpr uint32_t kStateOnFoot = 103063709;       // "on_foot"
+		// The pause menu (TidoGame::EnterAudioState / ExitAudioState post these through CreateAndPlayEvent): pause_game
+		// is a Pause All Except (a UI sound) with a 1 s linear fade, resume_game / resume_all resume (live::PauseGain).
+		constexpr uint32_t kEventPauseGame = 528278262;   // "pause_game"
+		constexpr uint32_t kEventResumeGame = 1565052233; // "resume_game"
+		constexpr uint32_t kEventResumeAll = 3679762312;  // "resume_all"
 
 		using ExtractFromCacheFn = char*(__fastcall*)(const char* filename);
 		using QMallocFn = void*(__fastcall*)(uint64_t size, const char* name, uint64_t allocationParams);
@@ -450,6 +455,10 @@ namespace hooks
 		bool __fastcall CreateAndPlayEventHook(void* entity, uint32_t eventId, void* controller, const void* params, uint32_t fadeMs, void* externalSources)
 		{
 			const bool played = gCreateAndPlayEvent(entity, eventId, controller, params, fadeMs, externalSources);
+			if (eventId == kEventPauseGame || eventId == kEventResumeGame || eventId == kEventResumeAll) {
+				LOG("radio: game %s", eventId == kEventPauseGame ? "paused (1 s fade out)" : "resumed (1 s fade in)");
+				live::SetGamePaused(eventId == kEventPauseGame);
+			}
 			if (gStationReady && gEventIds.count(eventId)) {
 				LOG("radio: post event %08X on entity %p: %s", eventId, entity, played ? "playing" : "FAILED");
 				gRadioEntity = reinterpret_cast<uint64_t>(entity);

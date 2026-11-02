@@ -156,9 +156,19 @@ namespace live
 	// The radio's station is (no longer) the live one (hooks.cc, after every station switch). Leaving it, the game
 	// stops the track with a 0.5 s fade, which RadioGain includes; back on it, the track starts without one.
 	void SetLiveTuned(bool tuned);
+	// The game paused (its pause menu): the Wwise event pause_game pauses everything but a UI sound with a 1 s
+	// linear fade; resume_game resumes without one, while the buses its paused state had silenced come back over
+	// the state's 1 s, so 1 s back in here too. Linear amplitude, `elapsedMs` into the change, from `from`. Pure.
+	float PauseGain(bool paused, float from, uint32_t elapsedMs);
+	// From the posted events (hooks.cc). Resuming counts as a read (NoteRead): the game plays the station again
+	// at once, before Wwise's next read.
+	void SetGamePaused(bool paused);
 	float RadioGain();
 	// Whether the game left the live station (another station, or the radio off) at least `ms` ago: the app
 	// pauses then, and resumes only once the station is back, not while Wwise's last reads still count as
 	// Listening.
 	bool LeftFor(DWORD ms);
+	// Left, and the game's fade for it is over (0.5 s for another station or the radio off, 1 s for the pause
+	// menu): time to pause the app.
+	bool FadedOut();
 }
