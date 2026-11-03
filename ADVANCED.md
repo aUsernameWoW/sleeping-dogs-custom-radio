@@ -22,8 +22,7 @@
 
 游戏的电台完全由数据驱动，所以 mod 只添加数据、提供文件，不改游戏逻辑：
 
-1. **电台列表**：游戏从 `Global.big` 的 XML 缓存里读 `Radios.xml`。mod hook 了读取函数，在末尾加一个
-   `<Station>`，每个音乐文件对应一个 `<Track>`。HUD 和切台逻辑自动跟上。
+1. **电台列表**：游戏从 `Global.big` 的 XML 缓存里读 `Radios.xml`。mod hook 了读取函数，在末尾为音乐文件夹本身和每个子文件夹各加一个 `<Station>`，每个音乐文件对应一个 `<Track>`。HUD 和切台逻辑自动跟上。电台号最多到 44（游戏自带 11 个台）：mod 生成的 Wwise ID 和游戏音频包里的 ID 比对过，到 44 号台都不冲突。
 2. **音频库（bank）**：mod 在运行时生成这个电台的 Wwise bank（每首歌一个流式 Sound + Play 事件），挂在车载电台原本的总线、效果和 RTPC 下面，所以音量、车内音效、暂停和对话压低都和原版一样。
 3. **音频流**：hook Wwise 的底层文件 I/O，把我们的文件 ID 变成虚拟文件：bank 本身，或者每首歌实时解码成的
    16 位立体声 WAV。
@@ -68,17 +67,17 @@ comment、RIFF INFO 标签，没有标签时用文件名；GBK 编码的老式�
 
 | 段 | 键 | 默认 | 作用 |
 | --- | --- | --- | --- |
-| `[Station]` | `Name` | `SDRADIO` | 切台时显示的台名，最多 63 字节 |
-| `[Station]` | `MusicFolder` | 空 | 音乐文件夹；空 = `.asi` 旁边的 `SDRadio`，相对路径相对于 `plugins` |
-| `[Station]` | `CustomLogo` | 1 | HUD 图标：1 = 音乐文件夹里的 `logo.png`，没有就用自带的「私家台」；0 = 借用下面的游戏图标 |
+| `[Station]` | `Name` | `SDRADIO` | 直接放在音乐文件夹里的歌组成的那个台的台名，最多 63 字节（子文件夹的台用文件夹名） |
+| `[Station]` | `MusicFolder` | 空 | 音乐文件夹；空 = `.asi` 旁边的 `SDRadio`，相对路径相对于 `plugins`。每个子文件夹（连同里面的文件夹）是一个单独的电台，按名称排序；最多 33 个台（包括直播电台），每台最多 255 首 |
+| `[Station]` | `CustomLogo` | 1 | HUD 图标：1 = 电台文件夹里的 `logo.png`，没有就用自带的「私家台」；0 = 借用下面的游戏图标 |
 | `[Station]` | `TextureName`, `TexturePack` | `Logo_Softly`, `Radio_Softly_TexturePack` | `CustomLogo = 0` 时借用的游戏电台图标（可选值见 ini 注释） |
-| `[Station]` | `Default` | `music` | 默认电台：换上另一辆车时，游戏会切到这辆车自己的电台；`music` 改成 SDRadio 的音乐电台（`live`：直播电台；哪个没有就用另一个），`off` 保持游戏原样。警车/救护车的 HKPD、回到刚下的车时恢复的电台、没有自己电台的车（继续放你上次的台）、任务和脚本指定的电台都不受影响 |
+| `[Station]` | `Default` | `music` | 默认电台：换上另一辆车时，游戏会切到这辆车自己的电台；`music` 改成 SDRadio 排在最前面的音乐电台（`live`：直播电台；哪个没有就用另一个），`off` 保持游戏原样。警车/救护车的 HKPD、回到刚下的车时恢复的电台、没有自己电台的车（继续放你上次的台）、任务和脚本指定的电台都不受影响 |
 | `[Live]` | `Enabled`, `Name`, `Source`, `Url`, `App`, `PauseApp`, `AppSound`, `Librespot`, `SpotifyName` | 0, `SDRADIO LIVE`, `test`, 空, `auto`, 1, `auto`, 空, `SDRadio` | 实验功能：再加一个播放实时音源的「直播」电台。`Source = test` 是测试信号（每秒一声提示音）；`Source = radio` 播放 `Url` 指向的网络电台：MP3 或 Ogg Vorbis 的流，或指向它的 .m3u / .pls（可以在 [radio-browser.info](https://www.radio-browser.info) 找台）。AAC、Opus、FLAC 的台暂不支持，日志里会写明。HUD 上显示当前歌名（还没有歌名时显示电台的域名），也写进日志。`Source = app` 播放 `App` 这个进程（例如 `AppleMusic.exe`、`cloudmusic.exe`）及其子进程的声音，需要 Windows 11；`App = auto`（或留空）自动选：媒体会话（SMTC）正在播放的程序，没有的话是唯一在出声的程序；跟随的程序被玩家自己暂停、另一个程序开始播放时，就换到那个（mod 自己暂停的不算），一开始之后只有媒体会话能让它换程序，系统提示音之类的不会。`AppSound`：`direct` = 直接听程序自己的声音，电台不出声，只跟着电台暂停/继续（不用设置，没有收音机效果）；`radio` = 通过电台听（带收音机效果，要把程序的输出设备改走）；`auto` = 程序在默认输出设备上就是 direct，在别的设备上就是 radio。direct 时程序的音量跟着游戏的电台走：下车熄火时淡出（0.5 秒，同时 1.5 秒降到 -96 dB），上车打火后 2.5 秒淡入，游戏设置里的电台音量，以及离车 85 米到 100 米渐渐减到约 -48 dB（和游戏电台一样）；mod 改的是音量合成器里程序的音量，离开时改回，游戏崩溃留下的会在下次启动时改回（原来的音量记在 `.asi` 旁边的 `SDRadio-app-volume.txt`）。切到这个台时，程序如果暂停着（auto 时：系统里只有它一个媒体会话），mod 会让它开始播放（Microsoft Store 版的程序如果实际是由同一个应用包里的另一个进程出声，就抓那个进程：Apple Music 的声音来自 `AMPLibraryAgent.exe`）：把这个程序的输出设备改成一个不用的设备（设置 → 系统 → 声音 → 音量合成器），或者把那个设备静音，就只会通过游戏电台听到它；不要在音量合成器里把程序本身静音，那样抓到的也是静音（日志里每 10 秒的电平会只有 -90 dBFS 左右）。mod 每 5 秒查一次这个程序在音量合成器里的会话：被静音、音量为 0，或者在默认输出设备上播放（会听到两份）时，日志里写一行 `WARNING`；被静音时 HUD 的歌名行也显示这条提示。HUD 上的歌名取自 Windows 的媒体会话（SMTC），网易云要在设置里勾选「SMTC」。`PauseApp = 1` 时，游戏里没在放这个台（换台、关电台、下车、暂停菜单）就让程序暂停，回来时继续（只恢复 mod 暂停的）。`Source = spotify` 运行 `Librespot`（留空 = `.asi` 旁边的 `librespot.exe`），在 Spotify 的设备列表里显示为 `SpotifyName`；需要 Spotify Premium，登录凭据存在 `.asi` 旁边的 `SDRadio-spotify` 文件夹 |
 | `[Debug]` | `Logging` | 1 | 写 `SDRadio.log`，出错时记录调用栈并写 `SDRadio-crash-<n>.dmp` |
 
 ### 自定义图标
 
-把 PNG 命名为 `logo.png` 放进音乐文件夹（默认 `plugins\SDRadio`），重启游戏生效；删掉就回到自带的「私家台」。
+把 PNG 命名为 `logo.png` 放进电台的文件夹（音乐文件夹本身，默认 `plugins\SDRadio`，或者某个子文件夹；直播电台用音乐文件夹本身的），重启游戏生效；删掉就回到自带的「私家台」。
 
 - HUD 会把所有电台图标染成白色（原版的彩色图标也一样），所以只有**透明度**会显示：不透明的部分是白色，半透明的部分是半透明的白（可以做光晕），颜色会被忽略；
 - 比例 2:1，推荐 512×256；其他尺寸会等比缩放进 512×256 并居中，不裁切（每边最多 16384 像素）；
@@ -151,8 +150,9 @@ SHA-256 固定在 `.github/asi-loader.env`。推送到 `main` 且测试（包括
 The game's radio is data-driven end to end, so the mod adds data and serves files; no game logic is patched:
 
 1. **Station list**: the game reads `Radios.xml` from the XML cache in `Global.big`. The mod hooks that read
-   and appends a `<Station>` with one `<Track>` per music file. The HUD and station cycling follow by
-   themselves.
+   and appends a `<Station>` for the music folder's own files and one for each subfolder, with one `<Track>`
+   per music file. The HUD and station cycling follow by themselves. Station IDs stop at 44 (the game has 11):
+   the Wwise IDs the mod generates were checked against the game's sound packages and don't clash through 44.
 2. **Bank**: the mod generates the station's Wwise bank at runtime (per track a streamed Sound + Play event),
    under the car radio's own bus, effect and RTPCs, so volume, the car-radio sound, pausing and dialogue
    ducking behave like the original stations.
@@ -226,18 +226,18 @@ If you already have an ASI loader, just put `SDRadio.asi` where it loads plugins
 
 | Section | Key | Default | Effect |
 | --- | --- | --- | --- |
-| `[Station]` | `Name` | `SDRADIO` | Station name on the HUD, at most 63 bytes |
-| `[Station]` | `MusicFolder` | empty | Music folder; empty = `SDRadio` next to the `.asi`, relative paths are relative to `plugins` |
-| `[Station]` | `CustomLogo` | 1 | HUD logo: 1 = `logo.png` from the music folder, else SDRadio's own (私家台); 0 = the game logo below |
+| `[Station]` | `Name` | `SDRADIO` | HUD name of the station made of the files right in the music folder, at most 63 bytes (a subfolder's station is named after the folder) |
+| `[Station]` | `MusicFolder` | empty | Music folder; empty = `SDRadio` next to the `.asi`, relative paths are relative to `plugins`. Each subfolder (with the folders inside it) is a station of its own, in name order; up to 33 stations (the live one included), 255 tracks each |
+| `[Station]` | `CustomLogo` | 1 | HUD logo: 1 = `logo.png` from the station's folder, else SDRadio's own (私家台); 0 = the game logo below |
 | `[Station]` | `TextureName`, `TexturePack` | `Logo_Softly`, `Radio_Softly_TexturePack` | With `CustomLogo = 0`, the game station logo to borrow (choices in the ini's comments) |
-| `[Station]` | `Default` | `music` | Getting into another car, the game tunes to that car's own station; `music` tunes to SDRadio's music station instead (`live`: the live station; each falls back to the other if it's missing), `off` leaves it to the game. A police or emergency car's HKPD, the station restored in the car you just left, a car without a station of its own (your last station plays on) and stations set by missions or scripts stay as the game has them |
+| `[Station]` | `Default` | `music` | Getting into another car, the game tunes to that car's own station; `music` tunes to SDRadio's first music station instead (`live`: the live station; each falls back to the other if it's missing), `off` leaves it to the game. A police or emergency car's HKPD, the station restored in the car you just left, a car without a station of its own (your last station plays on) and stations set by missions or scripts stay as the game has them |
 | `[Live]` | `Enabled`, `Name`, `Source`, `Url`, `App`, `PauseApp`, `AppSound`, `Librespot`, `SpotifyName` | 0, `SDRADIO LIVE`, `test`, empty, `auto`, 1, `auto`, empty, `SDRadio` | Experimental: a second station playing a real-time source. `Source = test` is a test signal (a beep every second); `Source = radio` plays the internet radio at `Url`: an MP3 or Ogg Vorbis stream, or an .m3u / .pls pointing at one (find stations at [radio-browser.info](https://www.radio-browser.info)). AAC, Opus and FLAC stations aren't supported yet (the log says so). The HUD shows the current song title (the host name until the station names one); titles also go to the log. `Source = app` plays the sound of the process `App` (e.g. `AppleMusic.exe`, `cloudmusic.exe`) and its children; needs Windows 11; `App = auto` (or empty) picks it: the program whose media session (SMTC) plays, else the only program making sound; when the player pauses the followed program and another starts playing, it moves there (a pause the mod made doesn't count), and after the first pick only a media session moves it, never a notification sound. `AppSound`: `direct` = the program's own sound, the station stays silent and only pauses/resumes it (no setup, no radio effect); `radio` = through the station (the radio effect; send the program to another output device); `auto` = direct while it plays on the default output device, radio on another. While direct the program's volume follows the game's radio: the fade out as you get out and the engine stops (0.5 s, and 1.5 s down to -96 dB), the 2.5 s fade in as you start it, the radio volume setting, and a fade from 85 m to 100 m away from the car down to about -48 dB (as the game's radio does); the mod changes the program's volume mixer volume and puts it back when you leave, or at the next start after a crash (the original volume is kept in `SDRadio-app-volume.txt` next to the `.asi`). Tuning in starts the program if it's paused (with auto: if it's the only media session) (for a Microsoft Store app whose sound really comes from another process of its package, that process: Apple Music plays from `AMPLibraryAgent.exe`). Send that program to an output device you don't listen to (Settings > System > Sound > Volume mixer) or mute that device, and you hear it only through the game's radio; don't mute the program itself in the mixer, that silences the capture too (the log's 10-second level then stays around -90 dBFS). Every 5 s the mod reads the program's volume mixer sessions and logs a `WARNING` when one plays muted, at 0, or on the default output device (heard twice); while it's muted the HUD's song line says so too. The HUD's song comes from the program's Windows media session (SMTC); NetEase Cloud Music needs "SMTC" ticked in its settings. With `PauseApp = 1` the program is paused while the game doesn't play this station (another station, radio off, out of the car, the pause menu) and resumed when it does (only a pause the mod made). `Source = spotify` runs `Librespot` (empty = `librespot.exe` next to the `.asi`), shown in Spotify's device list as `SpotifyName`; needs Spotify Premium; its credentials are kept in `SDRadio-spotify` next to the `.asi` |
 | `[Debug]` | `Logging` | 1 | Write `SDRadio.log`; on a crash, log the stack and write `SDRadio-crash-<n>.dmp` |
 
 ### Custom logo
 
-Name a PNG `logo.png` and put it into the music folder (`plugins\SDRadio` by default), then restart the
-game; delete it to get SDRadio's own logo (私家台) back.
+Name a PNG `logo.png` and put it into the station's folder (the music folder itself, `plugins\SDRadio` by
+default, or a subfolder; the live station uses the music folder's), then restart the game; delete it to get SDRadio's own logo (私家台) back.
 
 - The HUD tints every station logo white (the game's colored ones too), so only **transparency** shows:
   opaque parts are white, translucent parts translucent white (a glow works), colors are ignored;

@@ -16,7 +16,7 @@
 
 ## 中文
 
-给《热血无赖：终极版》的车载电台加一个新电台，播放你自己的音乐。它和游戏自带的电台完全一样：切台时显示台名、图标和“歌手 - 歌名”，一首放完自动换下一首（随机，避开刚放过的），音量、车内收音机的音效、暂停和对话时自动压低也都和原版电台一致。
+给《热血无赖：终极版》的车载电台加上新电台，播放你自己的音乐（每个文件夹一个台）。它们和游戏自带的电台完全一样：切台时显示台名、图标和“歌手 - 歌名”，一首放完自动换下一首（随机，避开刚放过的），音量、车内收音机的音效、暂停和对话时自动压低也都和原版电台一致。
 
 状态：Windows 上已在游戏内验证（FLAC）；Linux / Steam Deck / macOS 还没测试。
 
@@ -64,17 +64,22 @@ SleepingDogsDefinitiveEdition\
         SDRadio.asi
         SDRadio\
             歌曲1.mp3
-            某张专辑\
+            流行\
                 01 歌曲2.flac
+            摇滚\
+                某张专辑\
+                    01 歌曲3.flac
 ```
 
 - 支持 MP3、FLAC、WAV、OGG，也支持 M4A/AAC、WMA；
-- 可以有子文件夹，最多 255 首；
+- 直接放在 `SDRadio` 里的歌组成一个电台，台名默认是 “SDRADIO”；
+- **每个子文件夹是一个单独的电台**，台名就是文件夹名（上面的例子是「流行」和「摇滚」两个台）。子文件夹里面再分的文件夹都算进这个台；
+- 每个电台最多 255 首，最多可以有 33 个电台；
 - 歌名和歌手从音乐文件自带的信息里读取，没有的话就用文件名。
 
 **第 5 步：在游戏里收听**
 
-照常从 Steam 启动游戏，上一辆车，像平时一样切换电台。新电台排在所有电台的**最后**，图标是霓虹灯风格的「私家台」，台名默认是 “SDRADIO”。换上一辆新车时，收音机默认就会直接放 SDRADIO（警车里的警方频道、任务指定的电台除外）。
+照常从 Steam 启动游戏，上一辆车，像平时一样切换电台。新电台排在所有电台的**最后**，图标是霓虹灯风格的「私家台」。换上一辆新车时，收音机默认就会直接放 SDRadio 的第一个电台（警车里的警方频道、任务指定的电台除外）。
 
 ### 常见问题
 
@@ -91,16 +96,16 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 
 **想改台名或者换音乐文件夹**
 
-用记事本打开 `plugins\SDRadio.ini`，改完保存，重启游戏。每一项都有中文说明。台名最多约 21 个汉字。
+子文件夹电台的台名就是文件夹名，改文件夹名即可。直接放在 `SDRadio` 里的那个台，用记事本打开 `plugins\SDRadio.ini` 改 `Name`，改完保存，重启游戏。每一项都有中文说明。台名最多约 21 个汉字。
 
-**不想上车就放 SDRADIO**
+**不想上车就放 SDRadio 的电台**
 
-在 `plugins\SDRadio.ini` 的 `[Station]` 里把 `Default` 改成 `off`（改成 `live` 则默认放直播电台），保存后重启游戏。旧版本生成的 ini 里没有这一行，没有时按 `music` 处理，自己加上 `Default = off` 就行。
+在 `plugins\SDRadio.ini` 的 `[Station]` 里把 `Default` 改成 `off`（改成 `live` 则默认放直播电台），保存后重启游戏。旧版本生成的 ini 里没有这一行，没有时按 `music` 处理，自己加上 `Default = off` 就行。`music` 放的是 SDRadio 排在最前面的音乐电台。
 
 **想换成自己画的电台图标**
 
 1. 画一张比例 2:1 的图（推荐 512×256），背景透明，存成 PNG；
-2. 命名为 `logo.png`，放进 `plugins\SDRadio`；
+2. 命名为 `logo.png`，放进这个电台的文件夹：`plugins\SDRadio` 里的就给 SDRADIO 台用，放进某个子文件夹就给那个台用；
 3. 重启游戏。
 
 游戏会把所有电台图标显示成白色，所以显示出来的是图案的形状，不是颜色。删掉 `logo.png` 就回到自带的图标。
@@ -182,8 +187,8 @@ Bugs 标签里说明情况，并附上 `plugins\SDRadio.log`。
 
 ## English
 
-Adds a station to the car radio that plays your own music. It works just like the game's own stations: its
-name, logo and "artist - title" on screen when you switch to it, the next track starts by itself (random,
+Adds stations to the car radio that play your own music, one per folder. They work just like the game's own
+stations: the name, logo and "artist - title" on screen when you switch to it, the next track starts by itself (random,
 avoiding recent ones), and volume, the car-radio sound, pausing and turning down for dialogue behave like the
 original stations.
 
@@ -238,19 +243,25 @@ SleepingDogsDefinitiveEdition\
         SDRadio.asi
         SDRadio\
             Song 1.mp3
-            Some Album\
+            Pop\
                 01 Song 2.flac
+            Rock\
+                Some Album\
+                    01 Song 3.flac
 ```
 
 - MP3, FLAC, WAV and OGG work, and so do M4A/AAC and WMA;
-- subfolders are fine, up to 255 tracks;
+- the files right in `SDRadio` make one station, named "SDRADIO" by default;
+- **each subfolder is a station of its own**, named after the folder ("Pop" and "Rock" above); folders inside it
+  belong to that station;
+- up to 255 tracks per station and up to 33 stations;
 - titles and artists come from the music files' own tags, or else the file name.
 
 **Step 5: listen in game**
 
 Start the game from Steam as usual, get into a car and switch radio stations as you normally would. The new
-station comes **last**, with a neon 私家台 ("private station") logo, named "SDRADIO" by default. Getting into
-another car, the radio plays SDRADIO straight away (except a police car's scanner and stations set by missions).
+stations come **last**, with a neon 私家台 ("private station") logo. Getting into another car, the radio plays
+SDRadio's first station straight away (except a police car's scanner and stations set by missions).
 
 ### FAQ
 
@@ -271,18 +282,21 @@ is the safest.
 
 **Changing the station name or the music folder**
 
-Open `plugins\SDRadio.ini` in Notepad, save your changes and restart the game. Every setting is explained in
-the file. The name can be up to 63 bytes.
+A subfolder station is named after its folder: rename the folder. For the station of the files right in
+`SDRadio`, open `plugins\SDRadio.ini` in Notepad and change `Name`, save and restart the game. Every setting is
+explained in the file. A name can be up to 63 bytes.
 
-**Not tuning to SDRADIO when getting into a car**
+**Not tuning to SDRadio when getting into a car**
 
 In `plugins\SDRadio.ini`, under `[Station]`, set `Default` to `off` (or `live` for the live station), save and
 restart the game. An ini from an older version lacks the line and counts as `music`: add `Default = off`.
+`music` is SDRadio's first music station.
 
 **Using your own logo**
 
 1. Draw a 2:1 picture (512×256 recommended) with a transparent background and save it as PNG;
-2. name it `logo.png` and put it into `plugins\SDRadio`;
+2. name it `logo.png` and put it into the station's folder: right in `plugins\SDRadio` for SDRADIO, or into a
+   subfolder for that station;
 3. restart the game.
 
 The game shows every station logo in white, so what you see is your picture's shape, not its colors. Delete

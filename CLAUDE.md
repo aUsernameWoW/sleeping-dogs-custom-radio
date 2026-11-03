@@ -71,7 +71,8 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   our bank/events). Learns the streaming device ID from the first successful open.
 - `core/radios.*` — Radios.xml: next station ID, append the station (escaping, name ≤ 63 bytes).
 - `core/bank.*` — the generated bank (IDs, object layouts, top-node parameters). Pure.
-- `core/library.*` — scan the music folder (sorted, ≤ 255 tracks: `TrackAsset` index is a byte), probe
+- `core/library.*` — scan the music folder into stations (its own files, each subfolder; sorted, ≤ 255 tracks
+  each: `TrackAsset` index is a byte), probe
   each file (format, exact length, tags).
 - `core/decoder.*` — bundled backends (dr_mp3/dr_flac/dr_wav/stb_vorbis) + `ToStereo`;
   `core/decoder_mf.cc` — Media Foundation fallback (delay-loaded) with shell-property tags; logs once
@@ -509,11 +510,18 @@ while they slept, so only tested with a stand-in.
   come from outside Init, so all of those stay. Alternatives offered and not taken: every car entry; once per
   session. Logged as `radio: default station: X instead of the car's own station Y`. Not yet in game.
 
-## Several stations, one per folder (research 2026-11-03; not built)
+## Several stations, one per folder (2026-11-03; not yet in game)
 
 Asked for on Nexus by two players (2026-10-01: one channel per folder, genre stations like the game's; 2026-10-30:
 several add-on stations without merging them into one folder); the user answered there that it comes in a major
-update. Research only so far (legacy IDA + the installed PCKs):
+update. Built 2026-11-03 as the user chose: the music folder's own files stay one station (`[Station] Name`), each
+top-level subfolder with everything below it is a station named after the folder (no name file), in name order
+(`library::Station`); `[Station] Default = music` is the lowest-id one. The live station stays last. IDs stop at
+`kMaxStationId` 44 (hooks.cc; one kept for the live station). Logos: the music folder's station keeps
+`SDRadio-logo`, subfolder stations get `SDRadio-logo-<n>` (n-th subfolder station; the folder's `logo.png`, else the
+built-in), the live one `SDRadio-logo-live` (the music folder's picture), texture `Logo_SDRadio_<suffix>`; packs of
+suffixes no longer used are deleted at startup (`logo::RemoveOtherStationPacks`). Research behind it (legacy IDA +
+the installed PCKs):
 
 - **No station limit in the game.** `LoadRadioStationData` appends every `<Station>` to the `sm_stationList` qList
   and counts `sm_numStations`; the HUD's `ReadStationList` grows a `qArray<UIHKRadioStationData>`. Stations must
@@ -539,10 +547,8 @@ update. Research only so far (legacy IDA + the installed PCKs):
 - **Scan time** grows with the library: `Probe` takes an MP3's exact length with `drmp3_get_pcm_frame_count`
   (decodes every frame), and the Radios.xml hook gives the scan 30 s. A big multi-folder library may need a
   length cache (path + size + mtime) or stations built from whatever finished.
-- Design questions for the user: subfolders today all join the one station (recursive scan), so a folder per
-  station changes existing players' setup unless it is a switch or only top-level subfolders count; station
-  names (folder name, or a `station.ini` / name file in the folder, which also suits add-on packs); order; what
-  `[Station] Default = music` means with several; cycling through 11 + N stations gets long.
+- Open: existing players with subfolders now get several stations (documented, no switch); cycling through 11 + N
+  stations gets long.
 
 ## Design decisions (don't undo without reason)
 
@@ -609,8 +615,8 @@ update. Research only so far (legacy IDA + the installed PCKs):
 3. Next: Linux/macOS runs in game (the user has both; Wine/Proton/CrossOver; the tests already pass under
    Wine in CI), Chinese titles on the HUD without SDCNLoc,
    long-track seek behavior (`SeekMS` on resume reads far ahead: decode-to-position latency).
-4. Several stations, one per folder (promised to players on Nexus; researched, see "Several stations"),
-   shuffle/order option, M3U playlists.
+4. Several stations, one per folder (promised to players on Nexus; built 2026-11-03, see "Several stations";
+   test in game), shuffle/order option, M3U playlists.
 5. Live station / internet radio (2026-10-23, see their sections; hitches, stuck switch and HUD title done and
    confirmed in game): next AAC streams
    (many stations; needs a decoder: Media Foundation can't take a byte stream as simply, a bundled one would
