@@ -199,12 +199,22 @@ namespace hooks
 			return true;
 		}
 
-		// Appends one station to gPatchedXml and registers its bank and streams.
-		bool AddStation(radios::Station station, uint32_t id, std::vector<streamio::TrackSource> sources)
+		std::vector<std::string> gLogoSuffixes; // the station packs written (logo::StationPack), the rest are stale
+
+		// Appends one station to gPatchedXml and registers its bank and streams. The logo: the music folder's
+		// pack written at startup (`logoSuffix` empty), or a pack of the station's own from `logoFolder`;
+		// without one, a game station's logo.
+		bool AddStation(radios::Station station, uint32_t id, std::vector<streamio::TrackSource> sources, const std::wstring& logoFolder,
+			const std::string& logoSuffix)
 		{
-			// Our logo's texture pack, written at startup (long done by now); without one, a game station's logo.
-			const std::string pack = gConfig.mCustomLogo ? logo::Wait(10'000) : std::string();
-			station.mTextureName = pack.empty() ? gConfig.mTextureName : logo::kTextureName;
+			std::string pack = gConfig.mCustomLogo ? logo::Wait(10'000) : std::string(), texture = logo::kTextureName;
+			if (!pack.empty() && !logoSuffix.empty()) {
+				pack = logo::StationPack(logoFolder, logoSuffix, texture);
+				if (!pack.empty()) {
+					gLogoSuffixes.push_back(logoSuffix);
+				}
+			}
+			station.mTextureName = pack.empty() ? gConfig.mTextureName : texture;
 			station.mTexturePack = pack.empty() ? gConfig.mTexturePack : pack;
 
 			std::string xml = radios::Append(gPatchedXml, station, id);
@@ -255,6 +265,7 @@ namespace hooks
 			else {
 				// The live station keeps its place after the music ones.
 				const uint32_t last = gConfig.mLive ? kMaxStationId - 1 : kMaxStationId;
+				uint32_t subfolders = 0;
 				for (const library::Station& folder : *stations) {
 					if (next > last) {
 						LOG("radios: no more stations after %u (more would collide with the game's sound IDs), skipping \"%s\" and the rest", last,
@@ -269,7 +280,9 @@ namespace hooks
 						const uint32_t k = static_cast<uint32_t>(sources.size() + 1);
 						sources.push_back({ bank::TrackFileId(next, k), t.mPath, t.mSampleRate, t.mFrames });
 					}
-					if (AddStation(std::move(station), next, std::move(sources))) {
+					// The music folder's own station keeps the pack written at startup; a subfolder's is numbered.
+					const std::string logoSuffix = folder.mName.empty() ? std::string() : std::to_string(++subfolders);
+					if (AddStation(std::move(station), next, std::move(sources), folder.mFolder, logoSuffix)) {
 						// The first is the one `[Station] Default = music` picks.
 						if (!gMusicStationId) {
 							gMusicStationId = next;
@@ -322,11 +335,15 @@ namespace hooks
 						station.mTracks.push_back({ "SDRadio", title });
 						sources.push_back({ bank::TrackFileId(next, k), L"", live::kRate, live::kFrames, true });
 					}
-					if (AddStation(std::move(station), next, std::move(sources))) {
+					// Its own pack too, from the music folder's picture as before.
+					if (AddStation(std::move(station), next, std::move(sources), gConfig.mMusicFolder, "live")) {
 						gLiveStationId = next;
 						any = true;
 					}
 				}
+			}
+			if (gConfig.mCustomLogo) {
+				logo::RemoveOtherStationPacks(gLogoSuffixes);
 			}
 			return any;
 		}

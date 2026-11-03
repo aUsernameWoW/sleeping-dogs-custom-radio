@@ -8,6 +8,7 @@
 #include <Windows.h>
 
 #include <string>
+#include <vector>
 
 namespace logo
 {
@@ -20,4 +21,14 @@ namespace logo
 	// The TexturePack for Radios.xml once the pack is written, or empty if there is none (it couldn't be
 	// made, or it isn't ready within `timeoutMs`).
 	std::string Wait(DWORD timeoutMs);
+
+	// A pack of a station's own, SDRadio-logo-<suffix>, from `folder`'s logo.png or the built-in logo, with
+	// texture Logo_SDRadio_<suffix> (returned in `textureName`): each station needs its own, as the HUD widget
+	// misbehaves when two stations share a pack (hooks.cc, LoadTexturesHook). The TexturePack for Radios.xml,
+	// or empty if there is none. After Wait.
+	std::string StationPack(const std::wstring& folder, const std::string& suffix, std::string& textureName);
+
+	// Deletes the SDRadio-logo-<suffix> packs next to the .asi whose suffix isn't in `keep` (a subfolder that
+	// was a station before).
+	void RemoveOtherStationPacks(const std::vector<std::string>& keep);
 }

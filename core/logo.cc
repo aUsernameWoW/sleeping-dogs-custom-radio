@@ -2,6 +2,8 @@
 
 #include <cerrno>
 #include <cstdio>
+#include <cwchar>
+#include <iterator>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -16,6 +18,8 @@ namespace logo
 	{
 		HANDLE gDone = CreateEventW(nullptr, TRUE, FALSE, nullptr);
 		std::string gTexturePack; // set before gDone
+		std::wstring gAsiDir;     // set before gDone, with gPackPrefix
+		std::string gPackPrefix;  // the .asi folder as a TexturePack prefix: ..\..\<relative>\ (empty: no packs possible)
 
 		bool ReadWholeFile(const std::wstring& path, std::vector<uint8_t>& data)
 		{
@@ -49,10 +53,19 @@ namespace logo
 			return ok && closed ? 0 : EIO;
 		}
 
-		logoimage::Result BuiltIn()
+		logoimage::Result DecodeBuiltIn();
+
+		// Decoded once: every station without a logo.png of its own shows it.
+		const logoimage::Result& BuiltIn()
+		{
+			static const logoimage::Result result = DecodeBuiltIn();
+			return result;
+		}
+
+		logoimage::Result DecodeBuiltIn()
 		{
 			HMODULE self = nullptr;
-			GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCWSTR>(&BuiltIn),
+			GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCWSTR>(&DecodeBuiltIn),
 				&self);
 			HRSRC resource = FindResourceW(self, L"LOGO", RT_RCDATA);
 			HGLOBAL loaded = resource ? LoadResource(self, resource) : nullptr;
@@ -79,7 +92,7 @@ namespace logo
 			else {
 				LOG("logo: %s doesn't decode as a PNG; using the built-in logo", name.c_str());
 			}
-			const logoimage::Result builtIn = BuiltIn();
+			const logoimage::Result& builtIn = BuiltIn();
 			if (!builtIn.mImage) {
 				LOG("logo: the built-in logo is missing from the .asi");
 			}
@@ -116,6 +129,29 @@ namespace logo
 			return true;
 		}
 
+		// Writes the pack <asiDir>\<file>.perm.bin / .temp.bin holding `image` as texture `texture`; the
+		// TexturePack for Radios.xml, or empty after a write error (logged).
+		std::string WritePack(const logoimage::Image& image, const std::string& file, const char* texture, DWORD start)
+		{
+			// The widget loads Data\UI\<TexturePack>.perm.bin; two levels up is the game folder.
+			const std::string pack = gPackPrefix + file;
+			const logopack::Files files = logopack::Build(image, texture, "Data\\UI\\" + pack + ".perm.bin");
+			const std::wstring base = gAsiDir + L"\\" + std::wstring(file.begin(), file.end());
+			bool tempWritten = false, permWritten = false;
+			int error = WriteIfChanged(base + L".temp.bin", files.mTemp, tempWritten);
+			if (!error) {
+				error = WriteIfChanged(base + L".perm.bin", files.mPerm, permWritten);
+			}
+			if (error) {
+				LOG("logo: writing %s.perm.bin / .temp.bin failed (errno %d); the station borrows a game logo", logger::ToUtf8(base.c_str()).c_str(),
+					error);
+				return {};
+			}
+			LOG("logo: texture pack %s (%ux%u, %zu mips) %s in %lu ms", pack.c_str(), image.mWidth, image.mHeight, image.mMips.size(),
+				tempWritten || permWritten ? "written" : "unchanged", GetTickCount() - start);
+			return pack;
+		}
+
 		void Make(std::wstring asiDir, std::wstring musicFolder)
 		{
 			const DWORD start = GetTickCount();
@@ -133,28 +169,75 @@ namespace logo
 					logger::ToUtf8(cwd).c_str());
 			}
 
+			gAsiDir = asiDir;
+			gPackPrefix = "..\\..\\" + (relative.empty() ? std::string() : relative + "\\");
 			if (const std::shared_ptr<const logoimage::Image> image = Picture(musicFolder)) {
-				// The widget loads Data\UI\<TexturePack>.perm.bin; two levels up is the game folder.
-				const std::string pack = "..\\..\\" + (relative.empty() ? std::string() : relative + "\\") + "SDRadio-logo";
-				const logopack::Files files = logopack::Build(*image, kTextureName, "Data\\UI\\" + pack + ".perm.bin");
-				const std::wstring base = asiDir + L"\\SDRadio-logo";
-				bool tempWritten = false, permWritten = false;
-				int error = WriteIfChanged(base + L".temp.bin", files.mTemp, tempWritten);
-				if (!error) {
-					error = WriteIfChanged(base + L".perm.bin", files.mPerm, permWritten);
-				}
-				if (error) {
-					LOG("logo: writing %s.perm.bin / .temp.bin failed (errno %d); the station borrows a game logo",
-						logger::ToUtf8(base.c_str()).c_str(), error);
-				}
-				else {
-					gTexturePack = pack;
-					LOG("logo: texture pack %s (%ux%u, %zu mips) %s in %lu ms", pack.c_str(), image->mWidth, image->mHeight, image->mMips.size(),
-						tempWritten || permWritten ? "written" : "unchanged", GetTickCount() - start);
-				}
+				gTexturePack = WritePack(*image, "SDRadio-logo", kTextureName, start);
 			}
 			SetEvent(gDone);
 		}
+
+		// SDRadio-logo-<suffix>.perm.bin / .temp.bin: true and the suffix if `file` is one.
+		bool StationPackFile(const std::wstring& file, std::wstring& suffix)
+		{
+			static constexpr wchar_t kPrefix[] = L"SDRadio-logo-";
+			constexpr size_t prefix = std::size(kPrefix) - 1;
+			for (const wchar_t* ext : { L".perm.bin", L".temp.bin" }) {
+				const size_t length = wcslen(ext);
+				if (file.size() > prefix + length && _wcsnicmp(file.c_str(), kPrefix, prefix) == 0 &&
+					_wcsicmp(file.c_str() + file.size() - length, ext) == 0) {
+					suffix = file.substr(prefix, file.size() - prefix - length);
+					return true;
+				}
+			}
+			return false;
+		}
+	}
+
+	std::string StationPack(const std::wstring& folder, const std::string& suffix, std::string& textureName)
+	{
+		if (WaitForSingleObject(gDone, 0) != WAIT_OBJECT_0 || gPackPrefix.empty()) {
+			return {};
+		}
+		const DWORD start = GetTickCount();
+		const std::shared_ptr<const logoimage::Image> image = Picture(folder);
+		if (!image) {
+			return {};
+		}
+		const std::string texture = std::string(kTextureName) + "_" + suffix;
+		std::string pack = WritePack(*image, "SDRadio-logo-" + suffix, texture.c_str(), start);
+		if (!pack.empty()) {
+			textureName = texture;
+		}
+		return pack;
+	}
+
+	void RemoveOtherStationPacks(const std::vector<std::string>& keep)
+	{
+		if (gAsiDir.empty()) {
+			return;
+		}
+		WIN32_FIND_DATAW data;
+		HANDLE find = FindFirstFileW((gAsiDir + L"\\SDRadio-logo-*").c_str(), &data);
+		if (find == INVALID_HANDLE_VALUE) {
+			return;
+		}
+		do {
+			std::wstring suffix;
+			if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || !StationPackFile(data.cFileName, suffix)) {
+				continue;
+			}
+			bool kept = false;
+			for (const std::string& k : keep) {
+				kept |= _wcsicmp(suffix.c_str(), std::wstring(k.begin(), k.end()).c_str()) == 0;
+			}
+			if (!kept) {
+				const std::wstring path = gAsiDir + L"\\" + data.cFileName;
+				LOG("logo: removing %s (no station uses it now)", logger::ToUtf8(path.c_str()).c_str());
+				DeleteFileW(path.c_str());
+			}
+		} while (FindNextFileW(find, &data));
+		FindClose(find);
 	}
 
 	void Start(const std::wstring& asiDir, const std::wstring& musicFolder)
