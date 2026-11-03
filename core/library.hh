@@ -1,8 +1,9 @@
 #pragma once
 
-// The music folder: every playable file in it (subfolders included), sorted by path, with the tags and
-// stream format the station needs before anything is decoded. Scanned once on a background thread started
-// from DllMain; the Radios.xml hook waits for it.
+// The music folder: every playable file in it, sorted by path, with the tags and stream format a station
+// needs before anything is decoded, grouped into stations: the files directly in the folder are one, each
+// subfolder (with everything below it) another, named after the subfolder. Scanned once on a background
+// thread started from DllMain; the Radios.xml hook waits for it.
 
 #include <Windows.h>
 
@@ -21,8 +22,16 @@ namespace library
 		uint64_t mFrames = 0;
 	};
 
+	struct Station
+	{
+		std::wstring mFolder;
+		std::string mName; // UTF-8 subfolder name; empty for the music folder's own files
+		std::vector<Track> mTracks; // at most bank::kMaxTracks, never empty
+	};
+
 	void StartScan(const std::wstring& folder);
 
-	// The scan result, or nullptr if it isn't finished within `timeoutMs`.
-	const std::vector<Track>* Wait(DWORD timeoutMs);
+	// The scan result: the music folder's own station first (if it has music), then the subfolders' in name
+	// order; nullptr if it isn't finished within `timeoutMs`.
+	const std::vector<Station>* Wait(DWORD timeoutMs);
 }

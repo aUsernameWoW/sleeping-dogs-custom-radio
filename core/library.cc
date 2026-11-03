@@ -13,7 +13,7 @@ namespace library
 {
 	namespace
 	{
-		std::vector<Track> gTracks;
+		std::vector<Station> gStations;
 		HANDLE gDone = CreateEventW(nullptr, TRUE, FALSE, nullptr);
 
 		// The bundled decoders' formats, then what Media Foundation may handle (Windows; Wine depends on its
@@ -57,19 +57,49 @@ namespace library
 			FindClose(find);
 		}
 
-		void Scan(std::wstring folder)
+		bool Before(const std::wstring& a, const std::wstring& b) { return _wcsicmp(a.c_str(), b.c_str()) < 0; }
+
+		// The folder's own files, and each subfolder with everything below it, as separate groups.
+		std::vector<std::pair<std::wstring, std::vector<std::wstring>>> Groups(const std::wstring& folder)
 		{
-			// Only the Media Foundation fallback needs COM.
-			CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-			const DWORD start = GetTickCount();
+			std::vector<std::pair<std::wstring, std::vector<std::wstring>>> groups(1);
+			groups[0].first = folder;
+			WIN32_FIND_DATAW data;
+			HANDLE find = FindFirstFileW((folder + L"\\*").c_str(), &data);
+			if (find == INVALID_HANDLE_VALUE) {
+				return groups;
+			}
+			std::vector<std::wstring> subfolders;
+			do {
+				const std::wstring name = data.cFileName;
+				if (name == L"." || name == L"..") {
+					continue;
+				}
+				if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+					subfolders.push_back(name);
+				}
+				else if (IsMusic(name)) {
+					groups[0].second.push_back(folder + L"\\" + name);
+				}
+			} while (FindNextFileW(find, &data));
+			FindClose(find);
 
-			std::vector<std::wstring> paths;
-			Collect(folder, paths);
-			std::sort(paths.begin(), paths.end(), [](const std::wstring& a, const std::wstring& b) { return _wcsicmp(a.c_str(), b.c_str()) < 0; });
-			LOG("library: %zu music files in %s", paths.size(), logger::ToUtf8(folder.c_str()).c_str());
+			std::sort(subfolders.begin(), subfolders.end(), Before);
+			for (const std::wstring& name : subfolders) {
+				std::vector<std::wstring> paths;
+				Collect(folder + L"\\" + name, paths);
+				groups.emplace_back(folder + L"\\" + name, std::move(paths));
+			}
+			for (auto& group : groups) {
+				std::sort(group.second.begin(), group.second.end(), Before);
+			}
+			return groups;
+		}
 
+		void ScanTracks(const std::vector<std::wstring>& paths, std::vector<Track>& tracks)
+		{
 			for (const std::wstring& path : paths) {
-				if (gTracks.size() == bank::kMaxTracks) {
+				if (tracks.size() == bank::kMaxTracks) {
 					LOG("library: stopping at %u tracks (the game stores the track index in a byte)", bank::kMaxTracks);
 					break;
 				}
@@ -93,12 +123,42 @@ namespace library
 					t.mTitle = logger::ToUtf8(name.c_str());
 				}
 
-				LOG("library: %3zu  %s - %s  (%s, %u Hz, %.1f s)", gTracks.size() + 1, t.mArtist.c_str(), t.mTitle.c_str(), info.mBackend,
+				LOG("library: %3zu  %s - %s  (%s, %u Hz, %.1f s)", tracks.size() + 1, t.mArtist.c_str(), t.mTitle.c_str(), info.mBackend,
 					t.mSampleRate, static_cast<double>(t.mFrames) / t.mSampleRate);
-				gTracks.push_back(std::move(t));
+				tracks.push_back(std::move(t));
+			}
+		}
+
+		void Scan(std::wstring folder)
+		{
+			// Only the Media Foundation fallback needs COM.
+			CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+			const DWORD start = GetTickCount();
+
+			auto groups = Groups(folder);
+			size_t files = 0, tracks = 0;
+			for (const auto& group : groups) {
+				files += group.second.size();
+			}
+			LOG("library: %zu music files in %s, %zu subfolders", files, logger::ToUtf8(folder.c_str()).c_str(), groups.size() - 1);
+
+			for (auto& [dir, paths] : groups) {
+				Station station;
+				station.mFolder = dir;
+				if (dir.size() > folder.size()) {
+					station.mName = logger::ToUtf8(dir.c_str() + folder.size() + 1);
+				}
+				if (!paths.empty()) {
+					LOG("library: station \"%s\": %zu music files", station.mName.empty() ? "(music folder)" : station.mName.c_str(), paths.size());
+				}
+				ScanTracks(paths, station.mTracks);
+				if (!station.mTracks.empty()) {
+					tracks += station.mTracks.size();
+					gStations.push_back(std::move(station));
+				}
 			}
 
-			LOG("library: %zu tracks ready in %lu ms", gTracks.size(), GetTickCount() - start);
+			LOG("library: %zu tracks ready (%zu stations) in %lu ms", tracks, gStations.size(), GetTickCount() - start);
 			CoUninitialize();
 			SetEvent(gDone);
 		}
@@ -109,8 +169,8 @@ namespace library
 		std::thread(Scan, folder).detach();
 	}
 
-	const std::vector<Track>* Wait(DWORD timeoutMs)
+	const std::vector<Station>* Wait(DWORD timeoutMs)
 	{
-		return WaitForSingleObject(gDone, timeoutMs) == WAIT_OBJECT_0 ? &gTracks : nullptr;
+		return WaitForSingleObject(gDone, timeoutMs) == WAIT_OBJECT_0 ? &gStations : nullptr;
 	}
 }

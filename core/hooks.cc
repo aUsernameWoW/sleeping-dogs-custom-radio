@@ -227,39 +227,56 @@ namespace hooks
 			return true;
 		}
 
-		// Builds the stations (XML, banks, streams): the music folder's, and the live one if enabled. Returns
-		// false if there's neither.
+		// The highest station ID we use. Every ID our stations generate (bank, mixer, per track the sound, action,
+		// file and the game's play_station_* event name) was checked for stations 12-99 with 255 tracks against
+		// the IDs in SFX.pck and English(US).pck and against each other: clean through 44, the first clash at 45.
+		constexpr uint32_t kMaxStationId = 44;
+
+		// Builds the stations (XML, banks, streams): one per music folder group (the folder's own files, each
+		// subfolder), and the live one if enabled. Returns false if there's none.
 		bool BuildStations(const char* original)
 		{
 			gPatchedXml = original;
 			uint32_t next = radios::MaxStationId(original) + 1;
 			bool any = false;
 			// Before any bank can load; one past ours is harmless.
-			for (uint32_t id = 1; id <= next + 1; ++id) {
+			for (uint32_t id = 1; id <= kMaxStationId + 1; ++id) {
 				gStationBanks[bank::BankId(id)] = id;
 			}
 
 			// Radios.xml is read during the game's startup; the scan runs from DllMain, normally done by then.
-			const std::vector<library::Track>* tracks = library::Wait(30'000);
-			if (!tracks) {
-				LOG("radios: music scan still running after 30 s, starting without the music station");
+			const std::vector<library::Station>* stations = library::Wait(30'000);
+			if (!stations) {
+				LOG("radios: music scan still running after 30 s, starting without the music stations");
 			}
-			else if (tracks->empty()) {
+			else if (stations->empty()) {
 				LOG("radios: no music found in %s, no music station", logger::ToUtf8(gConfig.mMusicFolder.c_str()).c_str());
 			}
 			else {
-				radios::Station station;
-				station.mName = gConfig.mStationName;
-				std::vector<streamio::TrackSource> sources;
-				for (const library::Track& t : *tracks) {
-					station.mTracks.push_back({ t.mArtist, t.mTitle });
-					const uint32_t k = static_cast<uint32_t>(sources.size() + 1);
-					sources.push_back({ bank::TrackFileId(next, k), t.mPath, t.mSampleRate, t.mFrames });
-				}
-				if (AddStation(std::move(station), next, std::move(sources))) {
-					gMusicStationId = next;
-					++next;
-					any = true;
+				// The live station keeps its place after the music ones.
+				const uint32_t last = gConfig.mLive ? kMaxStationId - 1 : kMaxStationId;
+				for (const library::Station& folder : *stations) {
+					if (next > last) {
+						LOG("radios: no more stations after %u (more would collide with the game's sound IDs), skipping \"%s\" and the rest", last,
+							folder.mName.c_str());
+						break;
+					}
+					radios::Station station;
+					station.mName = folder.mName.empty() ? gConfig.mStationName : folder.mName;
+					std::vector<streamio::TrackSource> sources;
+					for (const library::Track& t : folder.mTracks) {
+						station.mTracks.push_back({ t.mArtist, t.mTitle });
+						const uint32_t k = static_cast<uint32_t>(sources.size() + 1);
+						sources.push_back({ bank::TrackFileId(next, k), t.mPath, t.mSampleRate, t.mFrames });
+					}
+					if (AddStation(std::move(station), next, std::move(sources))) {
+						// The first is the one `[Station] Default = music` picks.
+						if (!gMusicStationId) {
+							gMusicStationId = next;
+						}
+						++next;
+						any = true;
+					}
 				}
 			}
 

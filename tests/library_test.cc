@@ -1,5 +1,5 @@
 // Loads SDRadio.asi with music already in its folder, as on a player's first start: the library scan must find
-// files in subfolders and under Chinese names, read WAV tags written in UTF-8 and in GBK, skip a file no
+// files in a subfolder (a station of its own) and under Chinese names, read WAV tags written in UTF-8 and in GBK, skip a file no
 // backend can open (a broken .m4a goes to the Media Foundation fallback and fails there, or finds no Media
 // Foundation at all) and ignore files that aren't music. Written for the CI run under Wine, where file names,
 // code page 936 and Media Foundation are Wine's own implementations; runs on Windows too.
@@ -98,7 +98,8 @@ int main(int argc, char** argv)
 	std::printf("%s", contents.c_str());
 
 	const char* expected[] = { "library: 3 music files", "  测试歌手 - 测试曲目  (dr_wav, 44100 Hz, 0.5 s)",
-		"broken.m4a (no decoder for it, or no length)", "   - 无标签  (dr_wav, 48000 Hz, 1.0 s)", "library: 2 tracks ready" };
+		"broken.m4a (no decoder for it, or no length)", "   - 无标签  (dr_wav, 48000 Hz, 1.0 s)", "library: 2 tracks ready (2 stations)",
+		"library: station \"华语\": 1 music files" };
 	for (const char* line : expected) {
 		if (contents.find(line) == std::string::npos) {
 			std::printf("FAIL: log lacks \"%s\"\n", line);
