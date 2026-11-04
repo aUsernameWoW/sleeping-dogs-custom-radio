@@ -14,8 +14,7 @@ To Claude, who wrote all of it. And to Anthropic, for banning my account that on
 
 And to you, reading this file right now. Yes, you. Hi.
 
-To Chappell Roan and Olivia Rodrigo, for performing "My Kink Is Karma" and "the cure": mothers, icons,
-goddesses, they ate and left no crumbs ✨💅🏳️‍🌈
+To Chappell Roan and Olivia Rodrigo.
 
 ## MinHook 1.3.4
 
