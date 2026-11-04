@@ -383,7 +383,8 @@ jobs:
   #                              All three are in the "Advanced" dialog of a file on the mod page's Files tab.
   #   secrets.NEXUSMODS_API_KEY  a personal API key (nexusmods.com/settings/api-keys)
   # Without NEXUS_CI_FILE_ID the job is skipped. Until a release file exists the CI builds are the mod's main
-  # download and carry its version and changelog; after that, they are an optional file and releases do that.
+  # download and carry its version; after that, they are an optional file and releases do that. Every CI build
+  # adds its changes to the mod's changelog either way (the user wants them all there, 2026-11-04).
   nexus:
     name: Nexus Mods
     needs: prerelease
@@ -460,5 +461,5 @@ jobs:
           category: ${{ vars.NEXUS_RELEASE_FILE_ID == '' && 'main' || 'optional' }}
           primary_mod_manager_download: ${{ vars.NEXUS_RELEASE_FILE_ID == '' }}
           update_mod_version: ${{ vars.NEXUS_RELEASE_FILE_ID == '' }}
-          changelog: ${{ vars.NEXUS_RELEASE_FILE_ID == '' && steps.package.outputs.changelog || '' }}
+          changelog: ${{ steps.package.outputs.changelog }}
           archive_existing_version: true
