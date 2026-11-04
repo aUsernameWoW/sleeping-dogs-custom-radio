@@ -74,15 +74,19 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
 - `core/library.*` — scan the music folder into stations (its own files, each subfolder; sorted, ≤ 255 tracks
   each: `TrackAsset` index is a byte), probe
   each file (format, exact length, tags).
-- `core/decoder.*` — bundled backends (dr_mp3/dr_flac/dr_wav/stb_vorbis) + `ToStereo`;
+- `core/decoder.*` — bundled backends (dr_mp3/dr_flac/dr_wav/stb_vorbis, Vorbis reordered to WAVE order);
   `core/decoder_mf.cc` — Media Foundation fallback (delay-loaded) with shell-property tags; logs once
   whether it started (under Wine it may be missing, or start but open nothing without GStreamer plugins).
   Fresh Windows 11 installs lack the Dolby (AC-3 / E-AC-3) decoder MFT, so Apple Music's Dolby Atmos `.m4a`
   downloads fail with `0xC00D36B4` (2026-11-04, user's machine; only the IEC-61937 passthrough converter is
   registered). Dolby's free Store package "Dolby Digital Plus decoder for PC OEMs" (`9NVJQJBDKN97`) adds it:
-  then 5.1 48 kHz comes out, folded by `ToStereo` (surrounds and LFE dropped; in that track they were ~13 dB
-  under the fronts, so nothing audible lost). Such Atmos mixes measure ~-19 LUFS vs ~-7.5 for the FLACs beside
-  them: quieter on the station. README's FAQ tells players.
+  then 5.1 48 kHz comes out (mask 0x3F; asked for 7.1 it pads two silent channels: the Atmos objects aren't
+  rendered, only the 5.1 core). That track's surrounds are silent in the verses and carry elements of their
+  own in the choruses (~-11..-15 dB under the fronts, uncorrelated with them): the old fold to stereo, which
+  dropped them, lost real content. Such Atmos mixes measure ~-19 LUFS vs ~-7.5 for the FLACs beside them:
+  quieter on the station. README's FAQ tells players.
+- `core/layout.*` — channel layouts (2026-11-04, see "Multichannel tracks"): which go to Wwise as they are
+  (`ForWwise`), conversion to the stream's layout (`Convert`), Vorbis order. Pure.
 - `core/tags.*` — ID3v2.2-2.4/ID3v1, Vorbis comments, RIFF INFO; legacy text: UTF-8, else GBK, else Latin-1.
 - `core/stream_io.*` — virtual files, decoder threads, completion thread. `core/live.*` — the live station's
   ring, reader and sources (see "Live station"). `core/app_audio.*`, `core/now_playing.*` — another app's sound and its song title (see "App audio").
@@ -111,8 +115,9 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   .asi decodes to 7 BC3 levels whose alpha matches the PNG; the pack's fields; the UID functions against
   5 game packs; opaque pictures, fitting; includes stb by relative path since tests get no include paths),
   `library_test` (the .asi with music already in its folder: a Chinese subfolder and file name, WAV INFO tags
-  in GBK and UTF-8, mono, a broken `.m4a` that the Media Foundation fallback must reject, a `.txt` to ignore;
-  written for the Wine run below), `live_test` (the live ring and reader: preroll start, padding, rebuffering,
+  in GBK and UTF-8, mono, 5.1 with side surrounds and 6.1 (logged as passed on as 5.1 and folded to stereo), a
+  broken `.m4a` that the Media Foundation fallback must reject, a `.txt` to ignore; written for the Wine run
+  below), `layout_test` (layouts, the side/back relabel, fold coefficients, mono, Vorbis order), `live_test` (the live ring and reader: preroll start, padding, rebuffering,
   jumps, frame phase), `icy_test` and `pacer_test` (internet radio's pure parts, see there), and
   `netradio_manual` (compiled only: a real station with Wwise's reads emulated; needs the network).
 - `.github/workflows/build.yml` — CI like SDIMEFix's (documented in `mods\SDIMEFix\CLAUDE.md`), including
@@ -555,6 +560,33 @@ the installed PCKs):
   length cache (path + size + mtime) or stations built from whatever finished.
 - Open: existing players with subfolders now get several stations (documented, no switch); cycling through 11 + N
   stations gets long.
+
+## Multichannel tracks (2026-11-04; not yet in game)
+
+The user's Dolby Atmos `.m4a` (E-AC-3 JOC, 5.1 core + 15 objects) played folded to stereo, and its surrounds
+held content of their own. The user: passthrough is the better default, stereo or surround. So a track's
+channels go to Wwise as they are, and Wwise does the rest. Research (legacy IDA, Wwise 2012.2):
+
+- `CAkSrcFilePCM::ParseHeader` takes any `dwChannelMask` into the voice's `AkAudioFormat`.
+- The radio is 2D without the panner, so `CAkVPLSrcCbxNodeBase::ComputeSpeakerMatrix2D` →
+  `CAkSpeakerPan::GetSpeakerVolumes2DPan` gives each input channel unity gain on its own speaker (internal order
+  FL FR C BL BR SL SR, LFE apart): for a 0x37/0x3F input the back pair goes to SL/SR when the output is 7.x
+  (`(out & ~LFE) - 0x633` is 0 or 4), else to BL/BR. It only handles base masks (LFE aside) 0x3, 0x7, 0x33,
+  0x37, 0x633, 0x637 (and mono); any other mask (e.g. 0x607/0x60F, side 5.x) leaves the volumes unset.
+- The voice is mixed into its bus by `CAkMixer::Mix3D`, which turns that matrix into the bus's layout with
+  `AkDownmix::ComputeVolumes`: into stereo FL + 0.707 C + 0.707 BL + 0.707 SL (right likewise), into 5.1 sides
+  added to backs, into 7.1 as is; LFE only to an output with LFE.
+- `radio_car` and `master_music` are mixing buses in the output's layout: SDAtmos's log shows both at 0x63F
+  (no channel config of their own forcing stereo).
+- The radio's effect (`287224143`, plugin 0x00820003 = Time Stretch, for slow motion) sizes its phase vocoder
+  by the input's channel count (`CAkTimeStretchFX::Init`), so it handles 6 or 8 channels.
+
+`layout::ForWwise` keeps those layouts (side 5.x relabelled as back: same channel order, and Wwise sends a 5.1
+back pair to the sides of a 7.1 output anyway), folds the rest to stereo with the same coefficients, and keeps
+mono duplicated to stereo (0 dB both sides, as before). Memory: a track is decoded whole, so 5.1 is 3× stereo
+(~170 MB for 5 min). Live sources stay stereo. Open: hearing it in game, with SDAtmos (5.1 into its bed) and
+on stereo (Wwise's fold); playing the Atmos objects themselves would need a JOC decoder (Cavern, C#, its own
+non-commercial-leaning licence) and SDAtmos's object path, bypassing Wwise: shelved by the user.
 
 ## Design decisions (don't undo without reason)
 

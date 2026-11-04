@@ -152,7 +152,8 @@ What a player hears getting out and in; `AppSound = direct` follows the first th
   u32, is-bus u8, props, ranged props, fade curve u8, bank ID u32. Event (4): count u32, action IDs (must be
   loaded already).
 - Streamed PCM: `CAkSrcFilePCM::ParseHeader` → `AkFileParser::Parse` (RIFF/WAVE or RIFX, fmt, optional
-  cue/smpl/akd, data) and requires `wFormatTag == 0xFFFE`.
+  cue/smpl/akd, data) and requires `wFormatTag == 0xFFFE`. Any `dwChannelMask` is taken; how a 2D source's
+  channels reach the speakers, and which masks that works for, is in CLAUDE.md, "Multichannel tracks".
 
 ## Low-level I/O
 
