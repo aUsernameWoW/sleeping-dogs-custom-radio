@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#include "layout.hh"
+
 namespace library
 {
 	struct Track
@@ -20,6 +22,7 @@ namespace library
 		std::string mTitle;  // UTF-8; the file name if the file has no title tag
 		uint32_t mSampleRate = 0;
 		uint64_t mFrames = 0;
+		layout::Layout mLayout; // the stream's (decoder::Info::mLayout)
 	};
 
 	struct Station

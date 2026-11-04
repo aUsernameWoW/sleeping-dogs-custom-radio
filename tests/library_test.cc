@@ -38,15 +38,22 @@ namespace
 
 	// 16-bit PCM silence with an optional LIST/INFO chunk (IART, INAM: NUL-terminated as writers store them)
 	// ahead of the data.
-	std::string Wav(uint32_t rate, uint16_t channels, uint32_t frames, const std::string& artist, const std::string& title)
+	// `mask` != 0 writes WAVE_FORMAT_EXTENSIBLE with that channel mask.
+	std::string Wav(uint32_t rate, uint16_t channels, uint32_t frames, const std::string& artist, const std::string& title, uint32_t mask = 0)
 	{
 		std::string fmt;
-		Put16(fmt, 1);
+		Put16(fmt, mask ? 0xFFFE : 1);
 		Put16(fmt, channels);
 		Put32(fmt, rate);
 		Put32(fmt, rate * channels * 2);
 		Put16(fmt, static_cast<uint16_t>(channels * 2));
 		Put16(fmt, 16);
+		if (mask) {
+			Put16(fmt, 22);
+			Put16(fmt, 16);
+			Put32(fmt, mask);
+			fmt += std::string("\x01\x00\x00\x00\x00\x00\x10\x00\x80\x00\x00\xAA\x00\x38\x9B\x71", 16); // KSDATAFORMAT_SUBTYPE_PCM
+		}
 
 		std::string body = "WAVE" + Chunk("fmt ", fmt);
 		if (!artist.empty() || !title.empty()) {
@@ -77,6 +84,10 @@ int main(int argc, char** argv)
 	Write(music / L"a.wav", Wav(44100, 2, 22050, "\xB2\xE2\xCA\xD4\xB8\xE8\xCA\xD6", "测试曲目"));
 	// No tags: the title comes from the (Chinese) file name. Mono, as some rips are.
 	Write(music / L"华语" / L"无标签.wav", Wav(48000, 1, 48000, "", ""));
+	// Surround: 5.1 with side surrounds (as FLAC and Media Foundation give it) goes to Wwise as 5.1 with back
+	// surrounds; 6.1 (a layout Wwise's 2D mapping lacks) is folded to stereo.
+	Write(music / L"side.wav", Wav(48000, 6, 24000, "Surround", "Side", 0x60F));
+	Write(music / L"seven.wav", Wav(48000, 7, 24000, "Surround", "Seven"));
 	Write(music / L"broken.m4a", "not an MP4 file at all");
 	Write(music / L"notes.txt", "not music");
 
@@ -97,8 +108,9 @@ int main(int argc, char** argv)
 	}
 	std::printf("%s", contents.c_str());
 
-	const char* expected[] = { "library: 3 music files", "  测试歌手 - 测试曲目  (dr_wav, 44100 Hz, 0.5 s)",
-		"broken.m4a (no decoder for it, or no length)", "   - 无标签  (dr_wav, 48000 Hz, 1.0 s)", "library: 2 tracks ready (2 stations)",
+	const char* expected[] = { "library: 5 music files", "  测试歌手 - 测试曲目  (dr_wav, 44100 Hz, 0.5 s)",
+		"broken.m4a (no decoder for it, or no length)", "   - 无标签  (dr_wav, 48000 Hz, 1.0 s)", "library: 4 tracks ready (2 stations)",
+		"Surround - Side  (dr_wav, 48000 Hz, 0.5 s, 5.1 side as 5.1)", "Surround - Seven  (dr_wav, 48000 Hz, 0.5 s, 6.1 as stereo)",
 		"library: station \"华语\": 1 music files" };
 	for (const char* line : expected) {
 		if (contents.find(line) == std::string::npos) {

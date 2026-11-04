@@ -6,7 +6,8 @@
 // completion thread) as soon as the decoder has produced the bytes they ask for.
 //
 // A track file is a RIFF/WAVE image: WAVE_FORMAT_EXTENSIBLE (CAkSrcFilePCM::ParseHeader rejects anything
-// else), 16-bit stereo at the file's own rate, a data chunk sized from the scanned duration. If the decoder
+// else), 16-bit at the file's own rate and in the scanned layout (layout.hh: the file's own channels where
+// Wwise maps them, else stereo), a data chunk sized from the scanned duration. If the decoder
 // yields less, the rest is silence; if more, the end is cut.
 
 #include <cstdint>
@@ -14,6 +15,7 @@
 #include <vector>
 
 #include "ak.hh"
+#include "layout.hh"
 
 namespace streamio
 {
@@ -26,6 +28,7 @@ namespace streamio
 		uint32_t mSampleRate;
 		uint64_t mFrames;
 		bool mLive = false; // the live station's endless stream (live.hh) instead of a file
+		layout::Layout mLayout; // stereo for the live stream
 	};
 
 	// Registers what can be opened, once per station, before Wwise can ask for any of it.
@@ -40,6 +43,6 @@ namespace streamio
 	bool Read(void* file, ak::AsyncIOTransferInfo& info);
 	bool Close(void* file);
 
-	// The WAV header for `frames` stereo 16-bit frames at `rate` (exposed for the tests).
-	void WriteWavHeader(uint8_t* out, uint32_t rate, uint64_t frames);
+	// The WAV header for `frames` 16-bit frames at `rate` in `layout` (exposed for the tests).
+	void WriteWavHeader(uint8_t* out, uint32_t rate, uint64_t frames, const layout::Layout& layout = {});
 }

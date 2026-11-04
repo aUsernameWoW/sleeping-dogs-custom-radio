@@ -27,8 +27,9 @@ namespace decoder::mf
 		constexpr DWORD kAudio = static_cast<DWORD>(MF_SOURCE_READER_FIRST_AUDIO_STREAM);
 
 		// A reader on the first audio stream, converted to 16-bit PCM (the reader inserts the decoder and,
-		// if needed, a sample-format converter; rate and channel count stay native).
-		bool OpenReader(const std::wstring& path, ComPtr<IMFSourceReader>& reader, uint32_t& rate, uint32_t& channels)
+		// if needed, a sample-format converter; rate and channels stay native: Dolby's E-AC-3 decoder gives
+		// 5.1 as 0x3F, and only pads a request for 7.1 with silence, Atmos objects not rendered).
+		bool OpenReader(const std::wstring& path, ComPtr<IMFSourceReader>& reader, uint32_t& rate, layout::Layout& layout)
 		{
 			if (!Startup()) {
 				return false;
@@ -55,7 +56,8 @@ namespace decoder::mf
 			ComPtr<IMFMediaType> got;
 			reader->GetCurrentMediaType(kAudio, &got);
 			rate = MFGetAttributeUINT32(got.Get(), MF_MT_AUDIO_SAMPLES_PER_SECOND, 0);
-			channels = MFGetAttributeUINT32(got.Get(), MF_MT_AUDIO_NUM_CHANNELS, 0);
+			const uint32_t channels = MFGetAttributeUINT32(got.Get(), MF_MT_AUDIO_NUM_CHANNELS, 0);
+			layout = layout::FromDecoder(channels, MFGetAttributeUINT32(got.Get(), MF_MT_AUDIO_CHANNEL_MASK, 0));
 			if (rate == 0 || channels == 0) {
 				LOG("decoder: %s has no usable format (%u Hz, %u ch)", logger::ToUtf8(path.c_str()).c_str(), rate, channels);
 				return false;
@@ -117,11 +119,11 @@ namespace decoder::mf
 	bool Probe(const std::wstring& path, Info& out)
 	{
 		ComPtr<IMFSourceReader> reader;
-		uint32_t channels = 0;
-		if (!OpenReader(path, reader, out.mSampleRate, channels)) {
+		if (!OpenReader(path, reader, out.mSampleRate, out.mSource)) {
 			return false;
 		}
 		out.mBackend = "Media Foundation";
+		out.mLayout = layout::ForWwise(out.mSource);
 
 		PROPVARIANT duration;
 		PropVariantInit(&duration);
@@ -133,15 +135,13 @@ namespace decoder::mf
 		return true;
 	}
 
-	bool Decode(const std::wstring& path, uint32_t& rate, const std::function<bool(const int16_t*, size_t)>& sink)
+	bool Decode(const std::wstring& path, uint32_t& rate, layout::Layout& got, const Sink& sink)
 	{
 		ComPtr<IMFSourceReader> reader;
-		uint32_t channels = 0;
-		if (!OpenReader(path, reader, rate, channels)) {
+		if (!OpenReader(path, reader, rate, got)) {
 			return false;
 		}
 
-		std::vector<int16_t> stereo;
 		for (;;) {
 			DWORD flags = 0;
 			ComPtr<IMFSample> sample;
@@ -172,16 +172,7 @@ namespace decoder::mf
 				continue;
 			}
 
-			const auto* in = reinterpret_cast<const int16_t*>(data);
-			const size_t frames = length / (channels * sizeof(int16_t));
-			const int16_t* out = in;
-			if (channels != kChannels) {
-				stereo.resize(frames * kChannels);
-				ToStereo(in, channels, frames, stereo.data());
-				out = stereo.data();
-			}
-
-			const bool more = sink(out, frames);
+			const bool more = sink(reinterpret_cast<const int16_t*>(data), length / got.BlockAlign());
 			buffer->Unlock();
 			if (!more) {
 				return true;

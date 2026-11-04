@@ -149,12 +149,13 @@ namespace streamio
 			uint64_t notifiedAt = file->mReady.load();
 			uint32_t rate = 0;
 
-			const bool ok = decoder::Decode(track.mPath, rate, [&](const int16_t* frames, size_t count) {
+			const uint32_t blockAlign = track.mLayout.BlockAlign();
+			const bool ok = decoder::Decode(track.mPath, track.mLayout, rate, [&](const int16_t* frames, size_t count) {
 				if (file->mClosed.load(std::memory_order_relaxed)) {
 					return false;
 				}
 				const uint64_t at = file->mReady.load(std::memory_order_relaxed);
-				const uint64_t bytes = (std::min)(static_cast<uint64_t>(count) * decoder::kBlockAlign, file->mSize - at);
+				const uint64_t bytes = (std::min)(static_cast<uint64_t>(count) * blockAlign, file->mSize - at);
 				std::memcpy(file->mData.get() + at, frames, static_cast<size_t>(bytes));
 				file->mReady.store(at + bytes, std::memory_order_release);
 				if (at + bytes - notifiedAt >= 64 * 1024 || at + bytes == file->mSize) {
@@ -168,7 +169,7 @@ namespace streamio
 				// The header already went out with the scanned rate: this track plays at the wrong speed.
 				LOG("stream: %08X decodes at %u Hz but the scan said %u Hz; it will play off-speed", track.mFileId, rate, track.mSampleRate);
 			}
-			const uint64_t decoded = (file->mReady.load() - kWavHeaderSize) / decoder::kBlockAlign;
+			const uint64_t decoded = (file->mReady.load() - kWavHeaderSize) / blockAlign;
 			LOG("stream: %08X decoded %llu of %llu frames in %lu ms%s", track.mFileId, decoded, track.mFrames, GetTickCount() - start,
 				ok ? "" : " (decoder error, rest is silence)");
 
@@ -181,9 +182,10 @@ namespace streamio
 		}
 	}
 
-	void WriteWavHeader(uint8_t* out, uint32_t rate, uint64_t frames)
+	void WriteWavHeader(uint8_t* out, uint32_t rate, uint64_t frames, const layout::Layout& layout)
 	{
-		const uint32_t dataSize = static_cast<uint32_t>(frames * decoder::kBlockAlign);
+		const uint32_t blockAlign = layout.BlockAlign();
+		const uint32_t dataSize = static_cast<uint32_t>(frames * blockAlign);
 		auto put32 = [&](size_t at, uint32_t v) { std::memcpy(out + at, &v, 4); };
 		auto put16 = [&](size_t at, uint16_t v) { std::memcpy(out + at, &v, 2); };
 		std::memcpy(out, "RIFF", 4);
@@ -192,14 +194,14 @@ namespace streamio
 		std::memcpy(out + 12, "fmt ", 4);
 		put32(16, 40);
 		put16(20, 0xFFFE);                                // WAVE_FORMAT_EXTENSIBLE
-		put16(22, static_cast<uint16_t>(decoder::kChannels));
+		put16(22, static_cast<uint16_t>(layout.mChannels));
 		put32(24, rate);
-		put32(28, rate * decoder::kBlockAlign);
-		put16(32, static_cast<uint16_t>(decoder::kBlockAlign));
+		put32(28, rate * blockAlign);
+		put16(32, static_cast<uint16_t>(blockAlign));
 		put16(34, 16);
 		put16(36, 22);                                    // cbSize
 		put16(38, 16);                                    // valid bits
-		put32(40, 0x3);                                   // SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT
+		put32(40, layout.mMask);                          // SPEAKER_* bits
 		static constexpr uint8_t kSubtypePcm[16] = { 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 };
 		std::memcpy(out + 44, kSubtypePcm, 16);
 		std::memcpy(out + 60, "data", 4);
@@ -242,23 +244,23 @@ namespace streamio
 				}
 				if (it->second.mLive) {
 					file->mTrack = &it->second;
-					file->mSize = kWavHeaderSize + live::kFrames * decoder::kBlockAlign;
+					file->mSize = kWavHeaderSize + live::kFrames * live::kBlockAlign;
 					uint8_t header[kWavHeaderSize];
 					WriteWavHeader(header, live::kRate, live::kFrames);
 					file->mLive = std::make_unique<live::Reader>(live::Stream(), header);
 					live::Acquire();
 				}
 				else {
-					// A 4-minute track is ~42 MB; new[] of that size only reserves pages, so this is cheap on
-					// whichever thread Wwise opens from. The decoder commits them as it goes.
+					// A 4-minute stereo track is ~42 MB (5.1: three times that); new[] of that size only reserves
+					// pages, so this is cheap on whichever thread Wwise opens from. The decoder commits them as it goes.
 					file->mTrack = &it->second;
-					file->mSize = kWavHeaderSize + it->second.mFrames * decoder::kBlockAlign;
+					file->mSize = kWavHeaderSize + it->second.mFrames * it->second.mLayout.BlockAlign();
 					file->mData.reset(new (std::nothrow) uint8_t[file->mSize]);
 					if (!file->mData) {
 						LOG("stream: out of memory for %08X (%llu bytes)", fileId, file->mSize);
 						return false;
 					}
-					WriteWavHeader(file->mData.get(), it->second.mSampleRate, it->second.mFrames);
+					WriteWavHeader(file->mData.get(), it->second.mSampleRate, it->second.mFrames, it->second.mLayout);
 					file->mReady = kWavHeaderSize;
 				}
 			}

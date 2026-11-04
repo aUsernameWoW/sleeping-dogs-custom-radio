@@ -116,6 +116,7 @@ namespace library
 				t.mTitle = info.mTags.mTitle;
 				t.mSampleRate = info.mSampleRate;
 				t.mFrames = info.mFrames;
+				t.mLayout = info.mLayout;
 				if (t.mTitle.empty()) {
 					const size_t slash = path.find_last_of(L"\\/");
 					std::wstring name = path.substr(slash + 1);
@@ -123,8 +124,15 @@ namespace library
 					t.mTitle = logger::ToUtf8(name.c_str());
 				}
 
-				LOG("library: %3zu  %s - %s  (%s, %u Hz, %.1f s)", tracks.size() + 1, t.mArtist.c_str(), t.mTitle.c_str(), info.mBackend,
-					t.mSampleRate, static_cast<double>(t.mFrames) / t.mSampleRate);
+				// Stereo (and mono, played as stereo) as before; any other layout named, and how it's passed on.
+				std::string channels;
+				if (info.mSource.mChannels > 2) {
+					char a[16], b[16];
+					channels = std::string(", ") + layout::Name(info.mSource, a);
+					channels += info.mLayout == info.mSource ? "" : std::string(" as ") + layout::Name(info.mLayout, b);
+				}
+				LOG("library: %3zu  %s - %s  (%s, %u Hz, %.1f s%s)", tracks.size() + 1, t.mArtist.c_str(), t.mTitle.c_str(), info.mBackend,
+					t.mSampleRate, static_cast<double>(t.mFrames) / t.mSampleRate, channels.c_str());
 				tracks.push_back(std::move(t));
 			}
 		}

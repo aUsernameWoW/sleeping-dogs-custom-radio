@@ -17,7 +17,7 @@ namespace decoder
 {
 	namespace
 	{
-		// One open file of a bundled decoder, read as interleaved 16-bit frames in its own channel count.
+		// One open file of a bundled decoder, read as interleaved 16-bit frames in its own layout (WAVE order).
 		class Source
 		{
 		public:
@@ -26,6 +26,7 @@ namespace decoder
 
 			uint32_t mRate = 0;
 			uint32_t mChannels = 0;
+			uint32_t mMask = 0; // 0: the default for the count (layout::FromDecoder)
 			uint64_t mFrames = 0;
 			const char* mBackend = "";
 		};
@@ -118,6 +119,7 @@ namespace decoder
 				mOpen = true;
 				mRate = mWav.sampleRate;
 				mChannels = mWav.channels;
+				mMask = mWav.fmt.channelMask; // only WAVE_FORMAT_EXTENSIBLE has one
 				mFrames = mWav.totalPCMFrameCount;
 				mBackend = "dr_wav";
 				for (drwav_uint32 i = 0; tags && i < mWav.metadataCount; ++i) {
@@ -160,7 +162,13 @@ namespace decoder
 				}
 				const stb_vorbis_info info = stb_vorbis_get_info(mVorbis);
 				mRate = info.sample_rate;
-				mChannels = kChannels; // stb_vorbis downmixes to the channel count asked for
+				// Its own channels, reordered to WAVE order in Read; past 8 (no Vorbis order defined) stb_vorbis
+				// gives the first two.
+				mChannels = static_cast<uint32_t>(info.channels);
+				if (!layout::VorbisOrder(mChannels, mPerm, mMask)) {
+					mChannels = 2;
+					layout::VorbisOrder(mChannels, mPerm, mMask);
+				}
 				mFrames = stb_vorbis_stream_length_in_samples(mVorbis);
 				mBackend = "stb_vorbis";
 				if (tags) {
@@ -177,11 +185,24 @@ namespace decoder
 			}
 			size_t Read(int16_t* out, size_t frames) override
 			{
-				return static_cast<size_t>(stb_vorbis_get_samples_short_interleaved(mVorbis, kChannels, out, static_cast<int>(frames * kChannels)));
+				const int c = static_cast<int>(mChannels);
+				if (mChannels <= 2) {
+					return static_cast<size_t>(stb_vorbis_get_samples_short_interleaved(mVorbis, c, out, static_cast<int>(frames) * c));
+				}
+				mRaw.resize(frames * mChannels);
+				const size_t got = static_cast<size_t>(stb_vorbis_get_samples_short_interleaved(mVorbis, c, mRaw.data(), static_cast<int>(frames) * c));
+				for (size_t f = 0; f < got; ++f) {
+					for (uint32_t k = 0; k < mChannels; ++k) {
+						out[f * mChannels + k] = mRaw[f * mChannels + mPerm[k]];
+					}
+				}
+				return got;
 			}
 
 		private:
 			stb_vorbis* mVorbis = nullptr;
+			uint8_t mPerm[layout::kMaxChannels] = {};
+			std::vector<int16_t> mRaw;
 		};
 
 		bool HasExtension(const std::wstring& path, const wchar_t* ext)
@@ -211,28 +232,6 @@ namespace decoder
 			}
 			return nullptr;
 		}
-
-		int16_t Clamp(int v) { return static_cast<int16_t>(std::clamp(v, -32768, 32767)); }
-	}
-
-	void ToStereo(const int16_t* in, uint32_t channels, size_t frames, int16_t* out)
-	{
-		for (size_t f = 0; f < frames; ++f) {
-			const int16_t* s = in + f * channels;
-			if (channels == 1) {
-				out[f * 2] = out[f * 2 + 1] = s[0];
-			}
-			else if (channels == 2) {
-				out[f * 2] = s[0];
-				out[f * 2 + 1] = s[1];
-			}
-			else {
-				// FL FR FC ...: fold the center in at -3 dB, drop the rest (music is practically never surround).
-				const int center = static_cast<int>(s[2] * 0.7071f);
-				out[f * 2] = Clamp(s[0] + center);
-				out[f * 2 + 1] = Clamp(s[1] + center);
-			}
-		}
 	}
 
 	bool Probe(const std::wstring& path, Info& out)
@@ -241,6 +240,8 @@ namespace decoder
 			out.mSampleRate = source->mRate;
 			out.mFrames = source->mFrames;
 			out.mBackend = source->mBackend;
+			out.mSource = layout::FromDecoder(source->mChannels, source->mMask);
+			out.mLayout = layout::ForWwise(out.mSource);
 			tags::Finish(out.mTags);
 			return out.mSampleRate != 0;
 		}
@@ -248,28 +249,34 @@ namespace decoder
 		return mf::Probe(path, out);
 	}
 
-	bool Decode(const std::wstring& path, uint32_t& rate, const std::function<bool(const int16_t*, size_t)>& sink)
+	bool Decode(const std::wstring& path, const layout::Layout& want, uint32_t& rate, const Sink& sink)
 	{
+		std::vector<int16_t> converted;
+		auto deliver = [&](const int16_t* frames, size_t count, const layout::Layout& got) {
+			if (got == want) {
+				return sink(frames, count);
+			}
+			converted.resize(count * want.mChannels);
+			layout::Convert(frames, got, count, want, converted.data());
+			return sink(converted.data(), count);
+		};
+
 		auto source = OpenBundled(path, nullptr, false);
 		if (!source) {
-			return mf::Decode(path, rate, sink);
+			layout::Layout got;
+			return mf::Decode(path, rate, got, [&](const int16_t* frames, size_t count) { return deliver(frames, count, got); });
 		}
 
 		rate = source->mRate;
+		const layout::Layout got = layout::FromDecoder(source->mChannels, source->mMask);
 		constexpr size_t kChunk = 4096;
 		std::vector<int16_t> raw(kChunk * source->mChannels);
-		std::vector<int16_t> stereo(kChunk * kChannels);
 		for (;;) {
 			const size_t frames = source->Read(raw.data(), kChunk);
 			if (frames == 0) {
 				return true;
 			}
-			const int16_t* out = raw.data();
-			if (source->mChannels != kChannels) {
-				ToStereo(raw.data(), source->mChannels, frames, stereo.data());
-				out = stereo.data();
-			}
-			if (!sink(out, frames)) {
+			if (!deliver(raw.data(), frames, got)) {
 				return true;
 			}
 		}

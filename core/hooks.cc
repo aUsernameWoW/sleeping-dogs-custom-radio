@@ -278,7 +278,7 @@ namespace hooks
 					for (const library::Track& t : folder.mTracks) {
 						station.mTracks.push_back({ t.mArtist, t.mTitle });
 						const uint32_t k = static_cast<uint32_t>(sources.size() + 1);
-						sources.push_back({ bank::TrackFileId(next, k), t.mPath, t.mSampleRate, t.mFrames });
+						sources.push_back({ bank::TrackFileId(next, k), t.mPath, t.mSampleRate, t.mFrames, false, t.mLayout });
 					}
 					// The music folder's own station keeps the pack written at startup; a subfolder's is numbered.
 					const std::string logoSuffix = folder.mName.empty() ? std::string() : std::to_string(++subfolders);
