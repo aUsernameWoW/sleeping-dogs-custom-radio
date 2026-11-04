@@ -92,7 +92,9 @@ SleepingDogsDefinitiveEdition\
 
 **有的歌放不出来**
 
-M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不行。换成 MP3 或 FLAC 最稳。
+M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不行。换成 MP3 或 FLAC 最稳。放不出来的歌会在 `plugins\SDRadio.log` 里留一行 `skipping ...`；一个文件夹里一首能放的都没有时，这个台不会出现。
+
+杜比（Dolby Digital / Dolby Digital Plus，也叫 AC-3 / E-AC-3）编码的歌是常见的一种：例如 Apple Music 下载的杜比全景声版本，它们也是 `.m4a`。新装的 Windows 11 不再自带这个解码器（Apple Music 能放是因为它用自己的解码器）。可以从 Microsoft Store 免费安装杜比官方的「Dolby Digital Plus decoder for PC OEMs」（页面上写着给电脑厂商预装用，但个人也能直接安装），或者在命令行运行 `winget install --id 9NVJQJBDKN97 --source msstore`，装完重启游戏即可。另外，杜比全景声版本的混音通常比普通版本小声很多（我们测的一首比普通版本的歌低了约 12 dB），这是歌曲本身的音量，不是 mod 的问题。
 
 **想改台名或者换音乐文件夹**
 
@@ -278,7 +280,16 @@ SDRadio's first station straight away (except a police car's scanner and station
 **Some tracks don't play**
 
 M4A/AAC, WMA and similar formats go through Windows' own decoders, and the odd file may not work. MP3 or FLAC
-is the safest.
+is the safest. A track that can't play leaves a `skipping ...` line in `plugins\SDRadio.log`; a folder with no
+playable track at all gives no station.
+
+A common case is Dolby audio (Dolby Digital / Dolby Digital Plus, also called AC-3 / E-AC-3), e.g. Apple Music's
+Dolby Atmos downloads, which are `.m4a` files too. Fresh Windows 11 installs no longer include that decoder (Apple
+Music plays them with its own). Dolby's official "Dolby Digital Plus decoder for PC OEMs" is free in the Microsoft
+Store (its page says it's meant for PC makers to preinstall, but anyone can install it), or run
+`winget install --id 9NVJQJBDKN97 --source msstore`; restart the game afterwards. Dolby Atmos mixes are also
+usually much quieter than the regular versions (the one we measured was about 12 dB quieter): that's the track
+itself, not the mod.
 
 **Changing the station name or the music folder**
 

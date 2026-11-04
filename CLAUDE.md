@@ -77,6 +77,12 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
 - `core/decoder.*` — bundled backends (dr_mp3/dr_flac/dr_wav/stb_vorbis) + `ToStereo`;
   `core/decoder_mf.cc` — Media Foundation fallback (delay-loaded) with shell-property tags; logs once
   whether it started (under Wine it may be missing, or start but open nothing without GStreamer plugins).
+  Fresh Windows 11 installs lack the Dolby (AC-3 / E-AC-3) decoder MFT, so Apple Music's Dolby Atmos `.m4a`
+  downloads fail with `0xC00D36B4` (2026-11-04, user's machine; only the IEC-61937 passthrough converter is
+  registered). Dolby's free Store package "Dolby Digital Plus decoder for PC OEMs" (`9NVJQJBDKN97`) adds it:
+  then 5.1 48 kHz comes out, folded by `ToStereo` (surrounds and LFE dropped; in that track they were ~13 dB
+  under the fronts, so nothing audible lost). Such Atmos mixes measure ~-19 LUFS vs ~-7.5 for the FLACs beside
+  them: quieter on the station. README's FAQ tells players.
 - `core/tags.*` — ID3v2.2-2.4/ID3v1, Vorbis comments, RIFF INFO; legacy text: UTF-8, else GBK, else Latin-1.
 - `core/stream_io.*` — virtual files, decoder threads, completion thread. `core/live.*` — the live station's
   ring, reader and sources (see "Live station"). `core/app_audio.*`, `core/now_playing.*` — another app's sound and its song title (see "App audio").
