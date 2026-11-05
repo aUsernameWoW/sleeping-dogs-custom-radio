@@ -1,5 +1,5 @@
 # Publishes a full release to the mod's main file on Nexus Mods (build.yml sends every prerelease to the
-# "GitHub CI Build" file). A release is a build-<N> prerelease turned into a full release on GitHub: edit it
+# "Beta Build" file). A release is a build-<N> prerelease turned into a full release on GitHub: edit it
 # and untick "Set as a pre-release". Its SDRadio.zip is uploaded as built and tested by CI, nothing is
 # rebuilt. Settings (vars.NEXUS_*, secrets.NEXUSMODS_API_KEY) are described in build.yml.
 #

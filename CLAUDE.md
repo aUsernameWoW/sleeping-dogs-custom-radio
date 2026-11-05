@@ -121,7 +121,7 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   jumps, frame phase), `icy_test` and `pacer_test` (internet radio's pure parts, see there), and
   `netradio_manual` (compiled only: a real station with Wwise's reads emulated; needs the network).
 - `.github/workflows/build.yml` — CI like SDIMEFix's (documented in `mods\SDIMEFix\CLAUDE.md`), including
-  its last job, `nexus` (each prerelease → the "SDRadio GitHub CI Build" file on Nexus). The
+  its last job, `nexus` (each prerelease → the "SDRadio Beta Build" file on Nexus). The
   `package` job builds `SDRadio.zip` for players: Ultimate ASI Loader as `dinput8.dll` (pinned in
   `.github/asi-loader.env`, `asi-loader.yml` opens a PR for a new release), `plugins\SDRadio.asi`, notices,
   and the music folder `plugins\SDRadio\` with `.github/PUT-YOUR-MUSIC-HERE.txt` (ignored by the scan: not
