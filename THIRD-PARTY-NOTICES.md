@@ -9,8 +9,7 @@ below.
 To sneakyevil and the [SDmodding](https://github.com/SDmodding) team, to every creator in this community, to
 every player who ever tried this, and to every commenter from Reddit.
 
-To Claude, who wrote all of it. And to Anthropic, for banning my account that one time: no hard feelings
-(some hard feelings).
+To Claude, who wrote all of it.
 
 And to you, reading this file right now. Yes, you. Hi.
 

@@ -26,7 +26,7 @@ current song title on the HUD. Two bugs found in game on 2026-10-23 are fixed an
 (reads that waited for the source) and the radio sticking after a switch between our two stations (a game HUD
 bug our shared logo triggers). See "Live station" and "Internet radio" below. Since 2026-10-23 the live station can also play
 **another app's sound** (`Source = app`, own code on `main`, Windows 11; works in game): see "App audio".
-The older GPL experiment is parked on branch `gpl/external-audio` (GPL,
+`main` is 0BSD (`LICENSE`, since 2026-11-15). The older GPL experiment is parked on branch `gpl/external-audio` (GPL,
 not to be merged without the user's licensing decision; its CLAUDE.md has the details).
 
 ## How it works
