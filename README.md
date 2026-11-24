@@ -98,15 +98,11 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 
 **想改台名或者换音乐文件夹**
 
-子文件夹电台的台名就是文件夹名，改文件夹名即可。直接放在 `SDRadio` 里的那个台，用记事本打开 `plugins\SDRadio.ini` 改 `Name`，改完保存，重启游戏。每一项都有中文说明。台名最多约 21 个汉字。
+子文件夹电台的台名就是文件夹名，改文件夹名即可。直接放在 `SDRadio` 里的那个台，用记事本打开 `plugins\SDRadio.ini` 改 `[Music]` 里的 `Name`，改完保存，重启游戏。每一项都有中文说明。旧版本的 ini 会在游戏启动时自动换成新的写法，设置不变，原文件留作 `SDRadio.ini.bak`。台名最多约 21 个汉字。
 
-**不想上车就放 SDRadio 的电台**
+**上车时放哪个台**
 
-在 `plugins\SDRadio.ini` 的 `[Station]` 里把 `Default` 改成 `off`（改成 `live` 则默认放直播电台），保存后重启游戏。旧版本生成的 ini 里没有这一行，没有时按 `music` 处理，自己加上 `Default = off` 就行。`music` 放的是 SDRadio 排在最前面的音乐电台。
-
-**换车后接着放上次听的电台**
-
-默认就是这样（`[Station]` 里的 `KeepLast = 1`）：换上另一辆车时继续放你上次听的电台，游戏自带的台也算，不用每次切回来。`Default` 只决定这一局还没听过任何台时放什么。想让每辆车都按 `Default` 来，就把 `KeepLast` 改成 `0`。警车/救护车里的 HKPD 不算「上次的电台」。旧版本生成的 ini 里没有这一行，没有时按 `1` 处理。
+默认（`[Car]` 里的 `Station = last`）：换上另一辆车时继续放你上次听的电台，游戏自带的台也算，不用每次切回来；这一局的第一辆车放 SDRadio。改成 `sdradio` 就每辆车都放 SDRadio 排在最前面的音乐电台，`live` 每辆车都放直播电台，`game` 和原版游戏一样放这辆车自己的台。警车/救护车里的 HKPD 不算「上次的电台」。
 
 **想换成自己画的电台图标**
 
@@ -118,15 +114,15 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 
 **想在车里听网络电台（实验功能）**
 
-用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `radio`，`Url` 填上电台的流地址（例如 `https://stream.radioparadise.com/mp3-128`），保存后重启游戏。旧版本生成的 ini 里没有 `[Live]` 这一段，在文件末尾自己加上 `[Live]` 和这三行就行。切台时会多出一个「SDRADIO LIVE」，连上后几秒内出声。目前只支持 MP3 和 Ogg Vorbis 格式的电台，可以在 [radio-browser.info](https://www.radio-browser.info) 按格式（codec）找台。HUD 上显示电台正在放的歌名（电台还没报歌名时显示它的网址）。
+用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Source` 改成 `radio`，再在 `[Radio]` 里的 `Url` 填上电台的流地址（例如 `https://stream.radioparadise.com/mp3-128`），保存后重启游戏。切台时会多出一个「SDRADIO LIVE」，连上后几秒内出声。目前只支持 MP3 和 Ogg Vorbis 格式的电台，可以在 [radio-browser.info](https://www.radio-browser.info) 按格式（codec）找台。HUD 上显示电台正在放的歌名（电台还没报歌名时显示它的网址）。
 
 **想在车里听 Apple Music、Spotify、网易云音乐等程序放的歌（实验功能，需要 Windows 11）**
 
-用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `app`，`App` 保持 `auto`（或者留空），保存后重启游戏。`auto` 会自动找正在放歌的程序：Windows 媒体浮窗里显示正在播放的那个，没有的话就是唯一一个正在出声的程序；你换了个播放器放歌，它也会跟过去。想固定某个程序，就把 `App` 改成它的进程名，例如 `AppleMusic.exe`（Microsoft Store 里的 Apple Music）、`Spotify.exe` 或 `cloudmusic.exe`（网易云音乐）（进程名可以在任务管理器的「详细信息」页找）。切到「SDRADIO LIVE」，程序就开始放歌（它暂停着也没关系，只要 Windows 媒体浮窗里只有它一个）；切走、关电台或打开暂停菜单时它会暂停。什么都不用设置：你听到的是程序自己的声音，电台本身不出声（`AppSound = auto`）。它的音量跟着游戏的电台走：下车熄火时和游戏电台一样淡出，上车打火后淡入，打开/关闭暂停菜单时淡出暂停、淡入继续，游戏设置里的电台音量对它也有效。mod 是通过音量合成器里这个程序的音量来做的，离开时会改回你原来的音量。想让歌声完整地走游戏的电台混音（慢动作时的效果、血量低时变闷等）：打开 Windows 的 设置 → 系统 → 声音 → 音量合成器，把这个程序的输出设备改成一个你不用的设备（例如显示器的扬声器、Steam Streaming Speakers），或者把那个设备静音，mod 发现程序不在默认设备上，就会改为通过电台播放它。**网易云音乐不听 Windows 的这个设置**，要在网易云自己的设置里把音频输出设备改成那个设备（例如「WASAPI: Steam Streaming Speakers」）。**不要在音量合成器里把程序本身静音**，那样游戏里也听不到了：程序的声音本来就只该从游戏里听到，改完输出设备后程序那边「没声音」是正常的。如果程序被静音了，`plugins\SDRadio.log` 里会写一行 `WARNING` 提醒你；被静音时 HUD 的歌名那一行也会直接显示「AppleMusic.exe is muted in the volume mixer」。HUD 上会显示程序正在放的歌名（取自 Windows 的媒体信息，也就是按音量键时弹出的那个浮窗里的内容）；Apple Music 和 Spotify 默认就有，网易云音乐需要在它的设置里勾选「SMTC」才会提供歌名。同样借助 SMTC，换到别的台、关掉电台、下车或打开暂停菜单时，程序会自动暂停，回到这个台时继续播放（只恢复 mod 暂停的；不想要这个功能就在 ini 里把 `PauseApp` 改成 `0`）。
+用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Source` 改成 `app`，`[App]` 里的 `Program` 保持 `auto`（或者留空），保存后重启游戏。`auto` 会自动找正在放歌的程序：Windows 媒体浮窗里显示正在播放的那个，没有的话就是唯一一个正在出声的程序；你换了个播放器放歌，它也会跟过去。想固定某个程序，就把 `Program` 改成它的进程名，例如 `AppleMusic.exe`（Microsoft Store 里的 Apple Music）、`Spotify.exe` 或 `cloudmusic.exe`（网易云音乐）（进程名可以在任务管理器的「详细信息」页找）。切到「SDRADIO LIVE」，程序就开始放歌（它暂停着也没关系，只要 Windows 媒体浮窗里只有它一个）；切走、关电台或打开暂停菜单时它会暂停。什么都不用设置：你听到的是程序自己的声音，电台本身不出声（`[App]` 里的 `Sound = auto`）。它的音量跟着游戏的电台走：下车熄火时和游戏电台一样淡出，上车打火后淡入，打开/关闭暂停菜单时淡出暂停、淡入继续，游戏设置里的电台音量对它也有效。mod 是通过音量合成器里这个程序的音量来做的，离开时会改回你原来的音量。想让歌声完整地走游戏的电台混音（慢动作时的效果、血量低时变闷等）：打开 Windows 的 设置 → 系统 → 声音 → 音量合成器，把这个程序的输出设备改成一个你不用的设备（例如显示器的扬声器、Steam Streaming Speakers），或者把那个设备静音，mod 发现程序不在默认设备上，就会改为通过电台播放它。**网易云音乐不听 Windows 的这个设置**，要在网易云自己的设置里把音频输出设备改成那个设备（例如「WASAPI: Steam Streaming Speakers」）。**不要在音量合成器里把程序本身静音**，那样游戏里也听不到了：程序的声音本来就只该从游戏里听到，改完输出设备后程序那边「没声音」是正常的。如果程序被静音了，`plugins\SDRadio.log` 里会写一行 `WARNING` 提醒你；被静音时 HUD 的歌名那一行也会直接显示「AppleMusic.exe is muted in the volume mixer」。HUD 上会显示程序正在放的歌名（取自 Windows 的媒体信息，也就是按音量键时弹出的那个浮窗里的内容）；Apple Music 和 Spotify 默认就有，网易云音乐需要在它的设置里勾选「SMTC」才会提供歌名。同样借助 SMTC，换到别的台、关掉电台、下车或打开暂停菜单时，程序会自动暂停，回到这个台时继续播放（只恢复 mod 暂停的；不想要这个功能就在 ini 的 `[App]` 里把 `Pause` 改成 `0`）。
 
 **想在车里听 Spotify（实验功能，需要 Spotify Premium）**
 
-mod 可以运行 [librespot](https://github.com/librespot-org/librespot)（一个开源的 Spotify Connect 客户端），把游戏变成一个 Spotify 的播放设备。librespot 不在压缩包里，需要自己准备 `librespot.exe` 放到 `plugins` 文件夹（装了 Rust 的话可以用 `cargo install librespot` 编译）。然后用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Enabled` 改成 `1`、`Source` 改成 `spotify`，保存后重启游戏。切到「SDRADIO LIVE」后，在同一网络里的手机或电脑上打开 Spotify，从「设备」列表里选「SDRadio」，歌就会从游戏电台里放出来，HUD 上显示歌名。第一次运行时 Windows 防火墙可能会询问是否允许 librespot 访问网络，需要允许，Spotify 才能找到它。离开这个台时音乐会停在原处，回来时继续。注意：librespot 是非官方客户端，使用它不符合 Spotify 的服务条款，请自行斟酌。
+mod 可以运行 [librespot](https://github.com/librespot-org/librespot)（一个开源的 Spotify Connect 客户端），把游戏变成一个 Spotify 的播放设备。librespot 不在压缩包里，需要自己准备 `librespot.exe` 放到 `plugins` 文件夹（装了 Rust 的话可以用 `cargo install librespot` 编译）。然后用记事本打开 `plugins\SDRadio.ini`，在 `[Live]` 那一段里把 `Source` 改成 `spotify`，保存后重启游戏。切到「SDRADIO LIVE」后，在同一网络里的手机或电脑上打开 Spotify，从「设备」列表里选「SDRadio」，歌就会从游戏电台里放出来，HUD 上显示歌名。第一次运行时 Windows 防火墙可能会询问是否允许 librespot 访问网络，需要允许，Spotify 才能找到它。离开这个台时音乐会停在原处，回来时继续。注意：librespot 是非官方客户端，使用它不符合 Spotify 的服务条款，请自行斟酌。
 
 **更新**
 
@@ -298,22 +294,16 @@ itself, not the mod.
 **Changing the station name or the music folder**
 
 A subfolder station is named after its folder: rename the folder. For the station of the files right in
-`SDRadio`, open `plugins\SDRadio.ini` in Notepad and change `Name`, save and restart the game. Every setting is
-explained in the file. A name can be up to 63 bytes.
+`SDRadio`, open `plugins\SDRadio.ini` in Notepad and change `Name` under `[Music]`, save and restart the game. Every
+setting is explained in the file. An ini from an older version is moved to the new layout when the game starts,
+with your settings kept and the old file left as `SDRadio.ini.bak`. A name can be up to 63 bytes.
 
-**Not tuning to SDRadio when getting into a car**
+**Which station plays when you get into a car**
 
-In `plugins\SDRadio.ini`, under `[Station]`, set `Default` to `off` (or `live` for the live station), save and
-restart the game. An ini from an older version lacks the line and counts as `music`: add `Default = off`.
-`music` is SDRadio's first music station.
-
-**Keeping the station you last listened to**
-
-That's the default (`KeepLast = 1` under `[Station]`): getting into another car, the radio stays on the station you
-last listened to, the game's own stations included, so you don't have to switch back each time. `Default` only
-decides before you've listened to any station in a session. Set `KeepLast = 0` to have every car follow `Default`.
-A police or emergency car's HKPD doesn't count as your last station. An ini from an older version lacks the line
-and counts as `1`.
+By default (`Station = last` under `[Car]`), getting into another car keeps the station you last listened to,
+the game's own included, so you don't have to switch back each time; the first car of a session plays SDRadio.
+`sdradio` plays SDRadio's first music station in every car, `live` the live station, and `game` the car's own
+station as in the original game. A police or emergency car's HKPD doesn't count as your last station.
 
 **Using your own logo**
 
@@ -327,23 +317,21 @@ The game shows every station logo in white, so what you see is your picture's sh
 
 **Listening to internet radio in the car (experimental)**
 
-Open `plugins\SDRadio.ini` in Notepad; in the `[Live]` section set `Enabled` to `1`, `Source` to `radio` and
-`Url` to the station's stream address (e.g. `https://stream.radioparadise.com/mp3-128`), save and restart the
-game (an ini written by an older version has no `[Live]` section: add `[Live]` and those three lines at the
-end). A station "SDRADIO LIVE" joins the cycle and starts a few seconds after you tune in. Only MP3 and
+Open `plugins\SDRadio.ini` in Notepad; set `Source` to `radio` under `[Live]` and `Url` under `[Radio]` to the
+station's stream address (e.g. `https://stream.radioparadise.com/mp3-128`), save and restart the game. A station "SDRADIO LIVE" joins the cycle and starts a few seconds after you tune in. Only MP3 and
 Ogg Vorbis stations work so far (search [radio-browser.info](https://www.radio-browser.info) by codec). The HUD
 shows the song the station is playing (its address until the station names one).
 
 **Listening to Apple Music, Spotify, NetEase Cloud Music or another program in the car (experimental, Windows 11)**
 
-Open `plugins\SDRadio.ini` in Notepad; in the `[Live]` section set `Enabled` to `1` and `Source` to `app`, leave
-`App` at `auto` (or empty), save and restart the game. `auto` finds the program playing music: the one Windows' media
+Open `plugins\SDRadio.ini` in Notepad; set `Source` to `app` under `[Live]`, leave `Program` under `[App]` at
+`auto` (or empty), save and restart the game. `auto` finds the program playing music: the one Windows' media
 pop-up shows as playing, else the only program making sound; start music in another player and it follows. To stick
-to one program, set `App` to its process name instead, e.g. `AppleMusic.exe` (Apple Music from the Microsoft Store),
+to one program, set `Program` to its process name instead, e.g. `AppleMusic.exe` (Apple Music from the Microsoft Store),
 `Spotify.exe` or `cloudmusic.exe` (NetEase Cloud Music) (Task Manager's Details tab lists them). Tune to "SDRADIO
 LIVE" and the program plays (even if it was paused, as long as it's the only one in Windows' media pop-up); it
 pauses when you switch away, turn the radio off or open the pause menu. Nothing to set up: you hear the program's
-own sound and the station itself stays silent (`AppSound = auto`). Its volume follows the game's radio: it
+own sound and the station itself stays silent (`Sound = auto` under `[App]`). Its volume follows the game's radio: it
 fades out as you get out of the car and in as you start it again, fades out and pauses in the pause menu and fades
 back in after it, like the game's stations, and the game's radio volume setting applies to it. The mod does this with the program's volume in the volume mixer and puts your volume back when you leave.
 For everything the game's radio mix does (its slow-motion effect, muffling at low health...): in Windows
@@ -357,14 +345,14 @@ while it's muted the HUD's song line says "AppleMusic.exe is muted in the volume
 the program plays (from Windows' media info, what the volume keys' pop-up shows); Apple Music and Spotify always
 provide it, NetEase Cloud Music only with "SMTC" ticked in its settings. Through SMTC too, the program pauses when you
 switch to another station, turn the radio off, leave the car or open the pause menu, and resumes when you're
-back (only a pause the mod made; set `PauseApp = 0` in the ini to turn this off).
+back (only a pause the mod made; set `Pause = 0` under `[App]` to turn this off).
 
 **Listening to Spotify in the car (experimental, Spotify Premium)**
 
 The mod can run [librespot](https://github.com/librespot-org/librespot) (an open-source Spotify Connect client),
 which makes the game a Spotify playback device. librespot isn't in the zip: put a `librespot.exe` into the
 `plugins` folder (with Rust installed, `cargo install librespot` builds one). Then open `plugins\SDRadio.ini` in
-Notepad, set `Enabled` to `1` and `Source` to `spotify` in the `[Live]` section, save and restart the game. Tune
+Notepad, set `Source` to `spotify` in the `[Live]` section, save and restart the game. Tune
 to "SDRADIO LIVE", open Spotify on a phone or computer on the same network and pick "SDRadio" in its device
 list: the music plays through the game's radio, with the song on the HUD. On the first run Windows Firewall may
 ask whether librespot may use the network: allow it, or Spotify won't find it. Leaving the station holds the

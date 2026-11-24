@@ -1,6 +1,6 @@
 #pragma once
 
-// Another app's audio as a live source (`[Live] Source = app`, `App = <exe name>`): WASAPI process loopback
+// Another app's audio as a live source (`[Live] Source = app`, `[App] Program = <exe name>`): WASAPI process loopback
 // captures what that process (and its children) renders, as 48 kHz 16-bit stereo, into the live ring.
 // Windows 10 build 20348+ only (in practice Windows 11): ActivateAudioInterfaceAsync with
 // AUDIOCLIENT_ACTIVATION_PARAMS, looked up at run time so the .asi still loads where it's missing (Wine).

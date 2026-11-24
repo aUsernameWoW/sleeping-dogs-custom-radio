@@ -108,7 +108,17 @@ The game's radio is data-driven end to end, so the mod adds data and serves file
   (C, warnings off); `stb_vorbis.c` is compiled directly.
 - `core/ak.hh` — Wwise low-level I/O structs (legacy PDB layouts). `core/scan.*`, `core/log.*` from SDAtmos.
 - `core/config.*` — `SDRadio.ini`, parsed as UTF-8 by hand (GetPrivateProfileString would read a BOM-less
-  file as ANSI and mangle a Chinese station name or path).
+  file as ANSI and mangle a Chinese station name or path). Layout since 2026-11-24 (the user found the old one
+  too complex): `[Music] Folder, Name`, `[Car] Station = last | sdradio | live | game` (was `[Station] Default` +
+  `KeepLast`), `[Live] Source = off | radio | app | spotify | test, Name` (`off` was `Enabled = 0`), `[Radio] Url`,
+  `[App] Program, Sound, Pause`, `[Spotify] Device, Librespot`, `[Debug] Logging`; the borrowed logo
+  (`[Music] CustomLogo, TextureName, TexturePack`) is read but left out of the default file. The default file is a
+  template: `Render` writes the player's values into it, keys it lacks go to the end of their section.
+  `Load` migrates an old file itself (`Migrate`: old keys moved, the borrowed logo only when not its default), and
+  rewrites it in the current layout when it had old keys or lacks a current one, after copying it to
+  `SDRadio.ini.bak` (through a `.tmp` + MoveFileEx); the player's own comments go (the user: no consequence worth
+  keeping the old layout for). Logged as `config: ...` (the ini is read before the log opens). Every old key in
+  the history sections below means its new one. `config_test` covers the migration, rendering and Load.
 - Tests: `bank_test` (reads the bank back with ported Wwise readers; mixer params byte-identical to the
   game's top node; writes `station12.bnk`), `radios_test`, `tags_test`, `load_test` (also: the pack is
   written, one folder down from the test's "game folder"), `logo_test` (the `LOGO` resource of the built
@@ -527,6 +537,8 @@ while they slept, so only tested with a stand-in.
   of a SetStation inside Init or of the station buttons), in case other radios go through SetStation. A car without
   a preferred station still leaves whatever plays (after a police car, possibly HKPD: the game's behavior). Logged
   as `radio: last station: ...`; the setting at startup as `hook: getting into another car: ...`. Not yet in game.
+  The same day both keys became `[Car] Station` (`last` = KeepLast 1 with Default music, `sdradio`, `live`,
+  `game` = Default off; see `core/config.*`).
 
 ## Several stations, one per folder (2026-11-03; not yet in game)
 

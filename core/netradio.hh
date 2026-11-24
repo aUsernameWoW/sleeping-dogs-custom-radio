@@ -1,6 +1,6 @@
 #pragma once
 
-// Internet radio as a live source (`[Live] Source = radio`, `Url = ...`): an HTTP(S) stream (Icecast,
+// Internet radio as a live source (`[Live] Source = radio`, `[Radio] Url = ...`): an HTTP(S) stream (Icecast,
 // SHOUTcast 2, or an .m3u/.pls pointing at one) fetched with WinHTTP (Schannel on Windows, Wine's own
 // implementation elsewhere), ICY metadata split off for the title, MP3 or Ogg Vorbis decoded, resampled to
 // 48 kHz and pushed into the live ring at real-time pace.

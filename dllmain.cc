@@ -41,6 +41,9 @@ BOOL WINAPI DllMain(HMODULE module, DWORD reason, LPVOID)
 		}
 
 		LOG("SDRadio loaded, music folder %s", logger::ToUtf8(gConfig.mMusicFolder.c_str()).c_str());
+		if (!gConfig.mIniNote.empty()) {
+			LOG("config: %s", gConfig.mIniNote.c_str());
+		}
 
 		// So there's an obvious place to drop music into on first run.
 		CreateDirectoryW(gConfig.mMusicFolder.c_str(), nullptr);

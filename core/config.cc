@@ -3,7 +3,7 @@
 #include <Windows.h>
 
 #include <cstdio>
-#include <map>
+#include <optional>
 #include <string_view>
 
 Config gConfig;
@@ -12,96 +12,54 @@ namespace config
 {
 	namespace
 	{
+		// The layout since 2026-11-24 (before: [Station] and [Live] held everything, see Migrate). Details are in
+		// ADVANCED.md; keep this short. Render puts the player's values in place of these defaults.
 		constexpr char kDefaultIni[] =
-			"; SDRadio 配置 / configuration (UTF-8)\n"
+			"; SDRadio 设置 / settings (UTF-8). 详细说明 / details: ADVANCED.md\n"
 			"\n"
-			"[Station]\n"
-			"; 音乐文件夹里直接放的歌组成的电台的台名（最多 63 字节，中文约 21 个字）；子文件夹的台用文件夹名。\n"
-			"; HUD name of the station of the files right in the music folder (at most 63 bytes); a subfolder's\n"
-			"; station is named after the folder.\n"
+			"[Music]\n"
+			"; 音乐文件夹，留空 = .asi 旁边的 SDRadio 文件夹。直接放在里面的歌是一个台（台名 Name），每个子文件夹是一个台，\n"
+			"; 台名就是文件夹名（最多 33 个台，每台 255 首）。文件夹里放一张透明背景、2:1 的 logo.png 就是那个台的图标。\n"
+			"; Music folder, empty = SDRadio next to the .asi. Its own files are one station (Name), each subfolder another,\n"
+			"; named after the folder (up to 33 stations, 255 tracks each). A 2:1 logo.png with a transparent background in a\n"
+			"; folder is that station's logo.\n"
+			"Folder =\n"
 			"Name = SDRADIO\n"
 			"\n"
-			"; 音乐文件夹。留空 = .asi 旁边的 SDRadio 文件夹。直接放在里面的歌是上面 Name 这个台；每个子文件夹\n"
-			"; 是一个单独的电台，台名就是文件夹名（最多 33 个台，每台最多 255 首）。\n"
-			"; 支持 Windows 能解码的格式：mp3、m4a/aac、flac、wav、wma 等。\n"
-			"; Music folder. Empty = the SDRadio folder next to the .asi. The files right in it are the station above;\n"
-			"; each subfolder is a station of its own, named after the folder (up to 33 stations, 255 tracks each).\n"
-			"MusicFolder =\n"
-			"\n"
-			"; 电台图标：电台的文件夹里有 logo.png 就用它，否则用 SDRadio 自带的「私家台」（每次启动写成 .asi 旁边的\n"
-			"; SDRadio-logo*.perm.bin / .temp.bin）。游戏会把电台图标染成白色，只有形状（透明度）会显示：\n"
-			"; 请用透明背景、2:1（如 512x256）的 PNG。0 = 改用下面借来的游戏图标。\n"
-			"; HUD logo: logo.png from the station's folder if there is one, else SDRadio's own (written at each start as\n"
-			"; SDRadio-logo*.perm.bin / .temp.bin next to the .asi). The game tints station logos white, so only the\n"
-			"; shape (transparency) shows: use a 2:1 PNG (e.g. 512x256) with a transparent background.\n"
-			"; 0 = the game logo below.\n"
-			"CustomLogo = 1\n"
-			"\n"
-			"; CustomLogo = 0 时借用的游戏电台图标：\n"
-			"; With CustomLogo = 0, one of the game's station logos:\n"
-			";   Logo_H_Klub / Radio_H_Klub_TexturePack, Logo_WarpRecords / Radio_WarpRecords_TexturePack,\n"
-			";   Logo_NinjaTune / Radio_NinjaTune_TexturePack, Logo_RoadRunnerRecords / Radio_RoadRunnerRecords_TexturePack,\n"
-			";   Logo_RealFM / Radio_RealFM_TexturePack, Logo_Kerrang / Radio_Kerrang_TexturePack,\n"
-			";   Logo_Saggittarius / Radio_Saggittarius_TexturePack, Logo_DaptoneRecords / Radio_DaptoneRecords_TexturePack,\n"
-			";   Logo_Softly / Radio_Softly_TexturePack, Logo_BooseyHawkes / Radio_BooseyHawkes_TexturePack\n"
-			"TextureName = Logo_Softly\n"
-			"TexturePack = Radio_Softly_TexturePack\n"
-			"\n"
-			"; 默认电台：换上另一辆车时，游戏会切到这辆车自己的电台；这里改成 SDRadio。music = 排在最前面的音乐电台，live = 直播电台，\n"
-			"; off = 保持游戏原样。警车/救护车的 HKPD、回到刚下的车时恢复的电台、任务车和脚本指定的电台不受影响。\n"
-			"; Default station: getting into another car, the game tunes to that car's own station; this tunes to SDRadio\n"
-			"; instead. music = the first music station, live = the live station, off = as the game does. A police or emergency\n"
-			"; car's HKPD, the station restored in the car you just left, and stations set by missions or scripts stay.\n"
-			"Default = music\n"
-			"\n"
-			"; 1 = 换车后继续放你上次听的电台（游戏自带的台也算），上面的 Default 只管这一局还没听过任何台的时候；0 = 每换一辆车都按 Default。\n"
-			"; 警车/救护车的 HKPD 不算「上次的电台」。\n"
-			"; 1 = getting into another car keeps the station you last listened to (the game's own included); Default then\n"
-			"; only decides before you've tuned to any. 0 = Default for every car. A police or emergency car's HKPD doesn't count.\n"
-			"KeepLast = 1\n"
+			"[Car]\n"
+			"; 上车时放的台 / the station when getting into a car:\n"
+			"; last = 上次听的台（这局第一辆车放 SDRadio）/ the one you last listened to (SDRadio in the first car)\n"
+			"; sdradio = 总是 SDRadio / always SDRadio; live = 总是直播台 / always the live station; game = 游戏原样 / as the game does\n"
+			"; 警车的 HKPD、任务和脚本指定的台不受影响。/ A police car's HKPD and mission or script stations stay.\n"
+			"Station = last\n"
 			"\n"
 			"[Live]\n"
-			"; 实验功能：再加一个「直播」电台，播放实时音源（以后是网络电台等）。1 = 开启。\n"
-			"; Experimental: a second, live station playing a real-time source (internet radio and more later). 1 = on.\n"
-			"Enabled = 0\n"
-			"; 直播电台的台名。/ The live station's name.\n"
+			"; 直播电台 / live station: off; radio = 网络电台 / internet radio [Radio];\n"
+			"; app = 另一个程序的声音 / another program's sound [App] (Windows 11); spotify = Spotify Premium [Spotify];\n"
+			"; test = 测试信号 / a test signal\n"
+			"Source = off\n"
 			"Name = SDRADIO LIVE\n"
-			"; 音源：test = 测试信号（每秒一声提示音，每四声一声高音）；radio = 网络电台（下面的 Url）；\n"
-			"; app = 另一个程序的声音（下面的 App，需要 Windows 11）；spotify = Spotify（见下）。\n"
-			"; Source: test = a test signal (a beep every second, every fourth one higher); radio = internet radio (Url);\n"
-			"; app = another program's sound (App below; needs Windows 11); spotify = Spotify (below).\n"
-			"Source = test\n"
-			"; 网络电台的地址：MP3 或 Ogg Vorbis 的流，或指向它的 .m3u / .pls。可以在 https://www.radio-browser.info 找台。\n"
-			"; Internet radio stream: MP3 or Ogg Vorbis, or an .m3u / .pls pointing at one. Find stations at\n"
-			"; https://www.radio-browser.info\n"
+			"\n"
+			"[Radio]\n"
+			"; MP3 / Ogg Vorbis 流，或指向它的 .m3u / .pls / stream, or an .m3u / .pls. https://www.radio-browser.info\n"
 			"Url =\n"
-			"; Source = app 时要播放的程序。auto = 自动：正在放歌的那个程序（Windows 媒体浮窗里正在播放的，或者唯一在出声的程序）。\n"
-			"; 也可以写进程名，例如 AppleMusic.exe（Apple Music）、Spotify.exe、cloudmusic.exe（网易云音乐）。\n"
-			"; For Source = app: the program. auto = whichever plays music (its Windows media session plays, or it's the only\n"
-			"; program making sound). Or its process name, e.g. AppleMusic.exe (Apple Music), Spotify.exe, cloudmusic.exe\n"
-			"; (NetEase Cloud Music).\n"
-			"App = auto\n"
-			"; 1 = 游戏里没在放这个台时（换台、关电台、下车、暂停菜单）让程序暂停，回来时继续播放；0 = 不控制程序。\n"
-			"; 1 = pause the program while the game doesn't play this station (another station, radio off, out of the car,\n"
-			"; the pause menu) and resume it when it does; 0 = leave the program alone.\n"
-			"PauseApp = 1\n"
-			"; 怎么听到这个程序：direct = 直接听程序自己的声音，电台不出声，只是跟着电台暂停/继续（什么都不用设置）；\n"
-			"; radio = 通过游戏电台听（带收音机效果），要在音量合成器里把程序的输出设备改成一个你不用的设备，不然会听到两份；\n"
-			"; auto = 程序在默认输出设备上就用 direct，改到了别的设备就用 radio。\n"
-			"; How the program is heard: direct = its own sound, the station stays silent and only pauses/resumes it (no setup);\n"
-			"; radio = through the game's radio (its effect), with the program sent to an output device you don't listen to\n"
-			"; (Volume mixer), else you hear it twice; auto = direct while it plays on the default output device, radio on another.\n"
-			"AppSound = auto\n"
-			"; Source = spotify：mod 启动 librespot，在 Spotify 里选择下面这个名字的设备即可在电台里播放（需要 Spotify Premium）。\n"
-			"; librespot.exe 的位置，留空 = .asi 旁边的 librespot.exe。\n"
-			"; For Source = spotify: the mod runs librespot, a Spotify Connect device you pick in the Spotify app (Premium).\n"
-			"; Where librespot.exe is; empty = librespot.exe next to the .asi.\n"
+			"\n"
+			"[App]\n"
+			"; auto = 正在放歌的程序 / whichever plays music; 或进程名 / or a process name: AppleMusic.exe, Spotify.exe, cloudmusic.exe\n"
+			"Program = auto\n"
+			"; direct = 听程序自己的声音 / its own sound; radio = 通过游戏电台（要把程序的输出设备改到不用的设备）/ through the\n"
+			"; radio (send the program to an output device you don't use); auto = 按程序的输出设备选 / by the program's device\n"
+			"Sound = auto\n"
+			"; 1 = 不在这个台时暂停程序 / pause the program while you're not on this station\n"
+			"Pause = 1\n"
+			"\n"
+			"[Spotify]\n"
+			"; Spotify 里的设备名 / the device name in Spotify; librespot.exe，留空 = .asi 旁边 / empty = next to the .asi\n"
+			"Device = SDRadio\n"
 			"Librespot =\n"
-			"SpotifyName = SDRadio\n"
 			"\n"
 			"[Debug]\n"
-			"; 在 .asi 旁边写 SDRadio.log。\n"
-			"; Write SDRadio.log next to the .asi.\n"
+			"; 在 .asi 旁边写 SDRadio.log / write SDRadio.log next to the .asi\n"
 			"Logging = 1\n";
 
 		std::string_view Trim(std::string_view s)
@@ -111,34 +69,44 @@ namespace config
 			return s;
 		}
 
-		// GetPrivateProfileString reads BOM-less files in the ANSI code page (1252 here), which would mangle
-		// a Chinese station name or folder, so the (tiny) file is parsed as UTF-8 here. Keys are
-		// "Section.Key", case-sensitive.
-		std::map<std::string, std::string> Parse(const std::string& text)
+		std::string Lower(std::string s)
 		{
-			std::map<std::string, std::string> values;
-			std::string section;
-			std::string_view rest = text;
-			if (rest.starts_with("\xEF\xBB\xBF")) {
-				rest.remove_prefix(3);
+			for (char& c : s) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+			return s;
+		}
+
+		// One line of an ini: a section header, a key, or neither (comment, blank).
+		struct Line
+		{
+			std::string mSection; // set for a header
+			std::string mKey, mValue;
+		};
+
+		Line Classify(std::string_view raw)
+		{
+			const std::string_view line = Trim(raw);
+			Line out;
+			if (line.empty() || line.front() == ';' || line.front() == '#') return out;
+			if (line.front() == '[' && line.back() == ']') {
+				out.mSection = std::string(Trim(line.substr(1, line.size() - 2)));
+				return out;
 			}
-			while (!rest.empty()) {
-				const size_t eol = rest.find('\n');
-				std::string_view line = Trim(rest.substr(0, eol));
-				rest = eol == std::string_view::npos ? std::string_view() : rest.substr(eol + 1);
-				if (line.empty() || line.front() == ';' || line.front() == '#') {
-					continue;
-				}
-				if (line.front() == '[' && line.back() == ']') {
-					section = std::string(Trim(line.substr(1, line.size() - 2)));
-					continue;
-				}
-				const size_t eq = line.find('=');
-				if (eq != std::string_view::npos) {
-					values[section + "." + std::string(Trim(line.substr(0, eq)))] = std::string(Trim(line.substr(eq + 1)));
-				}
+			if (const size_t eq = line.find('='); eq != std::string_view::npos) {
+				out.mKey = std::string(Trim(line.substr(0, eq)));
+				out.mValue = std::string(Trim(line.substr(eq + 1)));
 			}
-			return values;
+			return out;
+		}
+
+		std::vector<std::string_view> Lines(std::string_view text)
+		{
+			std::vector<std::string_view> lines;
+			while (!text.empty()) {
+				const size_t eol = text.find('\n');
+				lines.push_back(text.substr(0, eol));
+				text = eol == std::string_view::npos ? std::string_view() : text.substr(eol + 1);
+			}
+			return lines;
 		}
 
 		std::wstring Widen(const std::string& utf8)
@@ -151,23 +119,169 @@ namespace config
 			MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), static_cast<int>(utf8.size()), result.data(), size);
 			return result;
 		}
+
+		bool WriteFile(const std::wstring& path, const std::string& text)
+		{
+			// Through a temporary file, so a failed write never leaves a half-written ini.
+			const std::wstring temp = path + L".tmp";
+			FILE* file = nullptr;
+			if (_wfopen_s(&file, temp.c_str(), L"wb") != 0 || !file) return false;
+			const bool written = fwrite(text.data(), 1, text.size(), file) == text.size();
+			if (fclose(file) != 0 || !written) {
+				DeleteFileW(temp.c_str());
+				return false;
+			}
+			if (!MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+				DeleteFileW(temp.c_str());
+				return false;
+			}
+			return true;
+		}
+	}
+
+	// GetPrivateProfileString reads BOM-less files in the ANSI code page (1252 here), which would mangle a Chinese
+	// station name or folder, so the (tiny) file is parsed as UTF-8 here. Keys are "Section.Key", case-sensitive.
+	Values Parse(const std::string& text)
+	{
+		Values values;
+		std::string section;
+		std::string_view rest = text;
+		if (rest.starts_with("\xEF\xBB\xBF")) {
+			rest.remove_prefix(3);
+		}
+		for (std::string_view raw : Lines(rest)) {
+			Line line = Classify(raw);
+			if (!line.mSection.empty()) section = std::move(line.mSection);
+			else if (!line.mKey.empty()) values[section + "." + line.mKey] = std::move(line.mValue);
+		}
+		return values;
+	}
+
+	bool Migrate(Values& values)
+	{
+		bool old = false;
+		auto take = [&](const char* key) -> std::optional<std::string> {
+			auto it = values.find(key);
+			if (it == values.end()) return std::nullopt;
+			old = true;
+			std::string value = std::move(it->second);
+			values.erase(it);
+			return value;
+		};
+		// A key the file also has in the new layout keeps the new one.
+		auto move = [&](const char* from, const char* to) {
+			if (auto value = take(from); value && !values.count(to)) values[to] = *value;
+		};
+		// The borrowed logo isn't in the new default file: carried only when set to something else than its default.
+		auto moveUnlessDefault = [&](const char* from, const char* to, const char* defaultValue) {
+			if (auto value = take(from); value && !value->empty() && *value != defaultValue && !values.count(to)) values[to] = *value;
+		};
+
+		move("Station.Name", "Music.Name");
+		move("Station.MusicFolder", "Music.Folder");
+		moveUnlessDefault("Station.CustomLogo", "Music.CustomLogo", "1");
+		moveUnlessDefault("Station.TextureName", "Music.TextureName", "Logo_Softly");
+		moveUnlessDefault("Station.TexturePack", "Music.TexturePack", "Radio_Softly_TexturePack");
+
+		// Default = music | live | off and KeepLast = 1 | 0 (default 1) became one key. Default = off is taken as
+		// "leave it to the game", as it was written before KeepLast existed.
+		const auto defaultStation = take("Station.Default");
+		const auto keepLast = take("Station.KeepLast");
+		if ((defaultStation || keepLast) && !values.count("Car.Station")) {
+			const std::string d = Lower(defaultStation.value_or("music"));
+			values["Car.Station"] = d == "off" || d == "0" ? "game" : keepLast.value_or("1") != "0" ? "last" : d == "live" ? "live" : "sdradio";
+		}
+
+		const auto enabled = take("Live.Enabled");
+		move("Live.Url", "Radio.Url");
+		move("Live.App", "App.Program");
+		move("Live.AppSound", "App.Sound");
+		move("Live.PauseApp", "App.Pause");
+		move("Live.Librespot", "Spotify.Librespot");
+		move("Live.SpotifyName", "Spotify.Device");
+
+		// Any other key of the old [Station] (none known) has nowhere to go.
+		for (auto it = values.begin(); it != values.end();) {
+			if (it->first.starts_with("Station.")) {
+				it = values.erase(it);
+				old = true;
+			}
+			else {
+				++it;
+			}
+		}
+
+		// The live station was off unless Enabled = 1, and its Source defaulted to test.
+		if (old) {
+			if (enabled.value_or("0") != "1") values["Live.Source"] = "off";
+			else if (values["Live.Source"].empty()) values["Live.Source"] = "test";
+		}
+		return old;
+	}
+
+	std::vector<std::string> TemplateKeys()
+	{
+		std::vector<std::string> keys;
+		std::string section;
+		for (std::string_view raw : Lines(kDefaultIni)) {
+			Line line = Classify(raw);
+			if (!line.mSection.empty()) section = std::move(line.mSection);
+			else if (!line.mKey.empty()) keys.push_back(section + "." + line.mKey);
+		}
+		return keys;
+	}
+
+	std::string Render(const Values& values)
+	{
+		const Values defaults = Parse(kDefaultIni);
+		std::vector<std::string> out;
+		std::string section;
+		// Keys of `section` the template doesn't have, inserted after its last non-blank line.
+		auto flushExtras = [&] {
+			if (section.empty()) return;
+			size_t at = out.size();
+			while (at > 0 && out[at - 1].empty()) --at;
+			std::vector<std::string> extras;
+			const std::string prefix = section + ".";
+			for (auto it = values.lower_bound(prefix); it != values.end() && it->first.starts_with(prefix); ++it) {
+				if (!defaults.count(it->first)) {
+					const std::string key = it->first.substr(prefix.size());
+					extras.push_back(it->second.empty() ? key + " =" : key + " = " + it->second);
+				}
+			}
+			out.insert(out.begin() + static_cast<ptrdiff_t>(at), extras.begin(), extras.end());
+		};
+		for (std::string_view raw : Lines(kDefaultIni)) {
+			Line line = Classify(raw);
+			if (!line.mSection.empty()) {
+				flushExtras();
+				section = std::move(line.mSection);
+				out.emplace_back(raw);
+			}
+			else if (!line.mKey.empty()) {
+				const auto it = values.find(section + "." + line.mKey);
+				const std::string& value = it != values.end() ? it->second : line.mValue;
+				out.push_back(value.empty() ? line.mKey + " =" : line.mKey + " = " + value);
+			}
+			else {
+				out.emplace_back(raw);
+			}
+		}
+		flushExtras();
+		std::string text;
+		for (const std::string& line : out) text += line + "\n";
+		return text;
 	}
 
 	void Load(const std::wstring& dir)
 	{
 		const std::wstring path = dir + L"\\SDRadio.ini";
 
-		if (GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES) {
-			FILE* file = nullptr;
-			if (_wfopen_s(&file, path.c_str(), L"wb") == 0 && file) {
-				fwrite(kDefaultIni, 1, sizeof(kDefaultIni) - 1, file);
-				fclose(file);
-			}
-		}
-
 		std::string text;
+		bool exists = false;
 		FILE* file = nullptr;
 		if (_wfopen_s(&file, path.c_str(), L"rb") == 0 && file) {
+			exists = true;
 			char buffer[4096];
 			size_t n;
 			while ((n = fread(buffer, 1, sizeof(buffer), file)) > 0) {
@@ -176,47 +290,61 @@ namespace config
 			fclose(file);
 		}
 
-		const auto values = Parse(text);
+		Values values = Parse(text);
+		const bool migrated = Migrate(values);
+		std::string missing;
+		for (const std::string& key : TemplateKeys()) {
+			if (!values.count(key)) missing += (missing.empty() ? "" : ", ") + key;
+		}
+		if (!exists) {
+			gConfig.mIniNote = WriteFile(path, Render(values)) ? "wrote the default SDRadio.ini" : "couldn't write the default SDRadio.ini";
+		}
+		else if (migrated || !missing.empty()) {
+			// Rewritten in the current layout with every value kept; the player's own comments go, so the old file
+			// stays next to it.
+			const bool backedUp = CopyFileW(path.c_str(), (path + L".bak").c_str(), FALSE) != 0;
+			const bool written = backedUp && WriteFile(path, Render(values));
+			const std::string what = migrated ? "moved to the new layout" : "added " + missing;
+			gConfig.mIniNote = written ? "SDRadio.ini " + what + " (the old file is SDRadio.ini.bak)"
+				: "SDRadio.ini should be " + what + ", but couldn't be rewritten (read as it is)";
+		}
+
 		auto get = [&](const char* key, std::string& out) {
 			if (auto it = values.find(key); it != values.end() && !it->second.empty()) out = it->second;
 		};
-		get("Station.Name", gConfig.mStationName);
-		get("Station.TextureName", gConfig.mTextureName);
-		get("Station.TexturePack", gConfig.mTexturePack);
+		auto flag = [&](const char* key, bool& out) {
+			if (auto it = values.find(key); it != values.end() && !it->second.empty()) out = it->second != "0";
+		};
 		std::string folder;
-		get("Station.MusicFolder", folder);
-		if (auto it = values.find("Station.CustomLogo"); it != values.end()) {
-			gConfig.mCustomLogo = it->second != "0";
-		}
-		if (auto it = values.find("Station.Default"); it != values.end()) {
-			std::string value = it->second;
-			for (char& c : value) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
-			gConfig.mDefaultStation = value == "live" || value == "off" || value == "0" ? (value == "0" ? "off" : value) : "music";
-		}
-		if (auto it = values.find("Station.KeepLast"); it != values.end()) {
-			gConfig.mKeepLast = it->second != "0";
-		}
-		if (auto it = values.find("Live.Enabled"); it != values.end()) {
-			gConfig.mLive = it->second == "1";
-		}
+		get("Music.Folder", folder);
+		get("Music.Name", gConfig.mStationName);
+		flag("Music.CustomLogo", gConfig.mCustomLogo);
+		get("Music.TextureName", gConfig.mTextureName);
+		get("Music.TexturePack", gConfig.mTexturePack);
+
+		std::string car;
+		get("Car.Station", car);
+		car = Lower(car);
+		gConfig.mCarStation = car == "sdradio" || car == "live" || car == "game" ? car : "last";
+
+		std::string source;
+		get("Live.Source", source);
+		source = Lower(source);
+		gConfig.mLive = !source.empty() && source != "off" && source != "0";
+		if (gConfig.mLive) gConfig.mLiveSource = source;
 		get("Live.Name", gConfig.mLiveName);
-		get("Live.Source", gConfig.mLiveSource);
-		get("Live.Url", gConfig.mLiveUrl);
+		get("Radio.Url", gConfig.mLiveUrl);
 		std::string app;
-		get("Live.App", app);
+		get("App.Program", app);
 		gConfig.mLiveApp = Widen(app);
-		if (auto it = values.find("Live.PauseApp"); it != values.end()) {
-			gConfig.mLivePauseApp = it->second != "0";
-		}
-		get("Live.AppSound", gConfig.mLiveAppSound);
+		get("App.Sound", gConfig.mLiveAppSound);
+		flag("App.Pause", gConfig.mLivePauseApp);
 		std::string librespot;
-		get("Live.Librespot", librespot);
+		get("Spotify.Librespot", librespot);
 		gConfig.mLibrespot = librespot.empty() ? dir + L"\\librespot.exe" : Widen(librespot);
-		get("Live.SpotifyName", gConfig.mSpotifyName);
+		get("Spotify.Device", gConfig.mSpotifyName);
 		gConfig.mSpotifyCache = dir + L"\\SDRadio-spotify";
-		if (auto it = values.find("Debug.Logging"); it != values.end()) {
-			gConfig.mLogging = it->second != "0";
-		}
+		flag("Debug.Logging", gConfig.mLogging);
 
 		gConfig.mMusicFolder = Widen(folder);
 		if (gConfig.mMusicFolder.empty()) {

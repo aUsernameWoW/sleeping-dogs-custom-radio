@@ -1,6 +1,8 @@
 #pragma once
 
+#include <map>
 #include <string>
+#include <vector>
 
 struct Config
 {
@@ -18,14 +20,12 @@ struct Config
 	std::string mTextureName = "Logo_Softly";
 	std::string mTexturePack = "Radio_Softly_TexturePack";
 
-	// Which of our stations replaces a car model's own station when the player gets into another car: "music",
-	// "live" or "off" (hooks.cc, DefaultStation).
-	std::string mDefaultStation = "music";
-	// Getting into another car keeps the station the player last tuned to (any station but HKPD) instead of the
-	// car's own; mDefaultStation then only decides until a station has been tuned to.
-	bool mKeepLast = true;
+	// `[Car] Station`: what the radio plays when the player gets into another car (hooks.cc): "last" (the station
+	// last tuned to, HKPD aside; SDRadio's first station until there is one), "sdradio" (our first music station,
+	// else the live one), "live" (the live one, else the first music station) or "game" (the car's own).
+	std::string mCarStation = "last";
 
-	// A second station playing a live source (live.hh); off by default.
+	// A second station playing a live source (live.hh); `[Live] Source = off` (the default) turns it off.
 	bool mLive = false;
 	std::string mLiveName = "SDRADIO LIVE";
 	// Which source: "test" (a beep each second), "radio" (internet radio at mLiveUrl, netradio.hh) or "app".
@@ -46,13 +46,31 @@ struct Config
 
 	// Write SDRadio.log next to the .asi.
 	bool mLogging = true;
+
+	// What Load did to the file, for the log (it's read before the log opens): empty, or e.g. "moved to the
+	// new layout (the old file is SDRadio.ini.bak)".
+	std::string mIniNote;
 };
 
 extern Config gConfig;
 
 namespace config
 {
-	// Loads <dir>\SDRadio.ini (UTF-8), writing a default one if it doesn't exist, and resolves the music
-	// folder against `dir`.
+	// "Section.Key" -> value (UTF-8, as written).
+	using Values = std::map<std::string, std::string>;
+
+	Values Parse(const std::string& text);
+	// Moves the keys of the layout before 2026-11-24 ([Station], [Live] with every source's keys) to the current
+	// one; true if there were any.
+	bool Migrate(Values& values);
+	// The default ini with `values` in place of its defaults; keys it doesn't have go at the end of their
+	// section if it has that section, else they're dropped.
+	std::string Render(const Values& values);
+	// The default ini's "Section.Key"s, in order.
+	std::vector<std::string> TemplateKeys();
+
+	// Loads <dir>\SDRadio.ini (UTF-8): writes the default if there's none, rewrites it in the current layout
+	// (keeping every value, the old file as SDRadio.ini.bak) when it has old keys or lacks current ones, and
+	// resolves the music folder against `dir`.
 	void Load(const std::wstring& dir);
 }
