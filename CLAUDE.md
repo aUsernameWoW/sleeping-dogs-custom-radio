@@ -520,6 +520,13 @@ while they slept, so only tested with a stand-in.
   live; or live, else music). The restore equals the current station, HKPD is 11, and mission/script stations
   come from outside Init, so all of those stay. Alternatives offered and not taken: every car entry; once per
   session. Logged as `radio: default station: X instead of the car's own station Y`. Not yet in game.
+- **`[Station] KeepLast`** (2026-11-24, default 1; a Nexus player asked to always get the station last heard,
+  which `Default = music` only half did; the user wanted it as a switch): the model's pick becomes the station the
+  player's radio was last tuned to (`gLastStation`, set by `NoteTuned` after Next/Prev/SetStation, any station but
+  HKPD 11), `DefaultStation()` only while there is none. Only the player's radio counts (`gPlayerRadio`: the radio
+  of a SetStation inside Init or of the station buttons), in case other radios go through SetStation. A car without
+  a preferred station still leaves whatever plays (after a police car, possibly HKPD: the game's behavior). Logged
+  as `radio: last station: ...`; the setting at startup as `hook: getting into another car: ...`. Not yet in game.
 
 ## Several stations, one per folder (2026-11-03; not yet in game)
 

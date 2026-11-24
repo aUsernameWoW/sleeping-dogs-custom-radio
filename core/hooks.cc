@@ -101,6 +101,8 @@ namespace hooks
 		// HKPD, the restore, a mission car's RadioStation property (VehicleInteractTask::Begin calls SetStation
 		// outside Init) and scripts' set_radio_station stay the game's; so does a car without a preferred station
 		// (no SetStation: the player's own last station plays on).
+		// `[Station] KeepLast` (default on, 2026-11-24, asked for on Nexus): the model's pick becomes the station the
+		// player's radio was last tuned to instead (HKPD never counts), `Default` only before there is one.
 		constexpr char kSigVehicleAudioInit[] = "40 55 56 57 48 83 EC 40 48 C7 44 24 30 FE FF FF FF 48 89 5C 24 68 48 8B EA";
 		constexpr uint32_t kCopScannerStation = 11;
 
@@ -166,6 +168,11 @@ namespace hooks
 		size_t gCurStationOffset = 0; // RadioFullyControlled::m_curStation, from the getter's first instruction
 		std::atomic<uint32_t> gLiveStationId{ 0 }; // 0: no live station
 		std::atomic<uint32_t> gMusicStationId{ 0 }; // 0: no music station
+		// `[Station] KeepLast`: the station the radio was last tuned to, HKPD aside (NoteTuned); 0 before any.
+		std::atomic<uint32_t> gLastStation{ 0 };
+		// The player's radio (RadioFullyControlled::sm_playerRadio), as seen by SetStation inside VehicleAudio-
+		// Component::Init and by the station buttons (Next/PrevStation), so other radios can't set gLastStation.
+		std::atomic<const void*> gPlayerRadio{ nullptr };
 		StepStationFn gNextStation = nullptr;
 		StepStationFn gPrevStation = nullptr;
 		SetStationFn gSetStation = nullptr;
@@ -452,6 +459,11 @@ namespace hooks
 		{
 			const uint32_t live = gLiveStationId.load();
 			const auto* station = *reinterpret_cast<const uint8_t* const*>(static_cast<const uint8_t*>(radio) + kRadioCurStationOffset);
+			if (station && radio == gPlayerRadio.load()) {
+				// HKPD is only selectable in police cars; keeping it in the next civilian car would be wrong.
+				const uint32_t id = *reinterpret_cast<const uint32_t*>(station + kStationIdOffset);
+				if (id != kCopScannerStation) gLastStation = id;
+			}
 			if (live && station) {
 				live::SetLiveTuned(*reinterpret_cast<const uint32_t*>(station + kStationIdOffset) == live);
 			}
@@ -461,6 +473,7 @@ namespace hooks
 		{
 			const std::string from = DescribeStation(radio);
 			const uint8_t flags = RadioFlags(radio);
+			gPlayerRadio = radio;
 			original(radio, displayStationId);
 			NoteTuned(radio);
 			const std::string to = DescribeStation(radio);
@@ -515,11 +528,13 @@ namespace hooks
 		{
 			const std::string from = DescribeStation(radio);
 			if (gInVehicleAudioInit) {
+				gPlayerRadio = radio;
 				const auto* station = *reinterpret_cast<const uint8_t* const*>(static_cast<const uint8_t*>(radio) + kRadioCurStationOffset);
 				const uint32_t current = station ? *reinterpret_cast<const uint32_t*>(station + kStationIdOffset) : 0;
-				const uint32_t ours = DefaultStation();
+				const uint32_t last = gConfig.mKeepLast ? gLastStation.load() : 0;
+				const uint32_t ours = last ? last : DefaultStation();
 				if (ours && index != kCopScannerStation && index != current && index != ours) {
-					LOG("radio: default station: %u instead of the car's own station %u", ours, index);
+					LOG("radio: %s station: %u instead of the car's own station %u", last ? "last" : "default", ours, index);
 					index = ours;
 				}
 			}
@@ -722,10 +737,14 @@ namespace hooks
 			Hook("NextStation", nextStation, &NextStationHook, gNextStation) & Hook("PrevStation", prevStation, &PrevStationHook, gPrevStation) &
 			Hook("SetStation", setStation, &SetStationHook, gSetStation);
 		LOG("hook: station hooks ready%s", diagnostics ? "" : " (diagnostic hooks missing)");
-		if (gConfig.mDefaultStation != "off") {
+		if (gConfig.mDefaultStation != "off" || gConfig.mKeepLast) {
 			uint8_t* vehicleAudioInit = scan::FindUnique("UFG::VehicleAudioComponent::Init", kSigVehicleAudioInit);
 			if (!gSetStation || !Hook("VehicleAudioComponent::Init", vehicleAudioInit, &VehicleAudioInitHook, gVehicleAudioInit)) {
-				LOG("hook: SDRadio can't be the default station (the cars keep their own)");
+				LOG("hook: SDRadio can't be the default station or keep the last one (the cars keep their own)");
+			}
+			else {
+				LOG("hook: getting into another car: %s, first car of the session: Default = %s", gConfig.mKeepLast ? "last station (KeepLast = 1)" : "Default (KeepLast = 0)",
+					gConfig.mDefaultStation.c_str());
 			}
 		}
 		if (gConfig.mLive && !InstallSongTitle()) {

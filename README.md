@@ -104,6 +104,10 @@ M4A/AAC、WMA 这类格式靠 Windows 自带的解码器，个别文件可能不
 
 在 `plugins\SDRadio.ini` 的 `[Station]` 里把 `Default` 改成 `off`（改成 `live` 则默认放直播电台），保存后重启游戏。旧版本生成的 ini 里没有这一行，没有时按 `music` 处理，自己加上 `Default = off` 就行。`music` 放的是 SDRadio 排在最前面的音乐电台。
 
+**换车后接着放上次听的电台**
+
+默认就是这样（`[Station]` 里的 `KeepLast = 1`）：换上另一辆车时继续放你上次听的电台，游戏自带的台也算，不用每次切回来。`Default` 只决定这一局还没听过任何台时放什么。想让每辆车都按 `Default` 来，就把 `KeepLast` 改成 `0`。警车/救护车里的 HKPD 不算「上次的电台」。旧版本生成的 ini 里没有这一行，没有时按 `1` 处理。
+
 **想换成自己画的电台图标**
 
 1. 画一张比例 2:1 的图（推荐 512×256），背景透明，存成 PNG；
@@ -302,6 +306,14 @@ explained in the file. A name can be up to 63 bytes.
 In `plugins\SDRadio.ini`, under `[Station]`, set `Default` to `off` (or `live` for the live station), save and
 restart the game. An ini from an older version lacks the line and counts as `music`: add `Default = off`.
 `music` is SDRadio's first music station.
+
+**Keeping the station you last listened to**
+
+That's the default (`KeepLast = 1` under `[Station]`): getting into another car, the radio stays on the station you
+last listened to, the game's own stations included, so you don't have to switch back each time. `Default` only
+decides before you've listened to any station in a session. Set `KeepLast = 0` to have every car follow `Default`.
+A police or emergency car's HKPD doesn't count as your last station. An ini from an older version lacks the line
+and counts as `1`.
 
 **Using your own logo**
 

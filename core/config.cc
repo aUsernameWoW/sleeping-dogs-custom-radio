@@ -54,6 +54,12 @@ namespace config
 			"; car's HKPD, the station restored in the car you just left, and stations set by missions or scripts stay.\n"
 			"Default = music\n"
 			"\n"
+			"; 1 = 换车后继续放你上次听的电台（游戏自带的台也算），上面的 Default 只管这一局还没听过任何台的时候；0 = 每换一辆车都按 Default。\n"
+			"; 警车/救护车的 HKPD 不算「上次的电台」。\n"
+			"; 1 = getting into another car keeps the station you last listened to (the game's own included); Default then\n"
+			"; only decides before you've tuned to any. 0 = Default for every car. A police or emergency car's HKPD doesn't count.\n"
+			"KeepLast = 1\n"
+			"\n"
 			"[Live]\n"
 			"; 实验功能：再加一个「直播」电台，播放实时音源（以后是网络电台等）。1 = 开启。\n"
 			"; Experimental: a second, live station playing a real-time source (internet radio and more later). 1 = on.\n"
@@ -186,6 +192,9 @@ namespace config
 			std::string value = it->second;
 			for (char& c : value) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
 			gConfig.mDefaultStation = value == "live" || value == "off" || value == "0" ? (value == "0" ? "off" : value) : "music";
+		}
+		if (auto it = values.find("Station.KeepLast"); it != values.end()) {
+			gConfig.mKeepLast = it->second != "0";
 		}
 		if (auto it = values.find("Live.Enabled"); it != values.end()) {
 			gConfig.mLive = it->second == "1";
