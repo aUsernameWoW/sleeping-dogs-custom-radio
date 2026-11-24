@@ -58,6 +58,18 @@ namespace config
 			"Device = SDRadio\n"
 			"Librespot =\n"
 			"\n"
+			"[External]\n"
+			"; 实验功能（gpl/external-audio 分支），只写日志：系统媒体会话，以及抓到的程序（或播放设备）的声音电平。1 = 开启。\n"
+			"; Experimental (gpl/external-audio branch), log only: the media sessions and the level captured from a program\n"
+			"; (or a playback device). 1 = on.\n"
+			"Enabled = 0\n"
+			"; 媒体会话：App ID 的一部分（如 spotify），留空 = 当前的 / media session: part of the app ID, empty = the current one\n"
+			"MediaSession =\n"
+			"; 程序（如 Spotify.exe），留空 = 抓下面的播放设备 / program (e.g. Spotify.exe), empty = the playback device below\n"
+			"CaptureProcess =\n"
+			"; 播放设备名称的一部分，留空 = 默认设备 / part of a playback device's name, empty = the default device\n"
+			"CaptureDevice =\n"
+			"\n"
 			"[Debug]\n"
 			"; 在 .asi 旁边写 SDRadio.log / write SDRadio.log next to the .asi\n"
 			"Logging = 1\n";
@@ -344,6 +356,14 @@ namespace config
 		gConfig.mLibrespot = librespot.empty() ? dir + L"\\librespot.exe" : Widen(librespot);
 		get("Spotify.Device", gConfig.mSpotifyName);
 		gConfig.mSpotifyCache = dir + L"\\SDRadio-spotify";
+		if (auto it = values.find("External.Enabled"); it != values.end()) {
+			gConfig.mExternal = it->second == "1";
+		}
+		get("External.MediaSession", gConfig.mMediaSession);
+		get("External.CaptureDevice", gConfig.mCaptureDevice);
+		std::string process;
+		get("External.CaptureProcess", process);
+		gConfig.mCaptureProcess = Widen(process);
 		flag("Debug.Logging", gConfig.mLogging);
 
 		gConfig.mMusicFolder = Widen(folder);
